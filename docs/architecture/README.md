@@ -9,6 +9,7 @@
 5. **Sensitive fields never enter context** — password/payment inputs are filtered in JavaScript and redacted again in Kotlin.
 6. **Projection is evidence, not decoration** — every overlay carries a cache id, anchor fingerprint, relevance, and rendering mode.
 7. **Web limitations are explicit** — same-origin/CSP/iframe restrictions are surfaced instead of bypassed.
+8. **Protocol is not authority** — MCP transports can discover/read/propose; capability policy, dispatcher state, and HITL still decide execution.
 
 ## Runtime pipeline
 
@@ -20,7 +21,7 @@ sequenceDiagram
     participant P as Privacy Guard
     participant C as L1 Cache
     participant R as Projection Engine
-    participant M as MCP
+    participant M as MCP Gateway
     participant D as Dispatcher
 
     W->>J: page loaded / DOM changed / selection changed
@@ -43,8 +44,15 @@ sequenceDiagram
 | L2 global cache | OpenClaw adapter | not connected in MVP |
 | Capability policy | `CapabilityRegistry` | code/config, deny-by-default |
 | Human/agent arbitration | `LocalDispatcher` | memory + audit event |
-| MCP features | `BrowserMcpServerFactory` | generated from runtime state |
+| MCP discovery/resources/tools | `BrowserMcpGateway` | generated from sanitized runtime state |
+| MCP peer identity and transport | platform/edge adapter | not connected in MVP |
 | Audit evidence | runtime audit flow | memory MVP; append-only store next |
+
+## MCP boundary
+
+The shared gateway supports stateless discovery and the legacy initialization flow without starting a socket or HTTP server. This keeps the protocol contract testable on every KMP target. A production transport must add authenticated pairing, protocol-version/header negotiation, origin policy, rate limiting, cancellation, replay protection, and lifecycle shutdown.
+
+The official Kotlin SDK remains an optional edge adapter where its published target variants fit. It is not forced into `commonMain` when Android/iOS variants are unavailable. See [ADR-0003](ADR-0003-mcp-platform-boundary.md).
 
 ## Module boundaries
 
@@ -53,4 +61,4 @@ sequenceDiagram
 - `capability/` owns authorization decisions.
 - `dispatcher/` owns temporal authority and human preemption.
 - `ui/` renders state and obtains explicit confirmation.
-- Platform source sets own lifecycle, store packaging, and native API bridges.
+- Platform source sets own lifecycle, store packaging, native API bridges, and authenticated MCP transports.

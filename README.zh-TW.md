@@ -18,8 +18,8 @@
 | Projection | DOM Anchor Matching、Overlay 導航線/氣泡、Context Rail Fallback |
 | Local Dispatcher | 人類輸入優先、狀態機、Medium/High Risk 必須確認 |
 | Capability Registry | Deny-by-default、權限檢查、Risk Ceiling |
-| MCP | Kotlin MCP Server Factory，提供 `browser://current-page` 與受控 Browser Tools |
-| Evidence | Audit Trail 與 Cache/Dispatcher/Policy/Privacy/Projection 共通測試 |
+| MCP | 跨平台 JSON-RPC Gateway，提供 `browser://current-page` 與受控 Proposal Tools |
+| Evidence | Audit Trail 與 Cache/Dispatcher/Policy/Privacy/Projection/MCP 共通測試 |
 
 ## 資料流
 
@@ -28,11 +28,11 @@ flowchart LR
     WV[平台 WebView] -->|JS Bridge PageContext| OBS[Observer]
     OBS --> PRIV[Privacy Guard]
     PRIV --> L1[(KMP L1 Semantic Cache)]
-    L2[(OpenClaw 私有 L2)] -. 後續串流 .-> PROJ[Projection Engine]
+    L2[(OpenClaw 私有 L2)] -. 後續認證串流 .-> PROJ[Projection Engine]
     L1 --> PROJ
     PRIV --> PROJ
     PROJ --> UI[Compose Overlay + Context Rail]
-    PRIV --> MCP[MCP Resource / Tools]
+    PRIV --> MCP[MCP JSON-RPC Gateway]
     MCP --> CAP[Capability Registry]
     CAP --> DISP[Local Dispatcher]
     DISP -->|HITL 核准| WV
@@ -50,6 +50,12 @@ flowchart LR
 ```
 
 iOS 請在 macOS 上開啟 `iosApp/iosApp.xcodeproj`。
+
+## MCP 相容性邊界
+
+`BrowserMcpGateway` 位於 `commonMain`，支援 Stateless Discovery 與 Legacy Initialize，且只暴露已清洗的 Resource 與 typed action proposal。它不會自行啟動網路 Listener；Android、iOS、Web、Desktop Transport 在接收遠端請求前，仍必須加入 Peer Authentication、Origin Allowlist、Rate Limit、Protocol Headers 與 App Lifecycle Binding。
+
+官方 Kotlin SDK 可放在其已發布 Target Variant 相符的 Edge/Platform Module；共用 Mobile Core 不會假裝不存在的 Android/iOS Artifact Variant 可以直接解析。詳細決策請看 [ADR-0003](docs/architecture/ADR-0003-mcp-platform-boundary.md)。
 
 ## 平台硬限制
 

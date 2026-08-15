@@ -18,8 +18,8 @@ A production-oriented Kotlin Multiplatform browser shell for Android, iOS, Web (
 | Projection | DOM-anchor matching, overlay paths/bubbles, fallback context rail |
 | Local dispatcher | Human-input preemption, proposal state machine, explicit confirmation for medium/high-risk actions |
 | Capability registry | Deny-by-default capability registration, enablement, permission and risk ceilings |
-| MCP | Native Kotlin MCP server factory exposing `browser://current-page` and bounded browser tools |
-| Evidence | Audit trail plus common tests for cache, dispatcher, policy, privacy, and projection |
+| MCP | Transport-independent JSON-RPC gateway exposing `browser://current-page` and bounded proposal tools |
+| Evidence | Audit trail plus common tests for cache, dispatcher, policy, privacy, projection, and MCP behavior |
 
 ## Architecture
 
@@ -28,11 +28,11 @@ flowchart LR
     WEB[Platform WebView] -->|JS bridge: PageContext| OBS[Observer]
     OBS --> PRIV[Privacy Guard]
     PRIV --> L1[(KMP L1 Semantic Cache)]
-    L2[(OpenClaw / private L2)] -. future stream .-> MATCH[Projection Engine]
+    L2[(OpenClaw / private L2)] -. future authenticated stream .-> MATCH[Projection Engine]
     L1 --> MATCH
     PRIV --> MATCH
     MATCH --> UI[Compose Overlay + Context Rail]
-    PRIV --> MCP[MCP Resource / Tools]
+    PRIV --> MCP[MCP JSON-RPC Gateway]
     MCP --> POLICY[Capability Registry]
     POLICY --> DISP[Local Dispatcher]
     DISP -->|HITL approval| WEB
@@ -62,7 +62,7 @@ composeApp/
     capability/      # capability registry and policy decisions
     dispatcher/      # deterministic human/agent arbitration
     domain/          # serialized contracts shared across targets
-    mcp/             # MCP server resources and tools
+    mcp/             # portable MCP JSON-RPC discovery/resource/tool gateway
     privacy/         # redaction and sensitive-element filtering
     projection/      # cache-to-DOM anchor projection
     runtime/         # orchestration and audit state
@@ -102,6 +102,12 @@ Prerequisites: JDK 17, Android SDK 36 for Android, and Xcode on macOS for iOS.
 ```
 
 The repository uses a checksum-pinned Gradle bootstrap script rather than committing a wrapper JAR. CI installs the same Gradle version through `gradle/actions/setup-gradle`.
+
+## MCP compatibility boundary
+
+`BrowserMcpGateway` lives in `commonMain`, supports stateless discovery plus the legacy initialization path, and exposes only sanitized resources and typed action proposals. It intentionally does not start a network listener. Android/iOS/Web/Desktop transports must add peer authentication, origin allowlists, rate limits, protocol headers, and lifecycle binding before accepting remote requests.
+
+The official Kotlin SDK can be added in platform/edge modules where its published target variants match the deployment target. The shared mobile core does not pretend an unavailable artifact variant exists. See [ADR-0003](docs/architecture/ADR-0003-mcp-platform-boundary.md).
 
 ## Platform constraints
 
