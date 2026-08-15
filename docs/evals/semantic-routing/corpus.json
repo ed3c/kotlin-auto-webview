@@ -1,0 +1,53 @@
+{
+  "schema": "kotlin-auto-webview/semantic-routing-corpus/v1",
+  "description": "Non-sensitive deterministic fixtures for the lexical routing baseline. These records are synthetic and contain no user browsing data.",
+  "candidates": [
+    {
+      "id": "kmp-privacy",
+      "content": "Kotlin Multiplatform WebView privacy redaction sensitive input bridge",
+      "relevant_to": ["q-kmp-privacy"]
+    },
+    {
+      "id": "openclaw-stream",
+      "content": "OpenClaw ordered stream replay expiry backpressure reconnect cancellation",
+      "relevant_to": ["q-openclaw-stream"]
+    },
+    {
+      "id": "ios-release",
+      "content": "TestFlight signed archive Organizer validation App Attest physical iPhone",
+      "relevant_to": ["q-ios-release"]
+    },
+    {
+      "id": "cooking",
+      "content": "Tomato basil recipe and kitchen preparation",
+      "relevant_to": []
+    }
+  ],
+  "queries": [
+    {
+      "id": "q-kmp-privacy",
+      "query": "kotlin webview privacy redaction",
+      "expected_top_k": ["kmp-privacy"],
+      "k": 1
+    },
+    {
+      "id": "q-openclaw-stream",
+      "query": "openclaw replay backpressure reconnect",
+      "expected_top_k": ["openclaw-stream"],
+      "k": 1
+    },
+    {
+      "id": "q-ios-release",
+      "query": "testflight signed archive app attest",
+      "expected_top_k": ["ios-release"],
+      "k": 1
+    }
+  ],
+  "baseline_acceptance": {
+    "top_1_precision": 1.0,
+    "top_1_recall": 1.0,
+    "tie_breaker": "candidate_id_ascending",
+    "physical_latency": "NOT_EXERCISED",
+    "physical_memory": "NOT_EXERCISED"
+  }
+}
