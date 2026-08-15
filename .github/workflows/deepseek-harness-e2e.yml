@@ -10,6 +10,7 @@ on:
       - 'docs/architecture/ADR-0014-deepseek-harness-process-e2e.md'
       - 'docs/architecture/ADR-0015-deepseek-harness-startup-recovery.md'
       - 'docs/architecture/ADR-0016-deepseek-established-session-recovery-probe.md'
+      - 'docs/architecture/ADR-0017-deepseek-stateless-call-recovery.md'
   workflow_dispatch:
 
 permissions:
@@ -88,9 +89,13 @@ jobs:
           cp \
             integrations/deepseek-harness/e2e/deepseek-harness-established-session-recovery.external.e2e.ts \
             "$destination/kotlin-auto-webview-established-session-recovery.external.e2e.ts"
+          cp \
+            integrations/deepseek-harness/e2e/deepseek-harness-stateless-call-recovery.external.e2e.ts \
+            "$destination/kotlin-auto-webview-stateless-call-recovery.external.e2e.ts"
           test -s "$destination/kotlin-auto-webview.external.e2e.ts"
           test -s "$destination/kotlin-auto-webview-startup-recovery.external.e2e.ts"
           test -s "$destination/kotlin-auto-webview-established-session-recovery.external.e2e.ts"
+          test -s "$destination/kotlin-auto-webview-stateless-call-recovery.external.e2e.ts"
 
       - name: Create masked synthetic credential
         shell: bash
@@ -105,7 +110,7 @@ jobs:
           echo "::add-mask::$token"
           echo "DSH_E2E_TOKEN=$token" >> "$GITHUB_ENV"
 
-      - name: Exercise pinned Cordis MCP client and recovery subjects
+      - name: Exercise admitted pinned Cordis MCP subjects
         shell: bash
         run: |
           set -euo pipefail
@@ -114,4 +119,6 @@ jobs:
           scripts/ci/run-gradle-with-annotations.sh \
             --no-daemon \
             :composeApp:desktopTest \
-            --tests 'dev.ed3c.autowebview.mcp.http.DeepSeekHarness*E2ETest'
+            --tests 'dev.ed3c.autowebview.mcp.http.DeepSeekHarnessCordisE2ETest' \
+            --tests 'dev.ed3c.autowebview.mcp.http.DeepSeekHarnessStartupRecoveryE2ETest' \
+            --tests 'dev.ed3c.autowebview.mcp.http.DeepSeekHarnessStatelessCallRecoveryE2ETest'

@@ -34,23 +34,46 @@ first attempt fails with no KMP tools
   -> sanitized read and proposal-only action
 ```
 
-### Established-session listener replacement — diagnostic PR
+### Established-session supervisor reconnect — failed diagnostic PR #40
 
-[`deepseek-harness-established-session-recovery.external.e2e.ts`](deepseek-harness-established-session-recovery.external.e2e.ts) is a falsifiable probe:
+[`deepseek-harness-established-session-recovery.external.e2e.ts`](deepseek-harness-established-session-recovery.external.e2e.ts) required:
 
 ```text
 listener generation 1
   -> real connection and tool registration
-  -> generation-1 context
   -> listener closes and port releases
-  -> at least one tool call fails during outage
+  -> real tool call fails during outage
   -> listener generation 2 starts on same authority
-  -> require upstream reconnected-and-re-synced signal
-  -> require tool-registration generation replacement
-  -> generation-2 context and proposal-only navigation
+  -> upstream reconnected-and-re-synced signal
+  -> tool-registration generation replacement
 ```
 
-A tool call that merely begins succeeding after the endpoint returns is not enough. The probe requires both the upstream supervisor recovery signal and a replaced registration generation.
+The clean single-attempt diagnostic outcome is:
+
+```text
+FAIL_TRANSPORT_CLOSE_NOT_OBSERVED
+```
+
+The first session, listener shutdown, real outage call failure, and replacement-listener start succeeded. The required end-to-end supervisor re-synchronization and registration-replacement combination did not appear within the bounded deadline. The failed oracle remains in the repository and is excluded from positive evidence workflows.
+
+### Stateless same-registration call recovery — Issue #41
+
+[`deepseek-harness-stateless-call-recovery.external.e2e.ts`](deepseek-harness-stateless-call-recovery.external.e2e.ts) tests the narrower behavior suggested by stateless Streamable HTTP:
+
+```text
+one current ctx.tools registration
+  -> generation-one sanitized context
+  -> listener disappears
+  -> at least one call through the existing registration fails
+  -> replacement listener starts on the same authority
+  -> a later call through the same registration reaches generation-two context
+  -> registration identity and count remain unchanged
+  -> navigation remains proposal-only
+```
+
+This behavior is named **stateless call recovery**. It is not upstream supervisor reconnect, tool-generation replacement, or Cordis HMR.
+
+The dedicated positive workflow runs immediate-connect, startup-recovery, and stateless-call-recovery subjects. It deliberately excludes the failed supervisor-reconnect diagnostic; the normal KMP workflow still compiles every test class.
 
 ## Independent authority oracle
 
@@ -80,9 +103,11 @@ The tests never invoke a model provider. They use synthetic page fixtures, synth
 
 ```text
 immediate-connect PASS != startup-recovery PASS
-startup-recovery PASS != established-session recovery PASS
-established-session recovery PASS != Cordis HMR
-reconnect PASS != arbitrary remote proxy or production network PASS
+startup-recovery PASS != established-session supervisor reconnect PASS
+failed supervisor reconnect != failed stateless call recovery
+stateless call recovery PASS != supervisor reconnect or generation replacement
+any recovery PASS != Cordis HMR
+local loopback PASS != arbitrary proxy or production network PASS
 ```
 
 ## Stable diagnostic outcomes
@@ -92,7 +117,7 @@ PASS
   real transport loss caused bounded supervisor reconnect and generation replacement
 
 FAIL_TRANSPORT_CLOSE_NOT_OBSERVED
-  outage/recovery occurred without the required upstream onclose/re-sync evidence
+  outage occurred without the required upstream onclose/re-sync evidence
 
 FAIL_RECONNECT_EXHAUSTED
   supervisor entered reconnect but did not recover within the bounded subject
