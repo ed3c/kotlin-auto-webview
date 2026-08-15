@@ -1,0 +1,105 @@
+name: DeepSeek Harness E2E
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/deepseek-harness-e2e.yml'
+      - 'composeApp/src/desktopMain/kotlin/dev/ed3c/autowebview/mcp/http/**'
+      - 'composeApp/src/desktopTest/kotlin/dev/ed3c/autowebview/mcp/http/DeepSeekHarnessCordisE2ETest.kt'
+      - 'integrations/deepseek-harness/e2e/**'
+      - 'docs/architecture/ADR-0014-deepseek-harness-process-e2e.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  cordis-mcp-e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      DSH_E2E_COMMIT: 47f943859bef60e4160492346772ded9b24f765a
+      DSH_E2E_ROOT: ${{ github.workspace }}/.e2e/deepseek-harness
+      DSH_E2E_MAX_WORKERS: '1'
+      CI: 'true'
+    steps:
+      - name: Check out kotlin-auto-webview
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 17
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Node 22.19.0
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '22.19.0'
+
+      - name: Set up Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Check out pinned DeepSeek Harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: deepseek-ai/deepseek-harness
+          ref: 47f943859bef60e4160492346772ded9b24f765a
+          path: .e2e/deepseek-harness
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify upstream subject and toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git -C "$DSH_E2E_ROOT" rev-parse HEAD)"
+          test "$actual" = "$DSH_E2E_COMMIT"
+          corepack enable
+          corepack prepare pnpm@11.7.0 --activate
+          test "$(pnpm --version)" = '11.7.0'
+          test "$(node --version)" = 'v22.19.0'
+
+      - name: Install pinned upstream workspace without lifecycle scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          PNPM_IGNORE_SCRIPTS=true pnpm --dir "$DSH_E2E_ROOT" install \
+            --frozen-lockfile \
+            --ignore-scripts
+
+      - name: Stage repository-owned external E2E specification
+        shell: bash
+        run: |
+          set -euo pipefail
+          destination="$DSH_E2E_ROOT/packages/mcp/mcp-client/tests/kotlin-auto-webview.external.e2e.ts"
+          cp integrations/deepseek-harness/e2e/deepseek-harness-cordis.e2e.ts "$destination"
+          test -s "$destination"
+
+      - name: Create masked synthetic credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          token="$(python3 - <<'PY'
+          import secrets
+          print(secrets.token_urlsafe(48))
+          PY
+          )"
+          test "${#token}" -ge 32
+          echo "::add-mask::$token"
+          echo "DSH_E2E_TOKEN=$token" >> "$GITHUB_ENV"
+
+      - name: Exercise pinned Cordis MCP client against the Desktop listener
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$DSH_E2E_ROOT"
+          test -n "$DSH_E2E_TOKEN"
+          scripts/ci/run-gradle-with-annotations.sh \
+            --no-daemon \
+            :composeApp:desktopTest \
+            --tests 'dev.ed3c.autowebview.mcp.http.DeepSeekHarnessCordisE2ETest'
