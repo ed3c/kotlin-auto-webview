@@ -100,6 +100,22 @@ class OpenClawStreamContractTest {
         assertTrue(session.reconnect(peer(expiresAt = 200), 111))
     }
 
+    @Test
+    fun reconnectDelayUsesBoundedExponentialBackoffAndJitter() {
+        val policy = ReconnectPolicy(
+            initialDelayMs = 100,
+            maximumDelayMs = 1_000,
+            multiplier = 2,
+            jitterPermille = 200,
+            maximumAttempts = 6,
+        )
+
+        assertEquals(100, policy.delayMs(attempt = 0, jitterSamplePermille = 0))
+        assertEquals(180, policy.delayMs(attempt = 1, jitterSamplePermille = -500))
+        assertEquals(440, policy.delayMs(attempt = 2, jitterSamplePermille = 500))
+        assertEquals(1_000, policy.delayMs(attempt = 5, jitterSamplePermille = 1_000))
+    }
+
     private fun peer(
         origin: String = "openclaw.local",
         expiresAt: Long = 1_000,
