@@ -1,0 +1,26 @@
+# Static repository policy for Git Town v24.0.0.
+# This file does not prove that an executable is installed or admitted.
+# Read docs/git/GIT_TOWN_ADMISSION.md before running any Git Town command.
+
+interactive = false
+
+[branches]
+main = "main"
+
+[create]
+new-branch-type = "feature"
+share-new-branches = "no"
+stash = false
+
+[sync]
+auto-sync = false
+detached = false
+push-branches = false
+push-hook = false
+tags = false
+upstream = false
+
+[sync-strategy]
+feature-branches = "rebase"
+prototype-branches = "rebase"
+perennial-branches = "ff-only"

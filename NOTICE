@@ -1,0 +1,20 @@
+Kotlin Auto WebView
+Copyright 2026 ed3c
+
+This product includes or depends on software distributed under separate licenses, including Kotlin,
+Compose Multiplatform, compose-webview-multiplatform, kotlinx libraries, AndroidX, WebKit platform
+APIs, Chromium/CEF components, and Gradle.
+
+The runtime foundation also declares these exact direct dependencies:
+
+- SQLDelight 2.3.2, copyright its respective contributors, licensed under Apache License 2.0.
+- Ktor 3.5.1, copyright JetBrains s.r.o. and its contributors, licensed under Apache License 2.0.
+
+The repository implements a transport-independent Model Context Protocol JSON-RPC gateway. The
+Model Context Protocol specification and any optional SDK adapters retain their respective licenses.
+
+Review the resolved dependency graph, required transitive notices, and generated SBOM for the exact
+versions shipped in each release. A direct permissive license does not by itself complete transitive,
+service-term, patent, trademark, export-control, or organization-approval review.
+
+No third-party trademark endorsement is implied.
