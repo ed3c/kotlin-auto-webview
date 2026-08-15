@@ -24,7 +24,7 @@ CREATE INDEX audit_event_time_idx
 ON audit_event(at_epoch_ms DESC, sequence DESC);
 
 upsertCache:
-INSERT INTO semantic_cache_record(
+INSERT OR REPLACE INTO semantic_cache_record(
   id,
   source_url,
   title,
@@ -33,15 +33,7 @@ INSERT INTO semantic_cache_record(
   created_at_epoch_ms,
   last_accessed_at_epoch_ms,
   tags_json
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(id) DO UPDATE SET
-  source_url = excluded.source_url,
-  title = excluded.title,
-  summary = excluded.summary,
-  content = excluded.content,
-  created_at_epoch_ms = excluded.created_at_epoch_ms,
-  last_accessed_at_epoch_ms = excluded.last_accessed_at_epoch_ms,
-  tags_json = excluded.tags_json;
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
 
 selectCacheCandidates:
 SELECT id, source_url, title, summary, content, created_at_epoch_ms, last_accessed_at_epoch_ms, tags_json
