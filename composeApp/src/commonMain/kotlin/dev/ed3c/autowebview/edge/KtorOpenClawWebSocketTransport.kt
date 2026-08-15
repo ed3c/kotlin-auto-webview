@@ -31,7 +31,9 @@ data class OpenClawWebSocketEndpointPolicy(
         val url = Url(endpoint)
         require(url.protocol.name == "wss") { "OpenClaw transport requires wss://" }
         require(url.host in allowedHosts) { "OpenClaw endpoint host is not allowlisted" }
-        require(url.user.isEmpty() && url.password.isEmpty()) { "Credentials are forbidden in endpoint URLs" }
+        require(url.user.isNullOrEmpty() && url.password.isNullOrEmpty()) {
+            "Credentials are forbidden in endpoint URLs"
+        }
         require(url.parameters.isEmpty()) { "Query parameters are forbidden in endpoint URLs" }
         require(url.fragment.isEmpty()) { "Fragments are forbidden in endpoint URLs" }
         return url
@@ -61,7 +63,7 @@ class KtorOpenClawWebSocketTransport(
 
     override suspend fun connect() {
         check(session == null) { "OpenClaw transport is already connected" }
-        session = client.webSocketSession(admittedUrl)
+        session = client.webSocketSession(urlString = admittedUrl.toString())
     }
 
     override suspend fun receive(): StreamChunk? {
