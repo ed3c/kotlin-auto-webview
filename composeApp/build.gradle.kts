@@ -106,6 +106,7 @@ sqldelight {
     databases {
         create("AppDatabase") {
             packageName.set("dev.ed3c.autowebview.persistence.db")
+            generateAsync.set(true)
             verifyMigrations.set(true)
         }
     }
