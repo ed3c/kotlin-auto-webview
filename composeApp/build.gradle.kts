@@ -80,8 +80,13 @@ kotlin {
             implementation(libs.sqldelight.android.driver)
         }
 
-        val iosMain by getting
-        iosMain.dependencies {
+        val iosArm64Main by getting
+        iosArm64Main.dependencies {
+            implementation(libs.sqldelight.native.driver)
+        }
+
+        val iosSimulatorArm64Main by getting
+        iosSimulatorArm64Main.dependencies {
             implementation(libs.sqldelight.native.driver)
         }
 
