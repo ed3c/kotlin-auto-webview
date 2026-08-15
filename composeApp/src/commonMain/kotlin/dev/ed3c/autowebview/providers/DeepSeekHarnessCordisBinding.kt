@@ -145,25 +145,25 @@ data class DeepSeekHarnessCordisBinding(
         }.joinToString(separator = "\n", postfix = "\n")
     }
 
-    private companion object {
-        val ID_PATTERN = Regex("[A-Za-z0-9_-]{1,64}")
-        val SERVER_NAME_PATTERN = Regex("[A-Za-z0-9_-]{1,32}")
-        val ENVIRONMENT_VARIABLE_PATTERN = Regex("[A-Z][A-Z0-9_]{0,63}")
-        val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "::1")
-        val RAW_TOOL_NAMES = linkedSetOf(
+    companion object {
+        private val ID_PATTERN = Regex("[A-Za-z0-9_-]{1,64}")
+        private val SERVER_NAME_PATTERN = Regex("[A-Za-z0-9_-]{1,32}")
+        private val ENVIRONMENT_VARIABLE_PATTERN = Regex("[A-Z][A-Z0-9_]{0,63}")
+        private val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "::1")
+        private val RAW_TOOL_NAMES = linkedSetOf(
             "browser_capture_context",
             "browser_propose_navigation",
         )
-        const val MAX_PUBLIC_TOOL_NAME_LENGTH = 64
+        private const val MAX_PUBLIC_TOOL_NAME_LENGTH = 64
 
-        fun parseEndpoint(endpoint: String): Url = runCatching { Url(endpoint) }
+        private fun parseEndpoint(endpoint: String): Url = runCatching { Url(endpoint) }
             .getOrElse { failure ->
                 throw IllegalArgumentException("Invalid MCP endpoint URL", failure)
             }
 
-        fun validEnvironmentVariable(value: String?): Boolean =
+        private fun validEnvironmentVariable(value: String?): Boolean =
             value != null && ENVIRONMENT_VARIABLE_PATTERN.matches(value)
 
-        fun yamlQuote(value: String): String = "'${value.replace("'", "''")}'"
+        private fun yamlQuote(value: String): String = "'${value.replace("'", "''")}'"
     }
 }
