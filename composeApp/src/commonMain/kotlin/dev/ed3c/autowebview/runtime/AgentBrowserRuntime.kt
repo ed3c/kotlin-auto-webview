@@ -23,7 +23,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
+@OptIn(ExperimentalTime::class)
 class AgentBrowserRuntime(
     private val cache: SemanticCache = InMemorySemanticCache(),
     private val privacyGuard: PrivacyGuard = PrivacyGuard(),
@@ -94,10 +96,10 @@ class AgentBrowserRuntime(
 
     private fun summarize(context: PageContext): String {
         val source = context.selection.ifBlank { context.markdown }
-        return source.replace(Regex("\s+"), " ").trim().take(240).ifBlank { context.title }
+        return source.replace(Regex("""\s+"""), " ").trim().take(240).ifBlank { context.title }
     }
 
-    private fun keywords(text: String): Set<String> = Regex("[\p{L}\p{N}_-]{4,}")
+    private fun keywords(text: String): Set<String> = Regex("""[\p{L}\p{N}_-]{4,}""")
         .findAll(text.lowercase())
         .map { it.value }
         .groupingBy { it }
