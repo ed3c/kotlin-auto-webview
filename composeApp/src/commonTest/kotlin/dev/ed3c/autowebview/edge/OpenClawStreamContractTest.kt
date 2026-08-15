@@ -1,149 +1,542 @@
 package dev.ed3c.autowebview.edge
 
+import dev.ed3c.autowebview.domain.ActionRisk
+import dev.ed3c.autowebview.domain.AgentAction
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class OpenClawStreamContractTest {
-    private val policy = PairingPolicy(
-        expectedOrigin = "openclaw.local",
-        allowedPeerIds = setOf("mac-1"),
-        allowedKeyIds = setOf("key-1"),
-    )
-
     @Test
-    fun anonymousPeerFailsClosed() {
-        val session = OpenClawStreamSession(policy)
-        assertEquals(
-            StreamRejectionReason.NOT_PAIRED,
-            (session.admit(chunk(sequence = 1), nowEpochMs = 100) as StreamAdmission.Rejected).reason,
-        )
-    }
+    fun pairingRequiresExactPeerOriginKeyAndOpenSession() {
+        val session = session()
+        assertFalse(session.pair(peer(peerId = "unknown"), NOW))
+        assertFalse(session.pair(peer(origin = "wss://other.local"), NOW))
+        assertFalse(session.pair(peer(keyId = "unknown-key"), NOW))
+        assertTrue(session.pair(peer(), NOW))
+        assertEquals(StreamSessionState.PAIRED, session.sessionState())
 
-    @Test
-    fun wrongOriginCannotPair() {
-        val session = OpenClawStreamSession(policy)
-        val paired = session.pair(peer(origin = "evil.invalid"), nowEpochMs = 100)
-        assertFalse(paired)
-    }
-
-    @Test
-    fun orderedDeliveryRejectsOldSequenceAndReplay() {
-        val session = OpenClawStreamSession(policy)
-        assertTrue(session.pair(peer(), 100))
-
-        assertIs<StreamAdmission.Accepted>(session.admit(chunk(sequence = 2, replayToken = "r2"), 100))
+        session.close()
+        assertEquals(StreamSessionState.CLOSED, session.sessionState())
+        assertFalse(session.pair(peer(sessionEpoch = 2, keyId = "key-2"), NOW))
         assertEquals(
-            StreamRejectionReason.OLD_SEQUENCE,
-            (session.admit(chunk(sequence = 1, replayToken = "r1"), 100) as StreamAdmission.Rejected).reason,
-        )
-        assertEquals(
-            StreamRejectionReason.OLD_SEQUENCE,
-            (session.admit(chunk(sequence = 2, replayToken = "r2-other"), 100) as StreamAdmission.Rejected).reason,
-        )
-
-        val otherStreamReplay = chunk(
-            streamId = "stream-2",
-            sequence = 1,
-            replayToken = "r2",
-        )
-        assertEquals(
-            StreamRejectionReason.DUPLICATE_REPLAY_TOKEN,
-            (session.admit(otherStreamReplay, 100) as StreamAdmission.Rejected).reason,
-        )
-    }
-
-    @Test
-    fun expiredAndStaleContextChunksFailClosed() {
-        val session = OpenClawStreamSession(policy)
-        assertTrue(session.pair(peer(), 100))
-
-        assertEquals(
-            StreamRejectionReason.CHUNK_EXPIRED,
-            (session.admit(chunk(sequence = 1, expiresAt = 100), 100) as StreamAdmission.Rejected).reason,
-        )
-        assertEquals(
-            StreamRejectionReason.CONTEXT_MISMATCH,
-            (
-                session.admit(
-                    chunk(sequence = 1, contextFingerprint = "page-a"),
-                    100,
-                    activeContextFingerprint = "page-b",
-                ) as StreamAdmission.Rejected
+            StreamRejectionReason.SESSION_CLOSED,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(projectionChunk(), NOW, CONTEXT),
             ).reason,
         )
     }
 
     @Test
-    fun boundedBufferProvidesBackpressure() {
-        val session = OpenClawStreamSession(policy, maximumBufferedChunks = 1)
-        assertTrue(session.pair(peer(), 100))
-        assertIs<StreamAdmission.Accepted>(session.admit(chunk(sequence = 1, replayToken = "a"), 100))
+    fun pairingPolicyRejectsCredentialBearingOrPathOrigins() {
+        assertFailsWith<IllegalArgumentException> {
+            policy(origin = "wss://user@private-node.local")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            policy(origin = "https://private-node.local/path")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            policy(origin = "http://private-node.local")
+        }
+    }
+
+    @Test
+    fun projectionChunksRequireExactContextContiguousSequenceAndDeterministicReplayToken() {
+        val session = pairedSession()
+
+        assertIs<StreamAdmission.Accepted>(
+            session.admit(projectionChunk(sequence = 0), NOW, CONTEXT),
+        )
+        assertEquals(
+            StreamRejectionReason.SEQUENCE_GAP,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(projectionChunk(sequence = 2), NOW, CONTEXT),
+            ).reason,
+        )
+        assertIs<StreamAdmission.Accepted>(
+            session.admit(projectionChunk(sequence = 1), NOW, CONTEXT),
+        )
+        assertEquals(
+            StreamRejectionReason.OLD_SEQUENCE,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(projectionChunk(sequence = 1), NOW, CONTEXT),
+            ).reason,
+        )
+
+        val original = projectionChunk(streamId = "other", sequence = 0)
+        val wrongToken = original.copy(replayToken = projectionChunk().replayToken)
+        assertEquals(
+            StreamRejectionReason.REPLAY_TOKEN_MISMATCH,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(wrongToken, NOW, CONTEXT),
+            ).reason,
+        )
+    }
+
+    @Test
+    fun nonHeartbeatPayloadsRequireContextWhileHeartbeatMustRemainUnbound() {
+        val session = pairedSession()
+
+        assertEquals(
+            StreamRejectionReason.CONTEXT_REQUIRED,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(projectionChunk(contextFingerprint = null), NOW, null),
+            ).reason,
+        )
+        assertEquals(
+            StreamRejectionReason.CONTEXT_MISMATCH,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(projectionChunk(contextFingerprint = "old-page"), NOW, CONTEXT),
+            ).reason,
+        )
+
+        assertIs<StreamAdmission.Accepted>(
+            session.admit(heartbeatChunk(streamId = "heartbeat", sequence = 0), NOW, CONTEXT),
+        )
+        assertEquals(
+            StreamRejectionReason.INVALID_CHUNK,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(
+                    heartbeatChunk(streamId = "bound-heartbeat", sequence = 0).copy(
+                        contextFingerprint = CONTEXT,
+                    ),
+                    NOW,
+                    CONTEXT,
+                ),
+            ).reason,
+        )
+    }
+
+    @Test
+    fun payloadBudgetsPrivacyCapabilityAndRiskFailClosed() {
+        val smallBudgetSession = pairedSession(
+            policy = policy(maximumPayloadCharacters = 64),
+        )
+        assertEquals(
+            StreamRejectionReason.PAYLOAD_TOO_LARGE,
+            assertIs<StreamAdmission.Rejected>(
+                smallBudgetSession.admit(
+                    projectionChunk(
+                        streamId = "large",
+                        payload = ProjectionCandidatePayload(
+                            cacheId = "cache",
+                            summary = "x".repeat(128),
+                            relevanceHint = 0.5,
+                        ),
+                    ),
+                    NOW,
+                    CONTEXT,
+                ),
+            ).reason,
+        )
+
+        val session = pairedSession()
+        assertEquals(
+            StreamRejectionReason.SENSITIVE_PAYLOAD,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(
+                    projectionChunk(
+                        streamId = "secret",
+                        payload = ProjectionCandidatePayload(
+                            cacheId = "cache",
+                            summary = "authorization=private-token-value",
+                            relevanceHint = 0.5,
+                        ),
+                    ),
+                    NOW,
+                    CONTEXT,
+                ),
+            ).reason,
+        )
+
+        assertEquals(
+            StreamRejectionReason.CAPABILITY_NOT_ALLOWED,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(
+                    actionChunk(
+                        streamId = "unknown-capability",
+                        action = action(capabilityId = "browser.interact"),
+                    ),
+                    NOW,
+                    CONTEXT,
+                ),
+            ).reason,
+        )
+        assertEquals(
+            StreamRejectionReason.ACTION_RISK_NOT_ALLOWED,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(
+                    actionChunk(
+                        streamId = "destructive",
+                        action = action(risk = ActionRisk.DESTRUCTIVE),
+                    ),
+                    NOW,
+                    CONTEXT,
+                ),
+            ).reason,
+        )
+        assertEquals(
+            StreamRejectionReason.SENSITIVE_PAYLOAD,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(
+                    actionChunk(
+                        streamId = "sensitive-parameter",
+                        action = action(parameters = mapOf("token" to "private-token-value")),
+                    ),
+                    NOW,
+                    CONTEXT,
+                ),
+            ).reason,
+        )
+
+        val accepted = assertIs<StreamAdmission.Accepted>(
+            session.admit(actionChunk(streamId = "allowed"), NOW, CONTEXT),
+        )
+        assertEquals(StreamPayloadKind.TYPED_ACTION_PROPOSAL, accepted.payloadKind)
+        assertEquals(1, session.bufferedCount())
+    }
+
+    @Test
+    fun trackedStreamsAndBufferAreBoundedWithoutSilentEviction() {
+        val session = pairedSession(
+            policy = policy(maximumTrackedStreams = 1),
+            maximumBufferedChunks = 1,
+        )
+        assertIs<StreamAdmission.Accepted>(
+            session.admit(projectionChunk(streamId = "one", sequence = 0), NOW, CONTEXT),
+        )
+        assertEquals(
+            StreamRejectionReason.TOO_MANY_STREAMS,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(projectionChunk(streamId = "two", sequence = 0), NOW, CONTEXT),
+            ).reason,
+        )
         assertEquals(
             StreamRejectionReason.BUFFER_FULL,
-            (session.admit(chunk(sequence = 2, replayToken = "b"), 100) as StreamAdmission.Rejected).reason,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(projectionChunk(streamId = "one", sequence = 1), NOW, CONTEXT),
+            ).reason,
         )
-        assertEquals(1, session.bufferedCount())
-        assertEquals(listOf(1L), session.drain().map { it.sequence })
+        assertEquals(1, session.drain().size)
+        assertIs<StreamAdmission.Accepted>(
+            session.admit(projectionChunk(streamId = "one", sequence = 1), NOW, CONTEXT),
+        )
+        assertEquals(1, session.trackedStreamCount())
     }
 
     @Test
-    fun pairingExpiryRequiresReauthentication() {
-        val session = OpenClawStreamSession(policy)
-        assertTrue(session.pair(peer(expiresAt = 110), 100))
+    fun reconnectPreservesSequenceAndCancellationWhileHigherEpochRotatesState() {
+        val session = pairedSession()
+        assertIs<StreamAdmission.Accepted>(
+            session.admit(projectionChunk(sequence = 0), NOW, CONTEXT),
+        )
+        session.disconnect()
+        assertEquals(StreamSessionState.DISCONNECTED, session.sessionState())
+        assertEquals(0, session.bufferedCount())
         assertEquals(
-            StreamRejectionReason.PAIRING_EXPIRED,
-            (session.admit(chunk(sequence = 1), 110) as StreamAdmission.Rejected).reason,
+            StreamRejectionReason.NOT_PAIRED,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(projectionChunk(sequence = 1), NOW, CONTEXT),
+            ).reason,
         )
-        assertTrue(session.reconnect(peer(expiresAt = 200), 111))
+
+        assertTrue(session.reconnect(peer(expiresAtEpochMs = 20_000), NOW))
+        assertEquals(
+            StreamRejectionReason.OLD_SEQUENCE,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(projectionChunk(sequence = 0), NOW, CONTEXT),
+            ).reason,
+        )
+        assertIs<StreamAdmission.Accepted>(
+            session.admit(projectionChunk(sequence = 1), NOW, CONTEXT),
+        )
+        assertTrue(session.cancelStream(STREAM))
+        assertEquals(
+            StreamRejectionReason.STREAM_CANCELLED,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(projectionChunk(sequence = 2), NOW, CONTEXT),
+            ).reason,
+        )
+
+        assertFalse(
+            session.pair(
+                peer(keyId = "key-2", sessionEpoch = 1, expiresAtEpochMs = 20_000),
+                NOW,
+            ),
+        )
+        assertTrue(
+            session.pair(
+                peer(keyId = "key-2", sessionEpoch = 2, expiresAtEpochMs = 20_000),
+                NOW,
+            ),
+        )
+        assertIs<StreamAdmission.Accepted>(
+            session.admit(
+                projectionChunk(sequence = 0, keyId = "key-2", sessionEpoch = 2),
+                NOW,
+                CONTEXT,
+            ),
+        )
     }
 
     @Test
-    fun reconnectDelayUsesBoundedExponentialBackoffAndJitter() {
+    fun pairingAndChunkExpiryLifetimeAndFutureTimeFailClosed() {
+        val expiredSession = session()
+        assertFalse(expiredSession.pair(peer(expiresAtEpochMs = NOW), NOW))
+
+        val session = pairedSession(
+            policy = policy(maximumChunkAgeMs = 100, maximumChunkLifetimeMs = 500),
+        )
+        assertEquals(
+            StreamRejectionReason.CHUNK_EXPIRED,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(
+                    projectionChunk(issuedAtEpochMs = NOW + 1, expiresAtEpochMs = NOW + 100),
+                    NOW,
+                    CONTEXT,
+                ),
+            ).reason,
+        )
+        assertEquals(
+            StreamRejectionReason.CHUNK_EXPIRED,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(
+                    projectionChunk(issuedAtEpochMs = NOW - 101, expiresAtEpochMs = NOW + 1),
+                    NOW,
+                    CONTEXT,
+                ),
+            ).reason,
+        )
+        assertEquals(
+            StreamRejectionReason.CHUNK_EXPIRED,
+            assertIs<StreamAdmission.Rejected>(
+                session.admit(
+                    projectionChunk(issuedAtEpochMs = NOW, expiresAtEpochMs = NOW + 501),
+                    NOW,
+                    CONTEXT,
+                ),
+            ).reason,
+        )
+    }
+
+    @Test
+    fun streamPumpAlwaysClosesTransportAndPreservesCancellation() = runTest {
+        val transport = RecordingTransport(
+            receiveBlock = { throw CancellationException("cancelled") },
+        )
+        val pump = OpenClawStreamPump(transport, pairedSession())
+
+        assertFailsWith<CancellationException> {
+            pump.run(
+                nowEpochMs = { NOW },
+                activeContextFingerprint = { CONTEXT },
+                onAdmission = {},
+            )
+        }
+        assertTrue(transport.connected)
+        assertTrue(transport.closed)
+    }
+
+    @Test
+    fun streamPumpReportsTypedAdmissionAndStopsAtEndOfStream() = runTest {
+        val chunks = ArrayDeque(
+            listOf(
+                projectionChunk(sequence = 0),
+                projectionChunk(sequence = 1),
+            ),
+        )
+        val transport = RecordingTransport(
+            receiveBlock = { chunks.removeFirstOrNull() },
+        )
+        val admissions = mutableListOf<StreamAdmission>()
+
+        OpenClawStreamPump(transport, pairedSession()).run(
+            nowEpochMs = { NOW },
+            activeContextFingerprint = { CONTEXT },
+            onAdmission = { admissions += it },
+        )
+
+        assertEquals(2, admissions.size)
+        assertTrue(admissions.all { it is StreamAdmission.Accepted })
+        assertTrue(transport.closed)
+    }
+
+    @Test
+    fun reconnectBackoffIsBoundedAndDeterministic() {
         val policy = ReconnectPolicy(
             initialDelayMs = 100,
             maximumDelayMs = 1_000,
             multiplier = 2,
             jitterPermille = 200,
-            maximumAttempts = 6,
+            maximumAttempts = 5,
         )
-
         assertEquals(100, policy.delayMs(attempt = 0, jitterSamplePermille = 0))
-        assertEquals(180, policy.delayMs(attempt = 1, jitterSamplePermille = -500))
-        assertEquals(440, policy.delayMs(attempt = 2, jitterSamplePermille = 500))
-        assertEquals(1_000, policy.delayMs(attempt = 5, jitterSamplePermille = 1_000))
+        assertEquals(240, policy.delayMs(attempt = 1, jitterSamplePermille = 1_000))
+        assertEquals(800, policy.delayMs(attempt = 3, jitterSamplePermille = 0))
+        assertTrue(policy.delayMs(attempt = 4, jitterSamplePermille = 1_000) <= 1_000)
     }
 
-    private fun peer(
-        origin: String = "openclaw.local",
-        expiresAt: Long = 1_000,
-    ) = PairedPeer(
-        peerId = "mac-1",
-        origin = origin,
-        keyId = "key-1",
-        pairedAtEpochMs = 10,
-        expiresAtEpochMs = expiresAt,
+    @Test
+    fun chunksAndPayloadsRoundTripThroughSerialization() {
+        val json = Json {
+            classDiscriminator = "payloadType"
+            encodeDefaults = true
+        }
+        val projection = projectionChunk()
+        assertEquals(
+            projection,
+            json.decodeFromString<StreamChunk>(json.encodeToString(projection)),
+        )
+        val action = actionChunk()
+        assertEquals(
+            action,
+            json.decodeFromString<StreamChunk>(json.encodeToString(action)),
+        )
+    }
+
+    private fun session(
+        policy: PairingPolicy = policy(),
+        maximumBufferedChunks: Int = 4,
+    ) = OpenClawStreamSession(policy, maximumBufferedChunks)
+
+    private fun pairedSession(
+        policy: PairingPolicy = policy(),
+        maximumBufferedChunks: Int = 4,
+    ) = session(policy, maximumBufferedChunks).also { created ->
+        assertTrue(created.pair(peer(), NOW))
+    }
+
+    private fun policy(
+        origin: String = ORIGIN,
+        maximumPayloadCharacters: Int = 8_192,
+        maximumTrackedStreams: Int = 8,
+        maximumChunkAgeMs: Long = 30_000,
+        maximumChunkLifetimeMs: Long = 60_000,
+    ) = PairingPolicy(
+        expectedOrigin = origin,
+        allowedPeerIds = setOf(PEER),
+        allowedKeyIds = setOf("key-1", "key-2"),
+        allowedRemoteCapabilityIds = setOf("browser.navigate"),
+        maximumRemoteActionRisk = ActionRisk.HIGH,
+        maximumPayloadCharacters = maximumPayloadCharacters,
+        maximumTrackedStreams = maximumTrackedStreams,
+        maximumChunkAgeMs = maximumChunkAgeMs,
+        maximumChunkLifetimeMs = maximumChunkLifetimeMs,
     )
 
-    private fun chunk(
-        streamId: String = "stream-1",
-        sequence: Long,
-        replayToken: String = "r-$sequence",
-        expiresAt: Long = 500,
-        contextFingerprint: String? = null,
-    ) = StreamChunk(
-        streamId = streamId,
-        peerId = "mac-1",
-        origin = "openclaw.local",
-        keyId = "key-1",
-        sequence = sequence,
-        issuedAtEpochMs = 50,
-        expiresAtEpochMs = expiresAt,
-        contextFingerprint = contextFingerprint,
-        payloadKind = StreamPayloadKind.PROJECTION_CANDIDATE,
-        payload = "{}",
-        replayToken = replayToken,
+    private fun peer(
+        peerId: String = PEER,
+        origin: String = ORIGIN,
+        keyId: String = "key-1",
+        sessionEpoch: Long = 1,
+        pairedAtEpochMs: Long = NOW - 10,
+        expiresAtEpochMs: Long = NOW + 10_000,
+    ) = PairedPeer(
+        peerId = peerId,
+        origin = origin,
+        keyId = keyId,
+        sessionEpoch = sessionEpoch,
+        pairedAtEpochMs = pairedAtEpochMs,
+        expiresAtEpochMs = expiresAtEpochMs,
     )
+
+    private fun projectionChunk(
+        streamId: String = STREAM,
+        sequence: Long = 0,
+        keyId: String = "key-1",
+        sessionEpoch: Long = 1,
+        issuedAtEpochMs: Long = NOW - 1,
+        expiresAtEpochMs: Long = NOW + 1_000,
+        contextFingerprint: String? = CONTEXT,
+        payload: OpenClawStreamPayload = ProjectionCandidatePayload(
+            cacheId = "cache-1",
+            summary = "Relevant sanitized context",
+            relevanceHint = 0.8,
+            tags = setOf("kmp", "cache"),
+        ),
+    ): StreamChunk {
+        val chunk = StreamChunk(
+            streamId = streamId,
+            peerId = PEER,
+            origin = ORIGIN,
+            keyId = keyId,
+            sessionEpoch = sessionEpoch,
+            sequence = sequence,
+            issuedAtEpochMs = issuedAtEpochMs,
+            expiresAtEpochMs = expiresAtEpochMs,
+            contextFingerprint = contextFingerprint,
+            payload = payload,
+            replayToken = "pending",
+        )
+        return chunk.copy(replayToken = expectedReplayToken(chunk))
+    }
+
+    private fun actionChunk(
+        streamId: String = "action-stream",
+        sequence: Long = 0,
+        action: AgentAction = action(),
+    ): StreamChunk = projectionChunk(
+        streamId = streamId,
+        sequence = sequence,
+        payload = TypedActionProposalPayload(action),
+    )
+
+    private fun heartbeatChunk(
+        streamId: String,
+        sequence: Long,
+    ): StreamChunk = projectionChunk(
+        streamId = streamId,
+        sequence = sequence,
+        contextFingerprint = null,
+        payload = HeartbeatPayload(
+            nonce = "heartbeat-$sequence",
+            sentAtEpochMs = NOW,
+        ),
+    )
+
+    private fun action(
+        capabilityId: String = "browser.navigate",
+        risk: ActionRisk = ActionRisk.MEDIUM,
+        parameters: Map<String, String> = mapOf("url" to "https://example.com"),
+    ) = AgentAction(
+        id = "action-1",
+        capabilityId = capabilityId,
+        name = "Navigate",
+        description = "Navigate to an approved public page",
+        risk = risk,
+        parameters = parameters,
+    )
+
+    private class RecordingTransport(
+        private val receiveBlock: suspend () -> StreamChunk?,
+    ) : OpenClawTransport {
+        var connected = false
+        var closed = false
+
+        override suspend fun connect() {
+            connected = true
+        }
+
+        override suspend fun receive(): StreamChunk? = receiveBlock()
+
+        override suspend fun close() {
+            closed = true
+        }
+    }
+
+    private companion object {
+        const val PEER = "private-node"
+        const val ORIGIN = "wss://private-node.local:8443"
+        const val STREAM = "projection-stream"
+        const val CONTEXT = "page-fingerprint"
+        const val NOW = 1_000L
+    }
 }
