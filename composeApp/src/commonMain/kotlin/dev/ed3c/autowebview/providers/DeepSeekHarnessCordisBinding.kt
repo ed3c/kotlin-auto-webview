@@ -77,7 +77,7 @@ data class DeepSeekHarnessCordisBinding(
             }
             DeepSeekHarnessEndpointClass.LOOPBACK_HTTP -> {
                 require(url.protocol.name == "http") { "Loopback development endpoints require HTTP" }
-                require(url.host.lowercase() in LOOPBACK_HOSTS) {
+                require(isExplicitLoopbackHost(url.host)) {
                     "Insecure HTTP is allowed only for an explicit loopback host"
                 }
             }
@@ -142,7 +142,12 @@ data class DeepSeekHarnessCordisBinding(
         private val ID_PATTERN = Regex("[A-Za-z0-9_-]{1,64}")
         private val SERVER_NAME_PATTERN = Regex("[A-Za-z0-9_-]{1,32}")
         private val ENVIRONMENT_VARIABLE_PATTERN = Regex("[A-Z][A-Z0-9_]{0,63}")
-        private val LOOPBACK_HOSTS = setOf("localhost", "127.0.0.1", "::1")
+        private val LOOPBACK_HOSTS = setOf(
+            "localhost",
+            "127.0.0.1",
+            "::1",
+            "0:0:0:0:0:0:0:1",
+        )
         private val RAW_TOOL_NAMES = linkedSetOf(
             "browser_capture_context",
             "browser_propose_navigation",
@@ -153,6 +158,20 @@ data class DeepSeekHarnessCordisBinding(
             .getOrElse { failure ->
                 throw IllegalArgumentException("Invalid MCP endpoint URL", failure)
             }
+
+        /**
+         * Ktor may expose an IPv6 host with brackets or in expanded form depending on target.
+         * Normalize only those representation differences; do not broaden admission to arbitrary
+         * private, wildcard, mapped, or DNS-resolved addresses.
+         */
+        private fun isExplicitLoopbackHost(host: String): Boolean {
+            val normalized = host
+                .trim()
+                .removePrefix("[")
+                .removeSuffix("]")
+                .lowercase()
+            return normalized in LOOPBACK_HOSTS
+        }
 
         private fun validEnvironmentVariable(value: String?): Boolean =
             value != null && ENVIRONMENT_VARIABLE_PATTERN.matches(value)
