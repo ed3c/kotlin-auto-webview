@@ -1,0 +1,54 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+/* Begin PBXBuildFile section */
+		A93A953B29CC810C00F8E227 /* iosApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A93A953A29CC810C00F8E227 /* iosApp.swift */; };
+		A93A953F29CC810D00F8E227 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A93A953E29CC810D00F8E227 /* Assets.xcassets */; };
+		A93A954229CC810D00F8E227 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A93A954129CC810D00F8E227 /* Preview Assets.xcassets */; };
+/* End PBXBuildFile section */
+/* Begin PBXFileReference section */
+		A93A953729CC810C00F8E227 /* KotlinAutoWebView.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KotlinAutoWebView.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A93A953A29CC810C00F8E227 /* iosApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iosApp.swift; sourceTree = "<group>"; };
+		A93A953E29CC810D00F8E227 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A93A954129CC810D00F8E227 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+/* Begin PBXFrameworksBuildPhase section */
+		A93A953429CC810C00F8E227 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+/* Begin PBXGroup section */
+		A93A952E29CC810C00F8E227 = {isa = PBXGroup; children = (A93A953929CC810C00F8E227 /* iosApp */, A93A953829CC810C00F8E227 /* Products */,); sourceTree = "<group>"; };
+		A93A953829CC810C00F8E227 /* Products */ = {isa = PBXGroup; children = (A93A953729CC810C00F8E227 /* KotlinAutoWebView.app */,); name = Products; sourceTree = "<group>"; };
+		A93A953929CC810C00F8E227 /* iosApp */ = {isa = PBXGroup; children = (A93A953A29CC810C00F8E227 /* iosApp.swift */, A93A953E29CC810D00F8E227 /* Assets.xcassets */, A93A954029CC810D00F8E227 /* Preview Content */,); path = iosApp; sourceTree = "<group>"; };
+		A93A954029CC810D00F8E227 /* Preview Content */ = {isa = PBXGroup; children = (A93A954129CC810D00F8E227 /* Preview Assets.xcassets */,); path = "Preview Content"; sourceTree = "<group>"; };
+/* End PBXGroup section */
+/* Begin PBXNativeTarget section */
+		A93A953629CC810C00F8E227 /* iosApp */ = {isa = PBXNativeTarget; buildConfigurationList = A93A954529CC810D00F8E227; buildPhases = (A9D80A052AAB5CDE006C8738 /* Compile Kotlin Framework */, A93A953329CC810C00F8E227 /* Sources */, A93A953429CC810C00F8E227 /* Frameworks */, A93A953529CC810D00F8E227 /* Resources */,); buildRules = (); dependencies = (); name = iosApp; productName = iosApp; productReference = A93A953729CC810C00F8E227; productType = "com.apple.product-type.application"; };
+/* End PBXNativeTarget section */
+/* Begin PBXProject section */
+		A93A952F29CC810C00F8E227 /* Project object */ = {isa = PBXProject; attributes = {LastSwiftUpdateCheck = 1600; LastUpgradeCheck = 1600; TargetAttributes = {A93A953629CC810C00F8E227 = {CreatedOnToolsVersion = 16.0;};};}; buildConfigurationList = A93A953229CC810D00F8E227; compatibilityVersion = "Xcode 14.0"; developmentRegion = en; hasScannedForEncodings = 0; knownRegions = (en, Base,); mainGroup = A93A952E29CC810C00F8E227; productRefGroup = A93A953829CC810C00F8E227; projectDirPath = ""; projectRoot = ""; targets = (A93A953629CC810C00F8E227,); };
+/* End PBXProject section */
+/* Begin PBXResourcesBuildPhase section */
+		A93A953529CC810D00F8E227 /* Resources */ = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (A93A954229CC810D00F8E227, A93A953F29CC810D00F8E227,); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+/* Begin PBXShellScriptBuildPhase section */
+		A9D80A052AAB5CDE006C8738 /* Compile Kotlin Framework */ = {isa = PBXShellScriptBuildPhase; alwaysOutOfDate = 1; buildActionMask = 2147483647; files = (); inputFileListPaths = (); inputPaths = (); outputFileListPaths = (); outputPaths = (); name = "Compile Kotlin Framework"; runOnlyForDeploymentPostprocessing = 0; shellPath = /bin/sh; shellScript = "cd \"$SRCROOT/..\"\n./gradlew :composeApp:embedAndSignAppleFrameworkForXcode\n"; };
+/* End PBXShellScriptBuildPhase section */
+/* Begin PBXSourcesBuildPhase section */
+		A93A953329CC810C00F8E227 /* Sources */ = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A93A953B29CC810C00F8E227,); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+/* Begin XCBuildConfiguration section */
+		A93A954329CC810D00F8E227 /* Debug project */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; COPY_PHASE_STRIP = NO; DEBUG_INFORMATION_FORMAT = dwarf; ENABLE_TESTABILITY = YES; GCC_C_LANGUAGE_STANDARD = gnu11; GCC_OPTIMIZATION_LEVEL = 0; IPHONEOS_DEPLOYMENT_TARGET = 15.0; SDKROOT = iphoneos; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; SWIFT_OPTIMIZATION_LEVEL = "-Onone";}; name = Debug; };
+		A93A954429CC810D00F8E227 /* Release project */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; CLANG_ENABLE_OBJC_ARC = YES; COPY_PHASE_STRIP = NO; DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym"; ENABLE_NS_ASSERTIONS = NO; GCC_C_LANGUAGE_STANDARD = gnu11; IPHONEOS_DEPLOYMENT_TARGET = 15.0; SDKROOT = iphoneos; SWIFT_COMPILATION_MODE = wholemodule; SWIFT_OPTIMIZATION_LEVEL = "-O"; VALIDATE_PRODUCT = YES;}; name = Release; };
+		A93A954629CC810D00F8E227 /* Debug target */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\""; ENABLE_PREVIEWS = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_FILE = iosApp/Info.plist; INFOPLIST_KEY_UILaunchScreen_Generation = YES; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks",); MARKETING_VERSION = 0.1.0; PRODUCT_BUNDLE_IDENTIFIER = dev.ed3c.autowebview.ios; PRODUCT_NAME = KotlinAutoWebView; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2";}; name = Debug; };
+		A93A954729CC810D00F8E227 /* Release target */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 1; DEVELOPMENT_ASSET_PATHS = "\"iosApp/Preview Content\""; ENABLE_PREVIEWS = YES; GENERATE_INFOPLIST_FILE = YES; INFOPLIST_FILE = iosApp/Info.plist; INFOPLIST_KEY_UILaunchScreen_Generation = YES; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)", "@executable_path/Frameworks",); MARKETING_VERSION = 0.1.0; PRODUCT_BUNDLE_IDENTIFIER = dev.ed3c.autowebview.ios; PRODUCT_NAME = KotlinAutoWebView; SWIFT_EMIT_LOC_STRINGS = YES; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = "1,2";}; name = Release; };
+/* End XCBuildConfiguration section */
+/* Begin XCConfigurationList section */
+		A93A953229CC810C00F8E227 = {isa = XCConfigurationList; buildConfigurations = (A93A954329CC810C00F8E227, A93A954429CC810D00F8E227,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		A93A954529CC810D00F8E227 = {isa = XCConfigurationList; buildConfigurations = (A93A954629CC810D00F8E227, A93A954729CC810D00F8E227,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+	};
+	rootObject = A93A952F29CC810C00F8E227;
+}

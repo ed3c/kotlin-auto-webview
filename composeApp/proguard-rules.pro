@@ -1,0 +1,3 @@
+-keep class kotlinx.serialization.** { *; }
+-keep class io.modelcontextprotocol.** { *; }
+-dontwarn org.slf4j.**
