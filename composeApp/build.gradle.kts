@@ -60,6 +60,7 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
 
             implementation(libs.sqldelight.runtime)
+            implementation(libs.sqldelight.async.extensions)
             implementation(libs.sqldelight.coroutines.extensions)
 
             implementation(libs.ktor.client.core)
@@ -106,6 +107,7 @@ sqldelight {
     databases {
         create("AppDatabase") {
             packageName.set("dev.ed3c.autowebview.persistence.db")
+            generateAsync.set(true)
             verifyMigrations.set(true)
         }
     }
