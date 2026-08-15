@@ -5,6 +5,7 @@ import dev.ed3c.autowebview.domain.SemanticCacheRecord
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertFailsWith
 import kotlin.test.assertTrue
 
 class SqlDelightPersistenceTest {
@@ -33,13 +34,35 @@ class SqlDelightPersistenceTest {
     }
 
     @Test
+    fun cacheSanitizerDropsUrlSecretsAndRedactsContent() {
+        val safe = PersistenceSanitizer().sanitize(
+            SemanticCacheRecord(
+                id = "record-1",
+                sourceUrl = "https://example.invalid/page?token=private-token#secret",
+                title = "token=abcdef123456",
+                summary = "password: hunter2-secret",
+                content = "card 4111 1111 1111 1111",
+                createdAtEpochMs = 1,
+                tags = setOf("authorization=Bearer.secret-value", "safe"),
+            ),
+        )
+
+        assertEquals("https://example.invalid/page", safe.sourceUrl)
+        assertFalse(safe.title.contains("abcdef123456"))
+        assertFalse(safe.summary.contains("hunter2-secret"))
+        assertFalse(safe.content.contains("4111"))
+        assertTrue(safe.tags.any { it == "safe" })
+        assertTrue(safe.tags.none { "secret-value" in it })
+    }
+
+    @Test
     fun auditSanitizerRedactsSensitiveKeysAndValues() {
         val event = AuditEvent(
             atEpochMs = 123,
             category = "tool",
             message = "token=abcdef123456 operation completed",
             metadata = mapOf(
-                "authorization" to "Bearer top-secret",
+                "authorization" to "Bearer top-secret-value",
                 "note" to "password: hunter2-secret",
                 "safe" to "projection-ready",
             ),
@@ -54,17 +77,36 @@ class SqlDelightPersistenceTest {
     }
 
     @Test
-    fun auditSanitizerRedactsPaymentLikeNumbers() {
+    fun auditSanitizerRedactsPaymentLikeNumbersAndPrivateKeys() {
         val safe = AuditSanitizer().sanitize(
             AuditEvent(
                 atEpochMs = 1,
                 category = "form",
-                message = "card 4111 1111 1111 1111",
+                message = """
+                    card 4111 1111 1111 1111
+                    -----BEGIN TEST PRIVATE KEY-----
+                    private-material
+                    -----END TEST PRIVATE KEY-----
+                """.trimIndent(),
             ),
         )
 
         assertTrue("[REDACTED]" in safe.message)
         assertFalse("4111" in safe.message)
+        assertFalse("private-material" in safe.message)
+    }
+
+    @Test
+    fun invalidRetentionBudgetsFailBeforeDatabaseMutation() {
+        assertFailsWith<IllegalArgumentException> {
+            PersistentMemoryPolicy(maximumCacheRecords = 0)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            PersistentMemoryPolicy(maximumAuditEvents = 0)
+        }
+        assertFailsWith<IllegalArgumentException> {
+            PersistentMemoryPolicy(maximumQueryCandidates = 0)
+        }
     }
 
     private fun record(id: String, createdAt: Long, content: String) = SemanticCacheRecord(

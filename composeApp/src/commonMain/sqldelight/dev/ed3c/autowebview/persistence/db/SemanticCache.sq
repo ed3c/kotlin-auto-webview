@@ -5,11 +5,12 @@ CREATE TABLE semantic_cache_record (
   summary TEXT NOT NULL,
   content TEXT NOT NULL,
   created_at_epoch_ms INTEGER NOT NULL,
+  last_accessed_at_epoch_ms INTEGER NOT NULL,
   tags_json TEXT NOT NULL
 );
 
 CREATE INDEX semantic_cache_created_idx
-ON semantic_cache_record(created_at_epoch_ms DESC, id ASC);
+ON semantic_cache_record(last_accessed_at_epoch_ms DESC, created_at_epoch_ms DESC, id ASC);
 
 CREATE TABLE audit_event (
   sequence INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
@@ -23,20 +24,48 @@ CREATE INDEX audit_event_time_idx
 ON audit_event(at_epoch_ms DESC, sequence DESC);
 
 upsertCache:
-INSERT OR REPLACE INTO semantic_cache_record(
+INSERT INTO semantic_cache_record(
   id,
   source_url,
   title,
   summary,
   content,
   created_at_epoch_ms,
+  last_accessed_at_epoch_ms,
   tags_json
-) VALUES (?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+  source_url = excluded.source_url,
+  title = excluded.title,
+  summary = excluded.summary,
+  content = excluded.content,
+  created_at_epoch_ms = excluded.created_at_epoch_ms,
+  last_accessed_at_epoch_ms = excluded.last_accessed_at_epoch_ms,
+  tags_json = excluded.tags_json;
 
-selectAllCache:
-SELECT id, source_url, title, summary, content, created_at_epoch_ms, tags_json
+selectCacheCandidates:
+SELECT id, source_url, title, summary, content, created_at_epoch_ms, last_accessed_at_epoch_ms, tags_json
 FROM semantic_cache_record
-ORDER BY created_at_epoch_ms DESC, id ASC;
+ORDER BY last_accessed_at_epoch_ms DESC, created_at_epoch_ms DESC, id ASC
+LIMIT ?;
+
+touchCache:
+UPDATE semantic_cache_record
+SET last_accessed_at_epoch_ms = ?
+WHERE id = ?;
+
+pruneCacheToLimit:
+DELETE FROM semantic_cache_record
+WHERE id NOT IN (
+  SELECT id
+  FROM semantic_cache_record
+  ORDER BY last_accessed_at_epoch_ms DESC, created_at_epoch_ms DESC, id ASC
+  LIMIT ?
+);
+
+countCache:
+SELECT COUNT(*)
+FROM semantic_cache_record;
 
 deleteCacheById:
 DELETE FROM semantic_cache_record
@@ -54,11 +83,24 @@ INSERT INTO audit_event(
 ) VALUES (?, ?, ?, ?);
 
 selectRecentAudit:
-SELECT at_epoch_ms, category, message, metadata_json
+SELECT sequence, at_epoch_ms, category, message, metadata_json
 FROM audit_event
 ORDER BY sequence DESC
 LIMIT ?;
 
+pruneAuditToLimit:
+DELETE FROM audit_event
+WHERE sequence NOT IN (
+  SELECT sequence
+  FROM audit_event
+  ORDER BY sequence DESC
+  LIMIT ?
+);
+
 pruneAuditBefore:
 DELETE FROM audit_event
 WHERE at_epoch_ms < ?;
+
+countAudit:
+SELECT COUNT(*)
+FROM audit_event;
