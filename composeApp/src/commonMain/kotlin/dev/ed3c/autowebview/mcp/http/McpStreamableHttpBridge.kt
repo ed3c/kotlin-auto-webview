@@ -1,6 +1,5 @@
 package dev.ed3c.autowebview.mcp.http
 
-import dev.ed3c.autowebview.domain.StableIds
 import dev.ed3c.autowebview.mcp.BrowserMcpGateway
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.Json
@@ -39,7 +38,7 @@ class McpStreamableHttpBridge(
             rpcId = rpc.id
             validateRequestMetadataHeaders(request, rpc)
             validateRpcSurface(rpc)
-            protectAgainstReplay(request, rpc, authentication, nowEpochMs)
+            protectAgainstReplay(rpc, authentication, nowEpochMs)
 
             if (rpc.isNotification) {
                 val response = acceptedNotificationResponse()
@@ -277,6 +276,7 @@ class McpStreamableHttpBridge(
             id = id,
             isNotification = !idPresent,
             name = params["name"].stringValue(),
+            arguments = params["arguments"] as? JsonObject,
         )
     }
 
@@ -326,24 +326,46 @@ class McpStreamableHttpBridge(
         if (rpc.method == METHOD_TOOLS_CALL && rpc.name !in ALLOWED_TOOL_NAMES) {
             throw McpHttpAdmissionFailure(McpHttpBridgeErrorCode.TOOL_NOT_ADMITTED)
         }
+        if (rpc.method == METHOD_TOOLS_CALL && rpc.name == TOOL_PROPOSE_NAVIGATION) {
+            validateNavigationArguments(rpc.arguments)
+        }
+    }
+
+    private fun validateNavigationArguments(arguments: JsonObject?) {
+        val admitted = arguments
+            ?: throw McpHttpAdmissionFailure(McpHttpBridgeErrorCode.INVALID_JSON_RPC)
+        if (admitted.keys != setOf(ARGUMENT_URL)) {
+            throw McpHttpAdmissionFailure(McpHttpBridgeErrorCode.INVALID_JSON_RPC)
+        }
+        val url = admitted[ARGUMENT_URL] as? JsonPrimitive
+            ?: throw McpHttpAdmissionFailure(McpHttpBridgeErrorCode.INVALID_JSON_RPC)
+        if (
+            !url.isString ||
+            url.content.length > MAX_URL_CHARACTERS ||
+            !url.content.startsWith(HTTPS_PREFIX) ||
+            url.content.any { it.code < 0x20 || it.code == 0x7f }
+        ) {
+            throw McpHttpAdmissionFailure(McpHttpBridgeErrorCode.INVALID_JSON_RPC)
+        }
     }
 
     private suspend fun protectAgainstReplay(
-        request: McpHttpBridgeRequest,
         rpc: ParsedJsonRpc,
         authentication: McpHttpAuthenticationDecision.Accepted,
         nowEpochMs: Long,
     ) {
-        if (rpc.method !in REPLAY_PROTECTED_METHODS) return
-        val replayKey = McpHttpReplayKey(
-            StableIds.from(
-                authentication.subjectId,
-                authentication.credentialEpoch,
-                endpointPolicy.normalizedScheme,
-                endpointPolicy.normalizedAuthority,
-                endpointPolicy.path,
-                request.body,
-            ),
+        if (rpc.method != METHOD_TOOLS_CALL || rpc.name != TOOL_PROPOSE_NAVIGATION) return
+        val arguments = rpc.arguments
+            ?: throw McpHttpAdmissionFailure(McpHttpBridgeErrorCode.INVALID_JSON_RPC)
+        val replayKey = semanticActionReplayKey(
+            subjectId = authentication.subjectId,
+            credentialEpoch = authentication.credentialEpoch,
+            scheme = endpointPolicy.normalizedScheme,
+            authority = endpointPolicy.normalizedAuthority,
+            path = endpointPolicy.path,
+            method = rpc.method,
+            toolName = rpc.name,
+            arguments = arguments,
         )
         val replayDecision = try {
             replayGuard.admit(replayKey, nowEpochMs)
@@ -464,6 +486,7 @@ class McpStreamableHttpBridge(
         val id: JsonElement,
         val isNotification: Boolean,
         val name: String?,
+        val arguments: JsonObject?,
     )
 
     private data class GatewayResponseEvidence(val isError: Boolean)
@@ -490,6 +513,9 @@ class McpStreamableHttpBridge(
         const val TOOL_CAPTURE_CONTEXT = "browser_capture_context"
         const val TOOL_PROPOSE_NAVIGATION = "browser_propose_navigation"
         const val META_PROTOCOL_VERSION = "io.modelcontextprotocol/protocolVersion"
+        const val ARGUMENT_URL = "url"
+        const val HTTPS_PREFIX = "https://"
+        const val MAX_URL_CHARACTERS = 2_048
 
         val SUPPORTED_LEGACY_PROTOCOL_VERSIONS = setOf(BrowserMcpGateway.LEGACY_PROTOCOL_VERSION)
         val SUPPORTED_PROTOCOL_VERSIONS = setOf(
@@ -504,7 +530,6 @@ class McpStreamableHttpBridge(
             METHOD_TOOLS_CALL,
         )
         val ALLOWED_TOOL_NAMES = setOf(TOOL_CAPTURE_CONTEXT, TOOL_PROPOSE_NAVIGATION)
-        val REPLAY_PROTECTED_METHODS = setOf(METHOD_TOOLS_CALL)
     }
 }
 
