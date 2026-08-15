@@ -87,8 +87,7 @@ fun interface McpHttpAuthenticationVerifier {
     suspend fun verify(input: McpHttpAuthenticationInput): McpHttpAuthenticationDecision
 }
 
-@JvmInline
-value class McpHttpReplayKey(val value: String)
+data class McpHttpReplayKey(val value: String)
 
 enum class McpHttpReplayDecision {
     ACCEPTED,
