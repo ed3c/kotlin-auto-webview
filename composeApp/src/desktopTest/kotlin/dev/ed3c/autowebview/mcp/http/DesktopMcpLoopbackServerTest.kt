@@ -405,7 +405,7 @@ class DesktopMcpLoopbackServerTest {
         if (origin != null) connection.setRequestProperty("Origin", origin)
         val bytes = body.encodeToByteArray()
         connection.setFixedLengthStreamingMode(bytes.size)
-        connection.outputStream.use { it.write(bytes) }
+        connection.outputStream.use { output -> output.write(bytes) }
 
         return try {
             val status = connection.responseCode
@@ -423,10 +423,9 @@ class DesktopMcpLoopbackServerTest {
         Socket().use { socket ->
             socket.soTimeout = 5_000
             socket.connect(InetSocketAddress("127.0.0.1", server.port), 5_000)
-            socket.getOutputStream().use { output ->
-                output.write(request.toByteArray(Charsets.ISO_8859_1))
-                output.flush()
-            }
+            val output = socket.getOutputStream()
+            output.write(request.toByteArray(Charsets.ISO_8859_1))
+            output.flush()
             socket.shutdownOutput()
             val raw = socket.getInputStream().readBytes().toString(Charsets.ISO_8859_1)
             val statusLine = raw.lineSequence().firstOrNull()
