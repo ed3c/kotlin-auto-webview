@@ -6,9 +6,10 @@ import kotlinx.serialization.Serializable
 /**
  * How DeepSeek Harness reaches the application's future Streamable HTTP MCP endpoint.
  *
- * REMOTE_HTTPS requires a bearer token whose value is resolved by DeepSeek Harness from
- * an environment variable at runtime. LOOPBACK_HTTP is limited to explicit loopback
- * development endpoints and carries no authentication material.
+ * REMOTE_HTTPS and LOOPBACK_HTTP both require a bearer token whose value is resolved by
+ * DeepSeek Harness from an environment variable at runtime. LOOPBACK_HTTP is additionally
+ * limited to explicit loopback development endpoints; loopback classification never disables
+ * authentication because another local process may still reach the listener.
  */
 @Serializable
 enum class DeepSeekHarnessEndpointClass {
@@ -59,6 +60,9 @@ data class DeepSeekHarnessCordisBinding(
         }
         require(toolCallTimeoutMs > 0) { "Tool-call timeout must be positive" }
         require(endpoint.none(Char::isISOControl)) { "Endpoint contains control characters" }
+        require(validEnvironmentVariable(bearerTokenEnvironmentVariable)) {
+            "MCP authentication requires a valid bearer-token environment variable"
+        }
 
         val url = parseEndpoint(endpoint)
         require(url.user.isNullOrEmpty() && url.password.isNullOrEmpty()) {
@@ -70,17 +74,11 @@ data class DeepSeekHarnessCordisBinding(
         when (endpointClass) {
             DeepSeekHarnessEndpointClass.REMOTE_HTTPS -> {
                 require(url.protocol.name == "https") { "Remote MCP endpoints require HTTPS" }
-                require(validEnvironmentVariable(bearerTokenEnvironmentVariable)) {
-                    "Remote MCP authentication requires a valid bearer-token environment variable"
-                }
             }
             DeepSeekHarnessEndpointClass.LOOPBACK_HTTP -> {
                 require(url.protocol.name == "http") { "Loopback development endpoints require HTTP" }
                 require(url.host.lowercase() in LOOPBACK_HOSTS) {
                     "Insecure HTTP is allowed only for an explicit loopback host"
-                }
-                require(bearerTokenEnvironmentVariable == null) {
-                    "Loopback development bindings cannot carry a bearer-token reference"
                 }
             }
         }
@@ -112,17 +110,12 @@ data class DeepSeekHarnessCordisBinding(
      * by the DeepSeek Harness host from the named environment variable and is never returned here.
      */
     fun renderCordisPatch(): String {
-        val authLines = when (endpointClass) {
-            DeepSeekHarnessEndpointClass.REMOTE_HTTPS -> {
-                val variable = requireNotNull(bearerTokenEnvironmentVariable)
-                listOf(
-                    "        headers:",
-                    "          Authorization: !!js >-",
-                    "            (() => { const token = process.env.$variable?.trim(); if (!token) throw new Error('$variable is required'); return `Bearer \${token}`; })()",
-                )
-            }
-            DeepSeekHarnessEndpointClass.LOOPBACK_HTTP -> emptyList()
-        }
+        val variable = requireNotNull(bearerTokenEnvironmentVariable)
+        val authLines = listOf(
+            "        headers:",
+            "          Authorization: !!js >-",
+            "            (() => { const token = process.env.$variable?.trim(); if (!token) throw new Error('$variable is required'); return `Bearer \${token}`; })()",
+        )
 
         return buildList {
             add("# Default-off DeepSeek Harness compatibility row.")

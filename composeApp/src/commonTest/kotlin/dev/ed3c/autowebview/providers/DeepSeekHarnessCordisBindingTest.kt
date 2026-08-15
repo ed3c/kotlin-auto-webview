@@ -19,14 +19,21 @@ class DeepSeekHarnessCordisBindingTest {
         val second = binding.renderCordisPatch()
 
         assertEquals(first, second)
-        assertTrue("@deepseek-ai/dsh-mcp-client" in first)
-        assertTrue("transport: streamable-http" in first)
-        assertTrue("KOTLIN_AUTO_WEBVIEW_MCP_TOKEN" in first)
-        assertTrue("process.env.KOTLIN_AUTO_WEBVIEW_MCP_TOKEN" in first)
-        assertTrue("Bearer \${token}" in first)
-        assertFalse("private-token-value" in first)
-        assertFalse("Authorization: Bearer" in first)
+        assertPatchUsesEnvironmentAuthentication(first)
+        assertTrue("https://agent.example.invalid/mcp" in first)
         assertTrue("47f943859bef60e4160492346772ded9b24f765a" in first)
+    }
+
+    @Test
+    fun loopbackBindingRendersTheSameSecretFreeAuthenticationBoundary() {
+        val binding = loopbackBinding()
+
+        val first = binding.renderCordisPatch()
+        val second = binding.renderCordisPatch()
+
+        assertEquals(first, second)
+        assertTrue("http://127.0.0.1:3090/mcp" in first)
+        assertPatchUsesEnvironmentAuthentication(first)
     }
 
     @Test
@@ -62,15 +69,25 @@ class DeepSeekHarnessCordisBindingTest {
     }
 
     @Test
-    fun remoteEndpointsRequireHttpsAndBearerEnvironmentReference() {
-        assertFailsWith<IllegalArgumentException> {
-            remoteBinding(endpoint = "http://agent.example.invalid/mcp")
-        }
+    fun bothEndpointClassesRequireBearerEnvironmentReference() {
         assertFailsWith<IllegalArgumentException> {
             remoteBinding(bearerEnvironmentVariable = null)
         }
         assertFailsWith<IllegalArgumentException> {
+            loopbackBinding(bearerEnvironmentVariable = null)
+        }
+        assertFailsWith<IllegalArgumentException> {
             remoteBinding(bearerEnvironmentVariable = "literal-token-value")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            loopbackBinding(bearerEnvironmentVariable = "literal-token-value")
+        }
+    }
+
+    @Test
+    fun remoteEndpointsRequireHttps() {
+        assertFailsWith<IllegalArgumentException> {
+            remoteBinding(endpoint = "http://agent.example.invalid/mcp")
         }
     }
 
@@ -91,32 +108,24 @@ class DeepSeekHarnessCordisBindingTest {
     }
 
     @Test
-    fun loopbackDevelopmentBindingIsExplicitAndUnauthenticated() {
-        val binding = DeepSeekHarnessCordisBinding(
-            endpoint = "http://127.0.0.1:3090/mcp",
-            endpointClass = DeepSeekHarnessEndpointClass.LOOPBACK_HTTP,
-        )
-
-        val patch = binding.renderCordisPatch()
-        assertTrue("http://127.0.0.1:3090/mcp" in patch)
-        assertFalse("headers:" in patch)
-        assertFalse("Authorization" in patch)
-    }
-
-    @Test
-    fun insecureNonLoopbackAndLoopbackSecretReferenceFailClosed() {
-        assertFailsWith<IllegalArgumentException> {
+    fun loopbackDevelopmentBindingRemainsHttpOnlyAndHostRestricted() {
+        listOf(
+            "http://localhost:3090/mcp",
+            "http://127.0.0.1:3090/mcp",
+            "http://[::1]:3090/mcp",
+        ).forEach { endpoint ->
             DeepSeekHarnessCordisBinding(
-                endpoint = "http://agent.example.invalid/mcp",
-                endpointClass = DeepSeekHarnessEndpointClass.LOOPBACK_HTTP,
-            )
-        }
-        assertFailsWith<IllegalArgumentException> {
-            DeepSeekHarnessCordisBinding(
-                endpoint = "http://localhost:3090/mcp",
+                endpoint = endpoint,
                 endpointClass = DeepSeekHarnessEndpointClass.LOOPBACK_HTTP,
                 bearerTokenEnvironmentVariable = "KOTLIN_AUTO_WEBVIEW_MCP_TOKEN",
             )
+        }
+
+        assertFailsWith<IllegalArgumentException> {
+            loopbackBinding(endpoint = "https://127.0.0.1:3090/mcp")
+        }
+        assertFailsWith<IllegalArgumentException> {
+            loopbackBinding(endpoint = "http://agent.example.invalid/mcp")
         }
     }
 
@@ -137,17 +146,29 @@ class DeepSeekHarnessCordisBindingTest {
     }
 
     @Test
-    fun bindingRoundTripsWithoutSecretValueFields() {
-        val binding = remoteBinding()
-        val encoded = json.encodeToString(binding)
-        val decoded = json.decodeFromString(DeepSeekHarnessCordisBinding.serializer(), encoded)
+    fun remoteAndLoopbackBindingsRoundTripWithoutSecretValueFields() {
+        listOf(remoteBinding(), loopbackBinding()).forEach { binding ->
+            val encoded = json.encodeToString(binding)
+            val decoded = json.decodeFromString(DeepSeekHarnessCordisBinding.serializer(), encoded)
 
-        assertEquals(binding, decoded)
-        assertTrue("bearerTokenEnvironmentVariable" in encoded)
-        assertFalse("private-token-value" in encoded)
-        assertFalse("headers" in encoded)
-        assertFalse("certificate" in encoded)
-        assertFalse("privateKey" in encoded)
+            assertEquals(binding, decoded)
+            assertTrue("bearerTokenEnvironmentVariable" in encoded)
+            assertFalse("private-token-value" in encoded)
+            assertFalse("headers" in encoded)
+            assertFalse("certificate" in encoded)
+            assertFalse("privateKey" in encoded)
+        }
+    }
+
+    private fun assertPatchUsesEnvironmentAuthentication(patch: String) {
+        assertTrue("@deepseek-ai/dsh-mcp-client" in patch)
+        assertTrue("transport: streamable-http" in patch)
+        assertTrue("headers:" in patch)
+        assertTrue("KOTLIN_AUTO_WEBVIEW_MCP_TOKEN" in patch)
+        assertTrue("process.env.KOTLIN_AUTO_WEBVIEW_MCP_TOKEN" in patch)
+        assertTrue("Bearer \${token}" in patch)
+        assertFalse("private-token-value" in patch)
+        assertFalse("Authorization: Bearer" in patch)
     }
 
     private fun remoteBinding(
@@ -161,5 +182,14 @@ class DeepSeekHarnessCordisBindingTest {
         endpointClass = DeepSeekHarnessEndpointClass.REMOTE_HTTPS,
         bearerTokenEnvironmentVariable = bearerEnvironmentVariable,
         toolCallTimeoutMs = toolCallTimeoutMs,
+    )
+
+    private fun loopbackBinding(
+        endpoint: String = "http://127.0.0.1:3090/mcp",
+        bearerEnvironmentVariable: String? = "KOTLIN_AUTO_WEBVIEW_MCP_TOKEN",
+    ) = DeepSeekHarnessCordisBinding(
+        endpoint = endpoint,
+        endpointClass = DeepSeekHarnessEndpointClass.LOOPBACK_HTTP,
+        bearerTokenEnvironmentVariable = bearerEnvironmentVariable,
     )
 }
