@@ -25,7 +25,7 @@ main @ e447dea815d63e89afd6acf58845f222bee07b6f
 |---|---|---|---|
 | `main` | default branch | exists | base subject only |
 | `feat/kmp-agent-browser-foundation` | PR #1 | open draft, mergeable | CI `PASS` at `a449fac...` |
-| `docs/agent-integration-stack-index` | issue #6 / PR `PR_TBD` | current documentation child | Git Town live sync `NOT_EXERCISED` |
+| `docs/agent-integration-stack-index` | issue #6 / PR #15 | open draft child PR | Git Town live sync `NOT_EXERCISED` |
 
 No other planned branch is created by this document.
 
@@ -34,7 +34,7 @@ No other planned branch is created by this document.
 ```text
 main
 └── feat/kmp-agent-browser-foundation                     # PR #1
-    └── docs/agent-integration-stack-index                # issue #6 / PR_TBD
+    └── docs/agent-integration-stack-index                # issue #6 / PR #15
         ├── build/runtime-dependency-admission            # issue #7
         │   ├── feat/persistent-memory                    # issue #8
         │   └── feat/openclaw-stream-contract             # issue #9
@@ -57,7 +57,7 @@ Issue #4 is the umbrella epic for private L2, persistence, and semantic-runtime 
 | Sequence | Issue | Head branch | PR base / parent | Class | Goal | State |
 |---:|---:|---|---|---|---|---|
 | 0 | #1 | `feat/kmp-agent-browser-foundation` | `main` | foundation | Executable four-platform agent-browser MVP | open draft; CI `PASS` |
-| 1 | #6 | `docs/agent-integration-stack-index` | foundation | foundation | Agent/docs/Git Town SSOT | current; PR `PR_TBD` |
+| 1 | #6 | `docs/agent-integration-stack-index` | foundation | foundation | Agent/docs/Git Town SSOT | open draft PR #15 |
 | 2 | #7 | `build/runtime-dependency-admission` | docs stack | foundation | Exact SQLDelight/Ktor dependency and legal admission | `NOT_IMPLEMENTED` |
 | 3A | #8 | `feat/persistent-memory` | runtime deps | child | SQLDelight L1 + append-only audit | `NOT_IMPLEMENTED` |
 | 3B | #9 | `feat/openclaw-stream-contract` | runtime deps | child | Authenticated ordered OpenClaw L2 transport | `NOT_IMPLEMENTED` |
@@ -140,13 +140,13 @@ git town sync --stack --dry-run --non-interactive --no-auto-resolve --no-push
 git town sync --stack --non-interactive --no-auto-resolve --no-push
 ```
 
-No live Git Town command has been exercised in this repository at the time of this document. The current documentation PR was created as an explicit child PR through GitHub while admission remains blocked.
+No live Git Town command has been exercised in this repository at the time of this document. PR #15 was created as an explicit child PR through GitHub while executable admission remains blocked.
 
 ## Reparent and merge order
 
 Human Admit controls each transition:
 
-1. Review PR #1 and the documentation child independently but preserve the declared base relationship.
+1. Review PR #1 and PR #15 independently but preserve the declared base relationship.
 2. Admit/merge #6 before starting Worker-controlled leaf stacks.
 3. Admit #7 before #8/#9.
 4. Admit #10 before #11.
