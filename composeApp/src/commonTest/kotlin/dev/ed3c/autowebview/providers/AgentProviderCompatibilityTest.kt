@@ -17,7 +17,10 @@ class AgentProviderCompatibilityTest {
     fun discoveryIsStableAndDoesNotGrantAuthority() {
         val discovered = registry.discover()
 
-        assertEquals(listOf("hermes", "nemoclaw", "openclaw"), discovered.map { it.id })
+        assertEquals(
+            listOf("deepseek-harness", "hermes", "nemoclaw", "openclaw"),
+            discovered.map { it.id },
+        )
         assertTrue(discovered.all { it.requiresLocalHitl })
         assertTrue(discovered.none { it.authorityCeiling == RemoteAuthorityCeiling.DIRECT_EXECUTION })
     }
@@ -83,6 +86,44 @@ class AgentProviderCompatibilityTest {
     }
 
     @Test
+    fun deepSeekHarnessIsAPluginHarnessAndMayOnlyReachTypedProposals() {
+        val accepted = registry.admit(
+            ProviderCompatibilityRequest(
+                providerId = "deepseek-harness",
+                requiredProtocols = setOf(
+                    AgentProviderProtocol.CORDIS_PLUGIN_COMPOSITION,
+                    AgentProviderProtocol.MCP_STREAMABLE_HTTP_CLIENT,
+                    AgentProviderProtocol.DYNAMIC_TOOL_REGISTRY,
+                ),
+                requestedAuthority = RemoteAuthorityCeiling.PROPOSE_TYPED_ACTIONS,
+            ),
+        )
+
+        val profile = assertIs<ProviderCompatibilityAdmission.Accepted>(accepted).profile
+        assertEquals(AgentProviderKind.DEEPSEEK_HARNESS, profile.kind)
+        assertEquals(AgentProviderRole.PLUGIN_HARNESS, profile.role)
+        assertEquals("deepseek-ai/deepseek-harness", profile.upstreamRepository)
+        assertEquals("47f943859bef60e4160492346772ded9b24f765a", profile.observedUpstreamCommit)
+        assertTrue(AgentProviderProtocol.DURABLE_SESSION_EVENT_LOG in profile.protocols)
+    }
+
+    @Test
+    fun deepSeekHarnessDoesNotClaimNemoClawManagedMcp() {
+        val rejected = registry.admit(
+            ProviderCompatibilityRequest(
+                providerId = "deepseek-harness",
+                requiredProtocols = setOf(AgentProviderProtocol.MCP_STREAMABLE_HTTP_MANAGED),
+                requestedAuthority = RemoteAuthorityCeiling.NONE,
+            ),
+        )
+
+        assertEquals(
+            ProviderCompatibilityRejectionReason.UNSUPPORTED_PROTOCOL,
+            assertIs<ProviderCompatibilityAdmission.Rejected>(rejected).reason,
+        )
+    }
+
+    @Test
     fun directExecutionIsRejectedForEveryProvider() {
         for (provider in registry.discover()) {
             val rejected = registry.admit(
@@ -125,6 +166,20 @@ class AgentProviderCompatibilityTest {
                 protocols = setOf(AgentProviderProtocol.SANDBOX_LIFECYCLE),
                 authorityCeiling = RemoteAuthorityCeiling.PROPOSE_TYPED_ACTIONS,
                 upstreamRepository = "example/unsafe",
+            )
+        }
+    }
+
+    @Test
+    fun pluginHarnessProfileRequiresCompositionProtocol() {
+        assertFailsWith<IllegalArgumentException> {
+            AgentProviderProfile(
+                id = "incomplete-plugin-harness",
+                kind = AgentProviderKind.DEEPSEEK_HARNESS,
+                role = AgentProviderRole.PLUGIN_HARNESS,
+                protocols = setOf(AgentProviderProtocol.MCP_CLIENT),
+                authorityCeiling = RemoteAuthorityCeiling.NONE,
+                upstreamRepository = "example/incomplete",
             )
         }
     }
