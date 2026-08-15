@@ -1,0 +1,19 @@
+# Default-off local-development example for DeepSeek Harness.
+# Evidence subject: deepseek-ai/deepseek-harness@47f943859bef60e4160492346772ded9b24f765a
+#
+# The KMP Streamable HTTP server adapter is NOT_IMPLEMENTED. This row is only
+# a configuration-shape fixture until an exact local server subject exists.
+- insert:
+    - id: kotlin-auto-webview-mcp
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: kotlin_auto_webview
+        transport: streamable-http
+        url: http://127.0.0.1:3090/mcp
+        toolCallTimeoutMs: 60000
+        failOnStartupError: true
+        reconnect:
+          enabled: true
+          initialDelayMs: 500
+          maxDelayMs: 30000
+          maxAttempts: 10
