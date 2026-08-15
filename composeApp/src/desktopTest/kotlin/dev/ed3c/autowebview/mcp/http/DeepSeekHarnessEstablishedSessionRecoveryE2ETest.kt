@@ -79,6 +79,7 @@ class DeepSeekHarnessEstablishedSessionRecoveryE2ETest {
                 "--config",
                 "vitest.e2e.config.ts",
                 STAGED_RECOVERY_SPEC,
+                "--retry=0",
                 "--reporter=dot",
             )
                 .directory(upstreamRoot.toFile())
@@ -107,7 +108,7 @@ class DeepSeekHarnessEstablishedSessionRecoveryE2ETest {
             generationOneServer.close()
             generationOneServer = null
             awaitPortReleased(port)
-            generationOneWorkers?.let(::awaitWorkerThreadsStopped)
+            generationOneWorkers.let(::awaitWorkerThreadsStopped)
             generationOneWorkers = null
             Files.writeString(listenerStoppedMarker, "stopped\n")
 
