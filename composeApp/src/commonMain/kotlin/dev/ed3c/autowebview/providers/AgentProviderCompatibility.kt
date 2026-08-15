@@ -7,11 +7,13 @@ enum class AgentProviderKind {
     OPENCLAW,
     HERMES,
     NEMOCLAW,
+    DEEPSEEK_HARNESS,
 }
 
 @Serializable
 enum class AgentProviderRole {
     AGENT_RUNTIME,
+    PLUGIN_HARNESS,
     SANDBOX_CONTROL_PLANE,
 }
 
@@ -19,10 +21,14 @@ enum class AgentProviderRole {
 enum class AgentProviderProtocol {
     ORDERED_PRIVATE_STREAM,
     MCP_CLIENT,
+    MCP_STREAMABLE_HTTP_CLIENT,
     MCP_STREAMABLE_HTTP_MANAGED,
     OPENAI_COMPATIBLE_API,
     MESSAGING_GATEWAY,
     AGENT_SKILLS,
+    CORDIS_PLUGIN_COMPOSITION,
+    DYNAMIC_TOOL_REGISTRY,
+    DURABLE_SESSION_EVENT_LOG,
     SANDBOX_LIFECYCLE,
     MANAGED_INFERENCE,
     NETWORK_POLICY,
@@ -57,6 +63,11 @@ data class AgentProviderProfile(
         }
         require(requiresLocalHitl) {
             "Provider compatibility cannot bypass local HITL"
+        }
+        if (role == AgentProviderRole.PLUGIN_HARNESS) {
+            require(AgentProviderProtocol.CORDIS_PLUGIN_COMPOSITION in protocols) {
+                "Plugin harness profiles must declare their composition protocol"
+            }
         }
         if (role == AgentProviderRole.SANDBOX_CONTROL_PLANE) {
             require(authorityCeiling == RemoteAuthorityCeiling.NONE) {
@@ -176,5 +187,26 @@ object BuiltInAgentProviders {
         observedUpstreamCommit = "815bdd563ce7c90f1144e6bdef3471a6f95b45c6",
     )
 
-    val all: List<AgentProviderProfile> = listOf(openClaw, hermes, nemoClaw)
+    val deepSeekHarness = AgentProviderProfile(
+        id = "deepseek-harness",
+        kind = AgentProviderKind.DEEPSEEK_HARNESS,
+        role = AgentProviderRole.PLUGIN_HARNESS,
+        protocols = setOf(
+            AgentProviderProtocol.MCP_CLIENT,
+            AgentProviderProtocol.MCP_STREAMABLE_HTTP_CLIENT,
+            AgentProviderProtocol.CORDIS_PLUGIN_COMPOSITION,
+            AgentProviderProtocol.DYNAMIC_TOOL_REGISTRY,
+            AgentProviderProtocol.DURABLE_SESSION_EVENT_LOG,
+        ),
+        authorityCeiling = RemoteAuthorityCeiling.PROPOSE_TYPED_ACTIONS,
+        upstreamRepository = "deepseek-ai/deepseek-harness",
+        observedUpstreamCommit = "47f943859bef60e4160492346772ded9b24f765a",
+    )
+
+    val all: List<AgentProviderProfile> = listOf(
+        openClaw,
+        hermes,
+        nemoClaw,
+        deepSeekHarness,
+    )
 }
