@@ -1,6 +1,6 @@
 # DeepSeek Harness process E2E
 
-This directory owns the repository-side specifications for pinned DeepSeek Harness/Cordis interoperability and startup-recovery tests.
+This directory owns the repository-side specifications for pinned DeepSeek Harness/Cordis interoperability and recovery tests.
 
 ## Exact evidence subject
 
@@ -13,95 +13,100 @@ pnpm: 11.7.0
 license: MIT
 ```
 
-The CI workflow checks out that exact commit into an ephemeral directory, verifies the commit identity, installs its frozen lockfile with lifecycle scripts disabled, and copies the repository-owned TypeScript specifications into the upstream test directory. No upstream source is copied into this repository.
+The CI workflow checks out that exact commit into an ephemeral directory, verifies the commit identity, installs its frozen lockfile with lifecycle scripts disabled, and copies repository-owned TypeScript specifications into the upstream test directory. No upstream source is copied into this repository.
 
 ## Evidence lanes
 
-### Immediate-connect interoperability
+### Immediate-connect interoperability — PR #36
 
-[`deepseek-harness-cordis.e2e.ts`](deepseek-harness-cordis.e2e.ts) runs after the Desktop listener is ready:
+[`deepseek-harness-cordis.e2e.ts`](deepseek-harness-cordis.e2e.ts) starts after the Desktop listener is ready and proves real Cordis plugin activation, `ctx.tools` registration, sanitized context, proposal-only navigation, and clean disposal.
 
-```text
-Desktop JVM test
-  -> real ephemeral 127.0.0.1 listener
-  -> masked synthetic bearer token
-  -> pinned upstream Vitest process
-  -> Cordis Context + ToolRuntime
-  -> @deepseek-ai/dsh-mcp-client
-  -> initialize / notifications/initialized / tools/list
-  -> ctx.tools generation
-  -> browser_capture_context
-  -> browser_propose_navigation
-  -> JVM-side dispatcher oracle
-```
+### Initially unavailable endpoint recovery — PR #38
 
-### Initially unavailable endpoint recovery
-
-[`deepseek-harness-startup-recovery.external.e2e.ts`](deepseek-harness-startup-recovery.external.e2e.ts) starts the pinned plugin before the listener exists:
+[`deepseek-harness-startup-recovery.external.e2e.ts`](deepseek-harness-startup-recovery.external.e2e.ts) starts the plugin before the listener exists:
 
 ```text
-No listener on selected numeric-loopback port
-  -> failOnStartupError=false
-  -> first MCP attempt fails
-  -> bounded reconnect supervisor starts
-  -> external process writes initial-failure marker
-  -> JVM starts listener on the exact port
-  -> MCP client reconnects
-  -> one current ctx.tools generation appears
-  -> sanitized read and proposal-only navigation succeed
+first attempt fails with no KMP tools
+  -> fixed marker
+  -> JVM starts listener
+  -> bounded startup reconnect
+  -> exact tools register
+  -> sanitized read and proposal-only action
 ```
 
-The marker is a control-plane synchronization artifact in a JVM-created temporary directory. It contains no token, endpoint, request, response, page context, or tool argument.
+### Established-session listener replacement — diagnostic PR
+
+[`deepseek-harness-established-session-recovery.external.e2e.ts`](deepseek-harness-established-session-recovery.external.e2e.ts) is a falsifiable probe:
+
+```text
+listener generation 1
+  -> real connection and tool registration
+  -> generation-1 context
+  -> listener closes and port releases
+  -> at least one tool call fails during outage
+  -> listener generation 2 starts on same authority
+  -> require upstream reconnected-and-re-synced signal
+  -> require tool-registration generation replacement
+  -> generation-2 context and proposal-only navigation
+```
+
+A tool call that merely begins succeeding after the endpoint returns is not enough. The probe requires both the upstream supervisor recovery signal and a replaced registration generation.
 
 ## Independent authority oracle
 
 The external TypeScript subjects assert model-facing schemas and tool results. The owning JVM tests independently verify the local dispatcher reached `WAITING_FOR_CONFIRMATION` with the exact proposed URL.
 
 ```text
-DeepSeek Harness process started
-  != Cordis plugin activated
-
-Cordis plugin activated
-  != ctx.tools registration committed
-
-ctx.tools registration committed
-  != local capability enabled
-
-MCP tool call succeeded
-  != browser/native side effect occurred
+DeepSeek Harness process started != Cordis plugin activated
+Cordis plugin activated != ctx.tools registration committed
+ctx.tools registration committed != local capability enabled
+MCP tool call succeeded != browser/native side effect occurred
 ```
 
-The tests never invoke a model provider. They use synthetic page fixtures, a synthetic token, numeric loopback endpoints, and the two existing KMP MCP tools.
+The tests never invoke a model provider. They use synthetic page fixtures, synthetic tokens, numeric loopback endpoints, and the two existing KMP MCP tools.
 
 ## Supply-chain and secret handling
 
-- The upstream repository, Node version, pnpm version, and GitHub Action commits are exact.
+- Upstream repository, Node, pnpm, and GitHub Action subjects are exact.
 - Installation uses the frozen upstream lockfile with lifecycle scripts disabled.
-- The token is generated per CI run and masked immediately.
-- The token is passed only through process environment and the transient Authorization header.
-- Child output must not contain the token or secret fixture.
-- Failure output is bounded and redacted before it can enter Gradle diagnostics.
+- Synthetic tokens are generated per CI run and masked immediately.
+- Tokens pass only through process environment and transient Authorization headers.
+- Child output must not contain tokens or secret fixtures.
+- Failure output is bounded and redacted before entering Gradle diagnostics.
+- Coordination markers contain fixed literals only.
 - No request body, page context, tool argument, response payload, or upstream workspace is uploaded as an artifact.
 
 ## Evidence distinction
 
 ```text
-immediate-connect PASS
-  != startup-recovery PASS
+immediate-connect PASS != startup-recovery PASS
+startup-recovery PASS != established-session recovery PASS
+established-session recovery PASS != Cordis HMR
+reconnect PASS != arbitrary remote proxy or production network PASS
+```
 
-startup-recovery PASS
-  != reconnect after an established listener fails
+## Stable diagnostic outcomes
 
-reconnect PASS
-  != Cordis HMR or tool-list generation replacement
+```text
+PASS
+  real transport loss caused bounded supervisor reconnect and generation replacement
+
+FAIL_TRANSPORT_CLOSE_NOT_OBSERVED
+  outage/recovery occurred without the required upstream onclose/re-sync evidence
+
+FAIL_RECONNECT_EXHAUSTED
+  supervisor entered reconnect but did not recover within the bounded subject
+
+FAILED_EVAL
+  another owning oracle failed
 ```
 
 ## Deliberately not proved
 
 ```yaml
-reconnect_after_established_listener_failure: NOT_EXERCISED
 cordis_hmr: NOT_EXERCISED
-tool_list_change_generation_replacement: NOT_EXERCISED
+tool_list_change_notification_generation_replacement: NOT_EXERCISED
+arbitrary_remote_proxy_behavior: NOT_EXERCISED
 production_token_custody: NOT_IMPLEMENTED
 oauth_or_mtls: NOT_IMPLEMENTED
 remote_tls: NOT_IMPLEMENTED

@@ -9,6 +9,7 @@ on:
       - 'integrations/deepseek-harness/e2e/**'
       - 'docs/architecture/ADR-0014-deepseek-harness-process-e2e.md'
       - 'docs/architecture/ADR-0015-deepseek-harness-startup-recovery.md'
+      - 'docs/architecture/ADR-0016-deepseek-established-session-recovery-probe.md'
   workflow_dispatch:
 
 permissions:
@@ -17,7 +18,7 @@ permissions:
 jobs:
   cordis-mcp-e2e:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 40
     env:
       DSH_E2E_COMMIT: 47f943859bef60e4160492346772ded9b24f765a
       DSH_E2E_ROOT: ${{ github.workspace }}/.e2e/deepseek-harness
@@ -84,8 +85,12 @@ jobs:
           cp \
             integrations/deepseek-harness/e2e/deepseek-harness-startup-recovery.external.e2e.ts \
             "$destination/kotlin-auto-webview-startup-recovery.external.e2e.ts"
+          cp \
+            integrations/deepseek-harness/e2e/deepseek-harness-established-session-recovery.external.e2e.ts \
+            "$destination/kotlin-auto-webview-established-session-recovery.external.e2e.ts"
           test -s "$destination/kotlin-auto-webview.external.e2e.ts"
           test -s "$destination/kotlin-auto-webview-startup-recovery.external.e2e.ts"
+          test -s "$destination/kotlin-auto-webview-established-session-recovery.external.e2e.ts"
 
       - name: Create masked synthetic credential
         shell: bash
@@ -100,7 +105,7 @@ jobs:
           echo "::add-mask::$token"
           echo "DSH_E2E_TOKEN=$token" >> "$GITHUB_ENV"
 
-      - name: Exercise pinned Cordis MCP client and startup recovery
+      - name: Exercise pinned Cordis MCP client and recovery subjects
         shell: bash
         run: |
           set -euo pipefail
