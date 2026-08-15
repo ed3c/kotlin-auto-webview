@@ -35,7 +35,7 @@ Target placement:
 |---|---|
 | `commonMain` | runtime + coroutines extensions |
 | `androidMain` | Android driver |
-| `iosMain` | Native driver |
+| `iosArm64Main`, `iosSimulatorArm64Main` | Native driver |
 | `desktopMain` | SQLite/JDBC driver |
 | `wasmJsMain` | Web Worker driver |
 
@@ -55,17 +55,18 @@ io.ktor:ktor-client-core
 io.ktor:ktor-client-cio
 io.ktor:ktor-client-content-negotiation
 io.ktor:ktor-client-websockets
-io.ktor:ktor-client-sse
 io.ktor:ktor-serialization-kotlinx-json
 ```
 
-The CIO engine is selected as the common baseline because official Ktor documentation lists it for JVM, Android, Native, JS, and WasmJS. Platform-specific engines may be evaluated later only through a separate task packet.
+Ktor 3.5.x exposes the client SSE plugin from `ktor-client-core`; there is no separate `io.ktor:ktor-client-sse:3.5.1` artifact. The failed exact-head CI on `c4ed8107555cf98b3135930c188986fb5cb0366c` was the falsifier that removed that invalid declaration.
+
+The CIO engine is selected as the common baseline because the admitted Ktor version provides multiplatform CIO support for the repository target matrix. Platform-specific engines may be evaluated later only through a separate task packet.
 
 Primary-source compatibility evidence:
 
 - Ktor 3.5.1 includes a fix for Kotlin 2.4 compiler-plugin breaking changes; this repository pins Kotlin 2.4.10.
 - Ktor 3.5.1 fixes the CIO static `node:net` import that broke WasmJS browser Webpack builds.
-- Ktor provides WebSocket and SSE client APIs needed by the future ordered/private stream, but this PR configures no endpoint or transport identity.
+- Ktor provides WebSocket and SSE client APIs needed by the future ordered/private stream; SSE requires only `ktor-client-core`. This PR configures no endpoint or transport identity.
 
 ## Security and authority delta
 
@@ -89,7 +90,7 @@ Future #8/#9 implementations must add origin/peer policy, lifecycle shutdown, ca
 | Exact source tag/commit | `PASS` | `PASS` |
 | Direct license source | `PASS` — Apache-2.0 | `PASS` — Apache-2.0 |
 | Additive repository NOTICE entry | present in this branch | present in this branch |
-| Maven artifact resolution | `NOT_EXERCISED` until exact-head CI | `NOT_EXERCISED` until exact-head CI |
+| Maven artifact resolution | `NOT_EXERCISED` until current exact-head CI passes | `NOT_EXERCISED` until current exact-head CI passes |
 | Transitive dependency inventory | `NOT_EXERCISED` |
 | Transitive license/SBOM review | `NOT_EXERCISED` |
 | Required third-party notice extraction | `NOT_EXERCISED` |
@@ -98,6 +99,18 @@ Future #8/#9 implementations must add origin/peer policy, lifecycle shutdown, ca
 | Hosted-service terms | not exercised; no service configured | not exercised; no service configured |
 
 Direct Apache-2.0 evidence does not mean zero commercial/legal risk. This document does not accept legal terms on behalf of a person or organization.
+
+## Failure and repair ledger
+
+### Attempt 1 — `fe2d2d0e1053ded3d655edca4e0c3890b724f17c`
+
+CI failed because the build assumed a shared `iosMain` source set that this project does not create. The repair bound the SQLDelight Native driver to the concrete `iosArm64Main` and `iosSimulatorArm64Main` source sets.
+
+### Attempt 2 — `c4ed8107555cf98b3135930c188986fb5cb0366c`
+
+All three CI jobs reached dependency resolution and failed because `io.ktor:ktor-client-sse:3.5.1` does not exist. Ktor's official 3.5.x SSE client documentation states that the SSE plugin requires only `ktor-client-core`. The repair removes the nonexistent artifact while retaining the SSE API through core.
+
+This is the second qualifying failure against the same build-admission oracle. If the next exact-head repair fails the same acceptance target, the three-failure escalation contract applies before any fourth blind patch.
 
 ## Build admission matrix
 
@@ -126,6 +139,7 @@ Review/evals reject:
 
 - a dynamic selector, snapshot, default branch, or `latest`;
 - moving a platform driver into an incompatible source set;
+- declaring a module that the selected upstream version does not publish;
 - adding an endpoint, credential, telemetry SDK, or feature implementation to this dependency-only PR;
 - claiming direct-license review completes transitive/legal review;
 - claiming successful resolution proves runtime correctness;
