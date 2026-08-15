@@ -2,6 +2,7 @@ package dev.ed3c.autowebview.edge
 
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
+import kotlin.math.min
 
 @Serializable
 data class PairedPeer(
@@ -151,6 +152,41 @@ class OpenClawStreamSession(
     private companion object {
         const val MAX_REPLAY_TOKENS = 4_096
     }
+}
+
+@Serializable
+data class ReconnectPolicy(
+    val initialDelayMs: Long = 250,
+    val maximumDelayMs: Long = 15_000,
+    val multiplier: Int = 2,
+    val jitterPermille: Int = 200,
+    val maximumAttempts: Int = 8,
+) {
+    init {
+        require(initialDelayMs > 0)
+        require(maximumDelayMs >= initialDelayMs)
+        require(multiplier >= 1)
+        require(jitterPermille in 0..1_000)
+        require(maximumAttempts > 0)
+    }
+
+    fun delayMs(attempt: Int, jitterSamplePermille: Int): Long {
+        require(attempt in 0 until maximumAttempts)
+        require(jitterSamplePermille in -1_000..1_000)
+
+        var base = initialDelayMs
+        repeat(attempt) {
+            base = min(maximumDelayMs, saturatingMultiply(base, multiplier.toLong()))
+        }
+
+        val boundedBase = min(base, maximumDelayMs)
+        val signedJitterPermille = jitterSamplePermille * jitterPermille / 1_000
+        val delta = boundedBase * signedJitterPermille / 1_000
+        return (boundedBase + delta).coerceIn(1, maximumDelayMs)
+    }
+
+    private fun saturatingMultiply(value: Long, factor: Long): Long =
+        if (factor == 0L || value <= Long.MAX_VALUE / factor) value * factor else Long.MAX_VALUE
 }
 
 interface OpenClawTransport {
