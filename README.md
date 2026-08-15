@@ -20,15 +20,50 @@ A production-oriented Kotlin Multiplatform browser shell for Android, iOS, Web/W
 | Bounded browser action executor | No privileged executor yet | `NOT_IMPLEMENTED` | contracts #10; executor #11 |
 | MCP | Portable JSON-RPC discovery/resource/proposal gateway | `PASS` common tests | `mcp/` |
 | MCP peer authentication/network listener | Intentionally absent from common core | `NOT_IMPLEMENTED` | #9 |
-| Local semantic router | Lexical ranking embedded in cache baseline | `IMPLEMENTED`; extraction contract pending | #12 |
+| Local semantic router | Lexical ranking embedded in cache baseline | baseline implemented; extraction contract pending | #12 |
 | On-device embedding/SLM engine | No engine selected | `NOT_IMPLEMENTED` | #13 |
 | Android Play delivery | Debug APK only | `NOT_EXERCISED` as store evidence | #2 |
 | iOS App Store/TestFlight delivery | Simulator framework only | `NOT_EXERCISED` as store evidence | #3 |
 | Web deployment | Production Wasm artifact built | deployment `NOT_EXERCISED` | #5 |
 | Git Town static policy | `.git-town.toml` for v24.0.0 | configuration present | issue #6 |
 | Git Town executable admission/live sync | Host binary/checksum/canaries missing | `ABSENT` / `NOT_EXERCISED` | `docs/git/GIT_TOWN_ADMISSION.md` |
+| Autonomous dual-lane policy | Repository binding and safety profile | documentation implemented; live local lane `NOT_EXERCISED` | `docs/automation/` |
+| Automatic merge | No repository-owned preauthorization | `EXTERNAL_AUTHORITY_REQUIRED` | leave exact PR open |
 
-`PASS`, `FAIL`, `ABSENT`, `NOT_IMPLEMENTED`, `NOT_EXERCISED`, and `SKIPPED_BY_POLICY` are not interchangeable.
+`PASS`, `FAIL`, `ABSENT`, `NOT_IMPLEMENTED`, `NOT_EXERCISED`, `SKIPPED_BY_POLICY`, and `EXTERNAL_AUTHORITY_REQUIRED` are not interchangeable.
+
+## Autonomous dual-lane control plane
+
+This repository applies the user-supplied **Repository Autonomous Dual-Lane Integration + Shadow Architecture + Git Town System Prompt v2.0** through a thin repository binding. Portable laws remain in the canonical shared Skills; repository identity, state ownership, evals, task packets, and safety postconditions live here.
+
+```mermaid
+flowchart LR
+    TASK[Task / issue / PDF / architecture source] --> B[Builder]
+    TASK --> S[Shadow Architect]
+    B -->|material delta| S
+    S -->|L0 observe / L1 warn| B
+    S -->|L2 reconcile| R[Architecture + evidence reconciliation]
+    R --> B
+    S -->|L3 block named transition| X[Stable blocked state]
+    X -->|continue independent safe work| B
+    B --> V[Exact-subject evals + negative controls]
+    V --> D[Commit / push / PR gates]
+    D --> REC[Evidence-bound receipt]
+```
+
+### Current automation admission
+
+| Operation class | State | Boundary |
+|---|---|---|
+| Repository/forge inspection | `READ_ONLY_ADMITTED` | Same public repository |
+| Feature-branch write | `BRANCH_WRITE_ADMITTED` | Declared PR branch, fast-forward only |
+| Issue/PR publication | `REMOTE_PR_ADMITTED` | Exact head/base, disclosure scan, existing rights |
+| Local linked worktree and dirty-state proof | `NOT_EXERCISED` | Current connector does not expose local checkout state |
+| Live Git Town synchronization | `BLOCKED_POLICY` | Exact host binary, wrapper, leases, receipts, and canaries missing |
+| Merge | `EXTERNAL_AUTHORITY_REQUIRED` | Repository does not preauthorize trusted automation; auto-merge is disabled |
+| Store/release/production/settings/secrets/license changes | denied | Outside Agent authority |
+
+A blocked transition does not trigger a question and does not stop independent safe slices. See [`docs/automation/README.md`](docs/automation/README.md) and [`docs/automation/REPOSITORY_PROFILE.md`](docs/automation/REPOSITORY_PROFILE.md).
 
 ## Runtime data flow
 
@@ -63,30 +98,35 @@ flowchart LR
 1. Observation precedes action.
 2. Raw page data is sanitized before cache, projection, MCP, or audit use.
 3. A model or remote node can propose a typed action; it cannot grant authority.
-4. User interaction preempts agent authority.
+4. User interaction preempts Agent authority.
 5. Page identity and anchor freshness must be revalidated before future execution.
 6. Web origin/CSP/iframe limitations are surfaced, never bypassed.
+7. Repository visibility, ownership, access, default branch, license/usage rights, remote topology, and private-data boundary remain immutable under autonomous work.
+8. Missing evidence remains missing; a green build cannot promote a local, physical-device, store, legal, merge, or production lane.
 
 ## Directory → state machine → data contract
 
-The table distinguishes explicit code state machines from pipeline transition contracts. Only `dispatcher/` currently owns a serialized enum state machine; other rows describe the required lifecycle of that module.
+The table distinguishes explicit code state machines from pipeline transition contracts. Only `dispatcher/` currently owns a serialized enum state machine; other runtime rows describe the required lifecycle of that module.
 
-| Directory | State/transition responsibility | Inputs | Outputs | Forbidden coupling |
-|---|---|---|---|---|
-| `domain/` | `DEFINE -> SERIALIZE -> VALIDATE` immutable contracts | Constructor/decoder values | `PageContext`, `AgentAction`, `ProjectionHint`, cache/audit DTOs | I/O, platform APIs, policy decisions |
-| `web/` | `NOT_INJECTED -> OBSERVING -> EMITTING -> RETRY/DEGRADED` | Page lifecycle, DOM/selection/mutation events | Raw `PageContext` JSON | Privileged execution, secret retention, authorization |
-| `privacy/` | `RAW -> FILTERED -> REDACTED -> BOUNDED` | Raw `PageContext` | Sanitized `PageContext` | Ranking, remote transport, permission decisions |
-| `cache/` | `QUERY -> HIT/MISS`; `PUT -> STORED`; `REMOVE/CLEAR` | Sanitized text/records | Ranked `CacheMatch` | UI rendering, network identity, action execution |
-| `projection/` | `MATCH -> ANCHORED/BUBBLE` or `UNMATCHED/CONTEXT_RAIL`; stale data is dropped | Current anchors + cache matches | `ProjectionHint` list | Authorization or direct DOM mutation |
-| `mcp/` | `PARSE -> VALIDATE -> DISCOVER/READ/PROPOSE -> RESULT/ERROR` | JSON-RPC payload | Sanitized resource result or typed proposal | Network listener, peer trust, WebView/native calls |
-| `capability/` | `UNREGISTERED/DISABLED/MISSING_PERMISSION/OVER_RISK -> DENIED`; low risk `-> ALLOWED`; medium/high `-> REQUIRES_CONFIRMATION` | `AgentAction`, granted permissions | `PolicyDecision` | Temporal execution state, UI rendering |
-| `dispatcher/` | Explicit `READY`, `OBSERVING_USER`, `PROPOSING`, `WAITING_FOR_CONFIRMATION`, `EXECUTING`, `SUSPENDED` | User and action lifecycle events | `DispatcherSnapshot` | Capability invention, platform implementation |
-| `runtime/` | `CAPTURE -> SANITIZE -> QUERY -> PROJECT -> STORE -> AUDIT` | Page contexts, proposals, HITL events | StateFlows for context/projection/audit/dispatcher | Store packaging, transport identity |
-| `ui/` | `RENDER -> OBSERVE_USER -> REQUEST_CONFIRMATION -> CONFIRM/REJECT -> RENDER` | Runtime flows and user input | UI events only | Hidden authorization or raw model execution |
-| `androidMain/` | `CREATE -> ATTACH_RENDERER -> FOREGROUND/BACKGROUND -> DESTROY` | Android lifecycle and shared contracts | Android renderer/tool results | Android-only policy divergence |
-| `iosMain/` + `iosApp/` | `CREATE_CONTROLLER -> ATTACH_WKWEBVIEW -> ACTIVE/BACKGROUND -> RELEASE` | iOS lifecycle and shared contracts | iOS renderer/tool results | iOS-only policy divergence |
-| `desktopMain/` | `INIT_KCEF -> READY -> ACTIVE -> SHUTDOWN` | Desktop lifecycle and shared contracts | Desktop renderer/tool results | Replacing mobile constraints with Chromium assumptions |
-| `wasmJsMain/` | `BOOT -> MOUNT -> ACTIVE -> UNMOUNT` | Browser document/lifecycle | Web UI events | Same-origin/CSP bypass claims |
+| Path | Domain / owner | State or transition responsibility | Inputs | Outputs | Forbidden coupling | Evidence / next slice |
+|---|---|---|---|---|---|---|
+| `domain/` | Shared contracts | `DEFINE -> SERIALIZE -> VALIDATE` | Constructor/decoder values | `PageContext`, `AgentAction`, `ProjectionHint`, cache/audit DTOs | I/O, platform APIs, policy decisions | serialization tests |
+| `web/` | Browser observer | `NOT_INJECTED -> OBSERVING -> EMITTING -> RETRY/DEGRADED` | Page lifecycle, DOM/selection/mutation events | Raw `PageContext` JSON | Privileged execution, secret retention, authorization | observer/privacy controls |
+| `privacy/` | Data boundary | `RAW -> FILTERED -> REDACTED -> BOUNDED` | Raw `PageContext` | Sanitized `PageContext` | Ranking, remote transport, permission decisions | privacy tests |
+| `cache/` | L1 memory | `QUERY -> HIT/MISS`; `PUT -> STORED`; `REMOVE/CLEAR` | Sanitized text/records | Ranked `CacheMatch` | UI rendering, network identity, action execution | cache tests; #8 |
+| `projection/` | Visual evidence | `MATCH -> ANCHORED/BUBBLE` or `UNMATCHED/CONTEXT_RAIL`; stale data drops | Current anchors + cache matches | `ProjectionHint` list | Authorization or direct DOM mutation | projection tests; #11/#12 |
+| `mcp/` | Protocol gateway | `PARSE -> VALIDATE -> DISCOVER/READ/PROPOSE -> RESULT/ERROR` | JSON-RPC payload | Sanitized resource or typed proposal | Network listener, peer trust, WebView/native calls | MCP tests; #9 |
+| `capability/` | Authorization policy | Unknown/disabled/missing/over-risk `-> DENIED`; low `-> ALLOWED`; medium/high `-> REQUIRES_CONFIRMATION` | `AgentAction`, granted permissions | `PolicyDecision` | Temporal execution state, UI rendering | policy tests; #10 |
+| `dispatcher/` | Human/Agent temporal authority | `READY`, `OBSERVING_USER`, `PROPOSING`, `WAITING_FOR_CONFIRMATION`, `EXECUTING`, `SUSPENDED` | User/action lifecycle events | `DispatcherSnapshot` | Capability invention, platform implementation | state tests; #11 |
+| `runtime/` | Pipeline orchestration | `CAPTURE -> SANITIZE -> QUERY -> PROJECT -> STORE -> AUDIT` | Page contexts, proposals, HITL events | StateFlows for context/projection/audit/dispatcher | Store packaging, transport identity | common tests; #8/#9 |
+| `ui/` | Rendering/HITL | `RENDER -> OBSERVE_USER -> REQUEST_CONFIRMATION -> CONFIRM/REJECT -> RENDER` | Runtime flows and user input | UI events | Hidden authorization or raw model execution | UI/semantics tests |
+| `androidMain/` | Android adapter | `CREATE -> ATTACH_RENDERER -> FOREGROUND/BACKGROUND -> DESTROY` | Android lifecycle + shared contracts | Android renderer/tool results | Android-only policy divergence | #2/#10/#11 |
+| `iosMain/` + `iosApp/` | Apple adapter/host | `CREATE_CONTROLLER -> ATTACH_WKWEBVIEW -> ACTIVE/BACKGROUND -> RELEASE` | iOS lifecycle + shared contracts | iOS renderer/tool results | iOS-only policy divergence | #3/#10/#11 |
+| `desktopMain/` | Desktop/KCEF adapter | `INIT_KCEF -> READY -> ACTIVE -> SHUTDOWN` | Desktop lifecycle + shared contracts | Desktop renderer/tool results | Replacing mobile constraints with Chromium assumptions | Desktop compile/runtime task |
+| `wasmJsMain/` | Web/Wasm adapter | `BOOT -> MOUNT -> ACTIVE -> UNMOUNT` | Browser document/lifecycle | Web UI events | Same-origin/CSP bypass claims | #5 |
+| `docs/automation/` | Autonomous control plane | `SM-AUTO-001`, `SM-SHADOW-001`, `SM-SAFE-001`, `SM-PUB-001` | Repository/task/evidence metadata | Admission, intervention, safety, final receipt contracts | Portable Skill duplication or invented runtime truth | issue #6 / PR #15 |
+| `docs/git/` | Stack governance | Task admission, branch/lease/sync/publication contracts | Issues, refs, exact tool evidence | Stack graph, Worker outcomes, receipts | Runtime feature ownership or merge authority | issue #6; future wrapper |
+| `docs/harness/` | Verification architecture | Invariant -> observer -> oracle -> control -> evidence | Exact subject + environment + command | Evidence state and receipt | Cross-subject evidence promotion | all implementation slices |
 
 ### Dispatcher state machine
 
@@ -106,12 +146,24 @@ stateDiagram-v2
     SUSPENDED --> READY: Resume
 ```
 
+### Autonomous state-machine index
+
+| ID | Owner | Purpose |
+|---|---|---|
+| `SM-AUTO-001` | Autonomous orchestrator | Discovery through furthest safe delivery state |
+| `SM-SHADOW-001` | Shadow Architect | L0-L3 architecture-delta intervention |
+| `SM-SAFE-001` | Safety binder | Read/local/branch/PR/merge admission without authority expansion |
+| `SM-PUB-001` | Publication gate | Exact-head commit/push/PR/merge separation |
+| `SM-DISP-001` | `dispatcher/` | Human input preemption and action lifecycle |
+
+Detailed automation state/flow contracts are in `docs/automation/README.md`.
+
 ## Repository layout
 
 ```text
 .git-town.toml                 # static no-push Git Town policy; not executable admission
 AGENTS.md                      # repository-wide Agent authority
-README.md / README.zh-TW.md    # architecture, state/data map, live stack index
+README.md / README.zh-TW.md    # architecture, state/data map, automation and Stack index
 
 composeApp/
   src/commonMain/kotlin/dev/ed3c/autowebview/
@@ -122,7 +174,7 @@ composeApp/
     projection/                # anchor selection + rendering hints
     mcp/                       # transport-independent JSON-RPC gateway
     capability/                # capability policy decisions
-    dispatcher/                # explicit human/agent state machine
+    dispatcher/                # explicit human/Agent state machine
     runtime/                   # orchestration + bounded audit state
     ui/                        # browser shell, overlay, HITL surface
   src/commonTest/              # shared state/policy/privacy/serialization evidence
@@ -134,28 +186,30 @@ composeApp/
 iosApp/                       # Xcode host shell
 
 docs/
+  automation/                 # autonomous dual-lane/Shadow/safety binding and repository profile
   architecture/               # hard laws and ADRs
   git/                        # Git Town profile, stack graph, Worker protocol
-  harness/                    # eval and evidence contract
+  harness/                    # eval, Shadow checkpoint, safety and evidence contract
   release/                    # platform delivery runbooks
   security/                   # threat model
-  TRACEABILITY.md             # requirement -> owner -> code -> evidence -> issue
+  TRACEABILITY.md             # REQ/SM/DF/INV/EVAL/WP/STACK/evidence index
 
 .github/
-  ISSUE_TEMPLATE/             # eval-first Stack PR task packet
-  PULL_REQUEST_TEMPLATE.md    # branch graph/path lease/evidence contract
+  ISSUE_TEMPLATE/             # eval-first, safety-bound Stack PR task packet
+  PULL_REQUEST_TEMPLATE.md    # branch/path/state/safety/evidence contract
   workflows/                  # CI and Pages workflows
 ```
 
 ## Git Town Stacked PR governance
 
-This repository consumes the shared [`git-town-stacked-pr-worker`](https://github.com/ed3c/skills-shared/tree/main/skills/git-town-stacked-pr-worker) method. The canonical Skill is not copied into this repository.
+This repository consumes the canonical [`git-town-stacked-pr-worker`](https://github.com/ed3c/skills-shared/tree/main/skills/git-town-stacked-pr-worker) method. The Skill is not copied into this repository.
 
 ```text
 Git Town                  branch hierarchy + bounded local synchronization
 Consumer repository       profile + task packets + path leases + evals + CI + receipts
 GitHub publication gate   exact-HEAD publication admission
-Human/trusted operator    semantic conflicts + legal acceptance + merge/ship + release
+Pre-existing policy       optional merge authority, only when explicitly preauthorized
+External authority        semantic conflicts, legal acceptance, store/production/settings operations
 ```
 
 ### Admission status
@@ -166,9 +220,11 @@ Human/trusted operator    semantic conflicts + legal acceptance + merge/ship + r
 | Exact source release and checksum-manifest identity | recorded |
 | Host OS/architecture binary checksum | `ABSENT` |
 | Executable provenance/SBOM/legal approval | `ABSENT` / `NOT_EXERCISED` |
+| Local linked worktree/lease wrapper | `NOT_IMPLEMENTED` / current session `NOT_EXERCISED` |
 | Live dry-run and no-push sync canary | `NOT_EXERCISED` |
 | Planted conflict canary | `NOT_EXERCISED` |
 | Exact-HEAD publication gate | `NOT_IMPLEMENTED` |
+| Repository-preauthorized automatic merge | `ABSENT` |
 
 Until admission is complete, a Worker returns `BLOCKED_POLICY`; it does not install `latest`, run another Git tool as a substitute, or publish manually.
 
@@ -218,7 +274,7 @@ The complete graph, including release branches and convergence, is maintained in
 | Order | Issue | Planned branch | Parent | Class | Exclusive path lease | Required evidence / state |
 |---:|---:|---|---|---|---|---|
 | 0 | #1 | `feat/kmp-agent-browser-foundation` | `main` | foundation | initial repository implementation | Draft PR; CI `PASS` at baseline head |
-| 1 | #6 | `docs/agent-integration-stack-index` | foundation | foundation | `.git-town.toml`, root docs, `docs/git/**`, `docs/harness/**`, templates | current docs stack; live Git Town `NOT_EXERCISED` |
+| 1 | #6 | `docs/agent-integration-stack-index` | foundation | foundation | automation/Git/Harness/root docs/templates | current docs stack; local Git Town `NOT_EXERCISED` |
 | 2 | #7 | `build/runtime-dependency-admission` | docs stack | foundation | Gradle catalogs/build files, dependency evidence, NOTICE | exact variants/licenses; no feature code |
 | 3A | #8 | `feat/persistent-memory` | runtime deps | child | `persistence/**`, SQLDelight schema/tests, ADR-0004 | migrations/restart/redaction; `NOT_IMPLEMENTED` |
 | 3B | #9 | `feat/openclaw-stream-contract` | runtime deps | child | `edge/**` common/mobile tests, ADR-0005 | auth/order/replay/backpressure; `NOT_IMPLEMENTED` |
@@ -228,8 +284,8 @@ The complete graph, including release branches and convergence, is maintained in
 | 3D | #13 | `feat/local-embedding-engine` | semantic contract | child | semantic engine/platform adapters + its admitted dependency changes | physical-device budget/license; `NOT_IMPLEMENTED` |
 | 4A | #2 | `release/android-play-evidence` | action executor | release | Android release workflow/metadata/runbook only | signed AAB + device/pre-launch evidence |
 | 4B | #3 | `release/ios-app-store-evidence` | action executor | release | iOS signing/metadata/runbook only | signed archive + TestFlight/device evidence |
-| 2D | #5 | `release/web-deployment-evidence` | docs stack | sibling | Pages/web deployment smoke evidence | deployed URL/browser/CSP receipts |
-| 5 | #14 | `converge/release-readiness-index` | docs stack after admitted dependencies | convergence | shared READMEs, `AGENTS.md`, traceability, aggregate release index | full exact-head matrix + Human Admit |
+| 2D | #5 | `release/web-deployment-evidence` | docs stack | sibling | Pages/Web deployment smoke evidence | deployed URL/browser/CSP receipts |
+| 5 | #14 | `converge/release-readiness-index` | docs stack after admitted dependencies | convergence | shared READMEs, `AGENTS.md`, traceability, aggregate release index | full exact-head matrix + external merge/release authority |
 
 Issue #4 remains the parent epic for persistent/private L2 and semantic-runtime work. Leaf PRs must not edit shared indexes; #14 owns final reconciliation.
 
@@ -262,7 +318,7 @@ Development entry points:
 ./gradlew :composeApp:wasmJsBrowserDevelopmentRun
 ```
 
-See [`docs/harness/README.md`](docs/harness/README.md) for module evals, mutation controls, evidence states, and release proof boundaries.
+See [`docs/harness/README.md`](docs/harness/README.md) for module evals, Shadow checkpoints, mutation controls, safety postconditions, evidence states, and release proof boundaries.
 
 ## MCP compatibility boundary
 
@@ -277,12 +333,16 @@ The official Kotlin SDK may be used in edge/platform modules only where its publ
 - Web/Wasm remains subject to same-origin, CSP, `X-Frame-Options`, and iframe policy. App-owned pages can expose richer context through an explicit `postMessage` contract; arbitrary sites may refuse embedding.
 - Desktop KCEF provides the richest Chromium surface but increases package size, memory use, and cold-start cost.
 
-## Security model
+## Security, privacy, and publication model
 
-No arbitrary model output is executed. Models and remote peers propose typed actions; capability policy and dispatcher state decide whether the proposal is denied, staged, or requires explicit confirmation. Password/payment fields are excluded before Kotlin processing. Production work still requires identity pinning, attestation, zero-telemetry review, persistent audit evidence, and store-specific privacy declarations.
+No arbitrary model output is executed. Models and remote peers propose typed actions; capability policy and dispatcher state decide whether the proposal is denied, staged, or requires explicit confirmation. Password/payment fields are excluded before Kotlin processing.
 
-Read [`SECURITY.md`](SECURITY.md), [`docs/security/THREAT_MODEL.md`](docs/security/THREAT_MODEL.md), and [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md).
+Autonomous repository work also preserves repository visibility, owner, access/rulesets, default branch, license/usage-right meaning, private-data boundary, user local state, protected history, and remote topology. The current connector does not prove local user-state preservation, so that lane remains `NOT_EXERCISED` rather than PASS.
+
+Production work still requires identity pinning, attestation, zero-telemetry review, persistent audit evidence, physical-device tests, store privacy declarations, and external authority.
+
+Read [`SECURITY.md`](SECURITY.md), [`docs/security/THREAT_MODEL.md`](docs/security/THREAT_MODEL.md), [`docs/automation/README.md`](docs/automation/README.md), and [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md).
 
 ## License
 
-Apache License 2.0. Third-party dependencies retain their own licenses; see [`NOTICE`](NOTICE). Git Town is a development tool and is separately admitted under `docs/git/GIT_TOWN_ADMISSION.md`.
+Apache License 2.0. Third-party dependencies retain their own licenses; see [`NOTICE`](NOTICE). This autonomous binding does not alter license or usage rights. Git Town is a development tool and is separately admitted under `docs/git/GIT_TOWN_ADMISSION.md`.
