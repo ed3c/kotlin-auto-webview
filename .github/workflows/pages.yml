@@ -1,8 +1,12 @@
 name: Deploy Web
 
+# Deployment is manual until GitHub Pages is enabled for this repository with
+# "GitHub Actions" as its source. Until then `configure-pages`/`deploy-pages` cannot succeed, so a
+# push trigger would fail every merge to main and spend a runner proving something already known.
+# Enabling Pages is a repository settings change and stays an owner decision (issue #5, ADR scope:
+# "without changing repository Pages settings"). Restore the push trigger in the same change that
+# enables Pages.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
