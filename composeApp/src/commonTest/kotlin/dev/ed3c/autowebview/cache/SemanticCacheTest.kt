@@ -8,14 +8,15 @@ import kotlin.test.assertTrue
 
 class SemanticCacheTest {
     @Test
-    fun ranksRelatedContextAboveUnrelatedContext() = runTest {
+    fun ranksStrongerMatchAbovePartialMatch() = runTest {
         val cache = InMemorySemanticCache()
         cache.put(record("kotlin", "Kotlin multiplatform webview browser context"))
-        cache.put(record("cooking", "Pasta tomato recipe kitchen"))
+        cache.put(record("partial", "Browser cooking catalog"))
+        cache.put(record("unrelated", "Pasta tomato recipe kitchen"))
 
         val matches = cache.query("KMP browser webview")
 
-        assertEquals("kotlin", matches.first().record.id)
+        assertEquals(listOf("kotlin", "partial"), matches.map { it.record.id })
         assertTrue(matches.first().relevance > matches.last().relevance)
     }
 
