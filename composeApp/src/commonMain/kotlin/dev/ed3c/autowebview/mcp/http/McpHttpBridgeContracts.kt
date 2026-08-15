@@ -15,7 +15,61 @@ data class McpHttpBridgeRequest(
     val headers: Map<String, List<String>>,
     val body: String,
     val declaredContentLength: Long? = null,
+    /** Transport facts observed by the trusted host listener, never asserted by the client. */
+    val transport: McpHttpTransportFacts = McpHttpTransportFacts(),
 )
+
+/**
+ * What the host's own HTTP/TLS implementation observed about the immediate peer.
+ *
+ * Every field is filled in by the trusted listener adapter. A value that arrived inside a request
+ * header never reaches this type; forwarding metadata is admitted separately and only when
+ * [McpHttpTransportPolicy] names the immediate peer as a trusted proxy.
+ */
+data class McpHttpTransportFacts(
+    /** Numeric address of the immediate peer as the host listener saw it. */
+    val peerAddress: String? = null,
+    /** Negotiated TLS protocol on this hop, or `null` when the hop was plaintext. */
+    val tlsProtocol: String? = null,
+    /** Exact validated client-certificate subject, or `null` when no client certificate was used. */
+    val peerCertificateSubject: String? = null,
+    /** True only when the listener's own trust manager validated the client chain. */
+    val peerCertificateVerified: Boolean = false,
+    /** Platform-issued workload identity assertion attached by the host, never by the client. */
+    val workloadIdentityAssertion: String? = null,
+)
+
+/**
+ * Transport identity requirements for one mounted route.
+ *
+ * [trustedProxies] is an exact numeric peer allowlist. Forwarding metadata from any other peer is
+ * rejected rather than trusted, so a client cannot promote itself by sending `X-Forwarded-Proto`.
+ */
+data class McpHttpTransportPolicy(
+    val requireDirectTls: Boolean = false,
+    val admittedTlsProtocols: Set<String> = setOf("TLSv1.3"),
+    val trustedProxies: Set<String> = emptySet(),
+    val requireClientCertificate: Boolean = false,
+) {
+    init {
+        require(admittedTlsProtocols.isNotEmpty()) { "At least one admitted TLS protocol is required" }
+        // TLS 1.2 is the floor: an obsolete protocol name here would silently widen every listener
+        // that reads this policy, so it is refused where the policy is built, not where it is used.
+        require(admittedTlsProtocols.all { it in ADMITTED_TLS_PROTOCOLS }) {
+            "Only TLS 1.2 or newer may be admitted"
+        }
+        require(trustedProxies.all { it.isNotBlank() && it.none(Char::isWhitespace) }) {
+            "Trusted proxy peer addresses are invalid"
+        }
+        require(!requireClientCertificate || requireDirectTls) {
+            "Client certificates can only be required on a directly terminated TLS hop"
+        }
+    }
+
+    companion object {
+        val ADMITTED_TLS_PROTOCOLS: Set<String> = setOf("TLSv1.2", "TLSv1.3")
+    }
+}
 
 /** Exact endpoint identity and body budgets for one mounted MCP route. */
 data class McpHttpEndpointPolicy(
@@ -26,6 +80,15 @@ data class McpHttpEndpointPolicy(
     val allowMissingOrigin: Boolean = true,
     val maxRequestBodyBytes: Int = 64 * 1024,
     val maxResponseBodyBytes: Int = 256 * 1024,
+    val transportPolicy: McpHttpTransportPolicy = McpHttpTransportPolicy(),
+    /**
+     * Whether a client that prefers `text/event-stream` gets a request-scoped SSE response.
+     *
+     * The stateless JSON response stays the default admitted mode; enabling this never adds a GET
+     * event stream or a protocol-level HTTP session.
+     */
+    val sseResponseEnabled: Boolean = false,
+    val maxSseEvents: Int = 8,
 ) {
     internal val normalizedScheme: String = normalizeMcpHttpScheme(scheme)
     internal val normalizedAuthority: String = normalizeMcpHttpAuthority(authority)
@@ -40,11 +103,19 @@ data class McpHttpEndpointPolicy(
         }
         require(maxRequestBodyBytes > 0) { "MCP request body budget must be positive" }
         require(maxResponseBodyBytes > 0) { "MCP response body budget must be positive" }
+        require(maxSseEvents in 1..64) { "MCP SSE event budget is outside the admitted range" }
         require(normalizedScheme == "https" || isMcpHttpLoopbackAuthority(normalizedAuthority)) {
             "Plain HTTP MCP endpoints are allowed only on explicit loopback authorities"
         }
         require(allowMissingOrigin || normalizedOrigins.isNotEmpty()) {
             "At least one exact Origin is required when missing Origin is denied"
+        }
+        require(
+            normalizedScheme != "https" ||
+                transportPolicy.requireDirectTls ||
+                transportPolicy.trustedProxies.isNotEmpty(),
+        ) {
+            "An HTTPS endpoint must terminate TLS directly or name at least one trusted proxy"
         }
     }
 }
@@ -53,6 +124,21 @@ data class McpHttpAuthenticationInput(
     val authorizationHeader: String?,
     val scheme: String,
     val authority: String,
+    /** Host clock reading for the request, so expiry is decided against one shared timeline. */
+    val nowEpochMs: Long,
+    /** Transport facts observed by the host listener; used by mTLS and workload-identity profiles. */
+    val transport: McpHttpTransportFacts = McpHttpTransportFacts(),
+    /**
+     * Admitted route path and method.
+     *
+     * The bridge has already rejected any other value by the time a verifier runs, so the defaults
+     * are the only admitted values; they exist so a proof-of-possession profile can bind a
+     * credential to the exact request without re-deriving route authority.
+     */
+    val path: String = "/mcp",
+    val httpMethod: String = "POST",
+    /** Second credential-bearing header (for example a DPoP proof), when the client sent one. */
+    val proofHeader: String? = null,
 )
 
 enum class McpHttpAuthenticationRejectionReason {
@@ -129,6 +215,11 @@ enum class McpHttpBridgeErrorCode(
     HEADER_INVALID(400, -32600, "An HTTP header is invalid"),
     DUPLICATE_HEADER(400, -32600, "A singleton HTTP header was repeated"),
     ORIGIN_REJECTED(403, -32600, "Request Origin is not admitted"),
+    TLS_REQUIRED(403, -32600, "An admitted TLS transport is required"),
+    TLS_VERSION_REJECTED(403, -32600, "Negotiated TLS protocol is not admitted"),
+    CLIENT_CERTIFICATE_REQUIRED(403, -32600, "A validated client certificate is required"),
+    FORWARDING_NOT_ADMITTED(403, -32600, "Forwarding metadata came from an untrusted peer"),
+    FORWARDED_METADATA_REJECTED(400, -32600, "Forwarding metadata does not match the admitted route"),
     BODY_LENGTH_INVALID(400, -32600, "Content length is invalid"),
     BODY_TOO_LARGE(413, -32600, "MCP request body exceeds the configured limit"),
     CONTENT_TYPE_REQUIRED(415, -32600, "Content-Type application/json is required"),
@@ -147,6 +238,7 @@ enum class McpHttpBridgeErrorCode(
     REPLAY_CAPACITY_EXHAUSTED(503, -32010, "Replay guard capacity is exhausted"),
     REPLAY_GUARD_UNAVAILABLE(503, -32603, "Replay guard is unavailable"),
     GATEWAY_RESPONSE_INVALID(502, -32603, "MCP gateway returned an invalid response"),
+    SSE_BUDGET_EXCEEDED(500, -32603, "MCP response exceeds the request-scoped event budget"),
     GATEWAY_FAILURE(502, -32603, "MCP gateway failed"),
     INTERNAL_FAILURE(500, -32603, "MCP HTTP bridge failed"),
 }
@@ -165,11 +257,51 @@ fun interface McpHttpBridgeObserver {
     fun record(receipt: McpHttpBridgeReceipt)
 }
 
+/** How the admitted response is framed on the wire. */
+enum class McpHttpResponseMode {
+    /** One JSON-RPC response object, `application/json`, body closed. */
+    JSON_SINGLE_RESPONSE,
+
+    /**
+     * One request-scoped `text/event-stream` response that ends when the request ends.
+     *
+     * This is not a standing GET event stream and carries no protocol-level session: the events
+     * belong to exactly one POST and the stream closes with it.
+     */
+    SSE_REQUEST_SCOPED_RESPONSE,
+}
+
+/** One Server-Sent Event of a request-scoped stream. */
+data class McpHttpSseEvent(val id: Int, val event: String, val data: String) {
+    init {
+        require(id >= 0) { "SSE event id must be non-negative" }
+        require(event.isNotBlank() && event.none(Char::isISOControl)) { "SSE event name is invalid" }
+        require('\r' !in data) { "SSE data cannot contain carriage returns" }
+    }
+
+    /** Wire framing for exactly this event, including its terminating blank line. */
+    fun frame(): String = buildString {
+        append("id: ").append(id).append('\n')
+        append("event: ").append(event).append('\n')
+        for (line in data.split('\n')) append("data: ").append(line).append('\n')
+        append('\n')
+    }
+}
+
 data class McpHttpBridgeResponse(
     val status: Int,
     val headers: Map<String, String>,
     val body: String?,
     val errorCode: McpHttpBridgeErrorCode? = null,
+    val mode: McpHttpResponseMode = McpHttpResponseMode.JSON_SINGLE_RESPONSE,
+    /**
+     * Events to write in order for [McpHttpResponseMode.SSE_REQUEST_SCOPED_RESPONSE].
+     *
+     * The list is fully materialised inside the response budget before the first byte is written,
+     * so a slow or vanished consumer can never make the producer accumulate unbounded state; a
+     * listener that fails mid-write simply stops writing the remainder.
+     */
+    val events: List<McpHttpSseEvent> = emptyList(),
 )
 
 internal fun normalizeMcpHttpScheme(value: String): String {

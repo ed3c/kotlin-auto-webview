@@ -157,6 +157,10 @@ compose.desktop {
             configurationFiles.from(project.file("compose-desktop.pro"))
         }
         nativeDistributions {
+            // The opt-in loopback MCP listener is built on com.sun.net.httpserver, which lives in
+            // jdk.httpserver. Without this the packaged runtime image starts but the listener
+            // cannot bind, and the failure only surfaces after a user enables the profile.
+            modules("jdk.httpserver")
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "KotlinAutoWebView"
             packageVersion = "0.1.0"

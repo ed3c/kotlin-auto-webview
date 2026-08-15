@@ -295,9 +295,12 @@ class McpStreamableHttpBridgeTest {
         }
         assertTrue(rejected)
 
+        // An HTTPS endpoint additionally has to say how TLS reaches it: terminated here, or by an
+        // exactly named trusted proxy. Declaring neither is a configuration error, not a default.
         McpHttpEndpointPolicy(
             scheme = "https",
             authority = "private.example:443",
+            transportPolicy = McpHttpTransportPolicy(requireDirectTls = true),
         )
     }
 

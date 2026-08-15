@@ -305,6 +305,7 @@ class DesktopMcpLoopbackServerTest {
                         authorizationHeader = "Bearer $TOKEN",
                         scheme = "http",
                         authority = "127.0.0.1:3090",
+                        nowEpochMs = 1_700_000_000_000,
                     ),
                 )
                 val wrong = verifier.verify(
@@ -312,6 +313,7 @@ class DesktopMcpLoopbackServerTest {
                         authorizationHeader = "Bearer ${"wrong-9Z".repeat(6)}",
                         scheme = "http",
                         authority = "127.0.0.1:3090",
+                        nowEpochMs = 1_700_000_000_000,
                     ),
                 )
                 val wrongScope = verifier.verify(
@@ -319,6 +321,7 @@ class DesktopMcpLoopbackServerTest {
                         authorizationHeader = "Bearer $TOKEN",
                         scheme = "http",
                         authority = "127.0.0.1:3091",
+                        nowEpochMs = 1_700_000_000_000,
                     ),
                 )
 
@@ -340,6 +343,7 @@ class DesktopMcpLoopbackServerTest {
                         authorizationHeader = "Bearer $TOKEN",
                         scheme = "http",
                         authority = "127.0.0.1:3090",
+                        nowEpochMs = 1_700_000_000_000,
                     ),
                 ),
             )

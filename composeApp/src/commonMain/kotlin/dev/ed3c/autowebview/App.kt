@@ -8,8 +8,7 @@ import dev.ed3c.autowebview.runtime.AgentBrowserRuntime
 import dev.ed3c.autowebview.ui.BrowserWorkspace
 
 @Composable
-fun App() {
-    val runtime = remember { AgentBrowserRuntime() }
+fun App(runtime: AgentBrowserRuntime = remember { AgentBrowserRuntime() }) {
     MaterialTheme(colorScheme = lightColorScheme()) {
         BrowserWorkspace(runtime)
     }

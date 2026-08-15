@@ -32,7 +32,8 @@ class McpStreamableHttpBridge(
 
         try {
             validateTransport(request)
-            val authentication = authenticate(request)
+            validateTransportIdentity(request)
+            val authentication = authenticate(request, nowEpochMs)
             val rpc = parseJsonRpc(request.body)
             rpcMethod = rpc.method
             rpcId = rpc.id
@@ -57,14 +58,19 @@ class McpStreamableHttpBridge(
             gatewayInvoked = true
             val gatewayBody = gateway.handle(request.body)
             val gatewayEvidence = validateGatewayResponse(gatewayBody, rpc.id)
-            val response = McpHttpBridgeResponse(
-                status = 200,
-                headers = responseHeaders(
-                    contentType = MEDIA_TYPE_JSON,
-                    protocolVersion = optionalSingleHeader(request, HEADER_PROTOCOL_VERSION),
-                ),
-                body = gatewayBody,
-            )
+            val protocolVersion = optionalSingleHeader(request, HEADER_PROTOCOL_VERSION)
+            val response = when (negotiateResponseMode(request)) {
+                McpHttpResponseMode.JSON_SINGLE_RESPONSE -> McpHttpBridgeResponse(
+                    status = 200,
+                    headers = responseHeaders(
+                        contentType = MEDIA_TYPE_JSON,
+                        protocolVersion = protocolVersion,
+                    ),
+                    body = gatewayBody,
+                )
+                McpHttpResponseMode.SSE_REQUEST_SCOPED_RESPONSE ->
+                    sseResponse(gatewayBody, protocolVersion)
+            }
             val sideEffectState = when {
                 gatewayEvidence.isError -> McpHttpSideEffectState.NOT_STARTED
                 rpc.method == METHOD_TOOLS_CALL && rpc.name == TOOL_PROPOSE_NAVIGATION ->
@@ -211,8 +217,71 @@ class McpStreamableHttpBridge(
         }
     }
 
+    /**
+     * Admit the transport hop itself before any credential is inspected.
+     *
+     * Forwarding metadata is authority-bearing, so it is honoured only when the immediate peer is
+     * an exactly named trusted proxy; otherwise its presence is a rejection rather than a hint.
+     */
+    private fun validateTransportIdentity(request: McpHttpBridgeRequest) {
+        val policy = endpointPolicy.transportPolicy
+        val transport = request.transport
+        val forwardedByTrustedProxy =
+            transport.peerAddress != null && transport.peerAddress in policy.trustedProxies
+
+        val forwardingHeaders = FORWARDING_HEADERS.flatMap { repeatedHeader(request, it) }
+        if (forwardingHeaders.isNotEmpty()) {
+            if (!forwardedByTrustedProxy) {
+                throw McpHttpAdmissionFailure(McpHttpBridgeErrorCode.FORWARDING_NOT_ADMITTED)
+            }
+            validateForwardedProtocol(request)
+        }
+
+        if (policy.requireDirectTls && !forwardedByTrustedProxy) {
+            val negotiated = transport.tlsProtocol
+                ?: throw McpHttpAdmissionFailure(McpHttpBridgeErrorCode.TLS_REQUIRED)
+            if (negotiated !in policy.admittedTlsProtocols) {
+                throw McpHttpAdmissionFailure(McpHttpBridgeErrorCode.TLS_VERSION_REJECTED)
+            }
+            if (
+                policy.requireClientCertificate &&
+                (!transport.peerCertificateVerified || transport.peerCertificateSubject == null)
+            ) {
+                throw McpHttpAdmissionFailure(McpHttpBridgeErrorCode.CLIENT_CERTIFICATE_REQUIRED)
+            }
+        }
+
+        if (
+            endpointPolicy.normalizedScheme == "https" &&
+            !forwardedByTrustedProxy &&
+            transport.tlsProtocol == null
+        ) {
+            throw McpHttpAdmissionFailure(McpHttpBridgeErrorCode.TLS_REQUIRED)
+        }
+    }
+
+    private fun validateForwardedProtocol(request: McpHttpBridgeRequest) {
+        val declaredProtocols = buildList {
+            optionalSingleHeader(request, HEADER_X_FORWARDED_PROTO)?.let(::add)
+            optionalSingleHeader(request, HEADER_FORWARDED)?.let { forwarded ->
+                FORWARDED_PROTO_PATTERN.find(forwarded)?.groupValues?.get(1)?.let(::add)
+            }
+        }.map { it.trim().lowercase() }
+        if (declaredProtocols.any { it != endpointPolicy.normalizedScheme }) {
+            throw McpHttpAdmissionFailure(McpHttpBridgeErrorCode.FORWARDED_METADATA_REJECTED)
+        }
+        val declaredHost = optionalSingleHeader(request, HEADER_X_FORWARDED_HOST)
+        if (declaredHost != null) {
+            val normalized = runCatching { normalizeMcpHttpAuthority(declaredHost) }.getOrNull()
+            if (normalized != endpointPolicy.normalizedAuthority) {
+                throw McpHttpAdmissionFailure(McpHttpBridgeErrorCode.FORWARDED_METADATA_REJECTED)
+            }
+        }
+    }
+
     private suspend fun authenticate(
         request: McpHttpBridgeRequest,
+        nowEpochMs: Long,
     ): McpHttpAuthenticationDecision.Accepted {
         val authorization = optionalSingleHeader(request, HEADER_AUTHORIZATION)
         val authentication = try {
@@ -221,6 +290,11 @@ class McpStreamableHttpBridge(
                     authorizationHeader = authorization,
                     scheme = endpointPolicy.normalizedScheme,
                     authority = endpointPolicy.normalizedAuthority,
+                    nowEpochMs = nowEpochMs,
+                    transport = request.transport,
+                    path = endpointPolicy.path,
+                    httpMethod = "POST",
+                    proofHeader = optionalSingleHeader(request, HEADER_DPOP),
                 ),
             )
         } catch (cancelled: CancellationException) {
@@ -424,6 +498,77 @@ class McpStreamableHttpBridge(
         return values.singleOrNull()?.trim()
     }
 
+    /**
+     * Choose the wire framing from ordinary HTTP content negotiation.
+     *
+     * `Accept` must already contain both media types, so preference — not presence — decides. A
+     * client that does not rank `text/event-stream` above `application/json` keeps the default
+     * stateless JSON response, and the mode is never taken from the JSON-RPC body.
+     */
+    private fun negotiateResponseMode(request: McpHttpBridgeRequest): McpHttpResponseMode {
+        if (!endpointPolicy.sseResponseEnabled) return McpHttpResponseMode.JSON_SINGLE_RESPONSE
+        val preferences = repeatedHeader(request, HEADER_ACCEPT)
+            .flatMap { it.split(',') }
+            .mapNotNull(::parseAcceptEntry)
+            .groupBy({ it.first }, { it.second })
+            .mapValues { (_, weights) -> weights.max() }
+        val json = preferences[MEDIA_TYPE_JSON] ?: return McpHttpResponseMode.JSON_SINGLE_RESPONSE
+        val eventStream = preferences[MEDIA_TYPE_EVENT_STREAM]
+            ?: return McpHttpResponseMode.JSON_SINGLE_RESPONSE
+        return if (eventStream > json) {
+            McpHttpResponseMode.SSE_REQUEST_SCOPED_RESPONSE
+        } else {
+            McpHttpResponseMode.JSON_SINGLE_RESPONSE
+        }
+    }
+
+    /** `type/subtype;q=0.8` to `type/subtype` and its weight; a malformed weight drops the entry. */
+    private fun parseAcceptEntry(rawEntry: String): Pair<String, Double>? {
+        val entry = rawEntry.trim().takeIf(String::isNotEmpty) ?: return null
+        val mediaType = mediaType(entry)
+        if (mediaType.isEmpty()) return null
+        val quality = entry.split(';')
+            .drop(1)
+            .map(String::trim)
+            .firstOrNull { it.startsWith("q=", ignoreCase = true) }
+            ?.drop(2)
+            ?.toDoubleOrNull()
+            ?: 1.0
+        if (quality !in 0.0..1.0) return null
+        return mediaType to quality
+    }
+
+    /**
+     * Frame one JSON-RPC response as a request-scoped event stream.
+     *
+     * The whole stream is materialised inside the response budget before anything is written, so
+     * the producer cannot accumulate unbounded state while a consumer stalls, and the listener can
+     * abandon the remaining events the moment a write fails.
+     */
+    private fun sseResponse(
+        gatewayBody: String,
+        protocolVersion: String?,
+    ): McpHttpBridgeResponse {
+        val events = listOf(McpHttpSseEvent(id = 0, event = SSE_EVENT_MESSAGE, data = gatewayBody))
+        if (events.size > endpointPolicy.maxSseEvents) {
+            throw McpHttpAdmissionFailure(McpHttpBridgeErrorCode.SSE_BUDGET_EXCEEDED)
+        }
+        val framedBytes = events.sumOf { it.frame().encodeToByteArray().size }
+        if (framedBytes > endpointPolicy.maxResponseBodyBytes) {
+            throw McpHttpAdmissionFailure(McpHttpBridgeErrorCode.SSE_BUDGET_EXCEEDED)
+        }
+        return McpHttpBridgeResponse(
+            status = 200,
+            headers = responseHeaders(
+                contentType = MEDIA_TYPE_EVENT_STREAM,
+                protocolVersion = protocolVersion,
+            ) + mapOf("Connection" to "close"),
+            body = null,
+            mode = McpHttpResponseMode.SSE_REQUEST_SCOPED_RESPONSE,
+            events = events,
+        )
+    }
+
     private fun acceptedNotificationResponse(): McpHttpBridgeResponse = McpHttpBridgeResponse(
         status = 202,
         headers = responseHeaders(contentType = null, protocolVersion = null),
@@ -495,6 +640,7 @@ class McpStreamableHttpBridge(
         const val JSON_RPC_VERSION = "2.0"
         const val MEDIA_TYPE_JSON = "application/json"
         const val MEDIA_TYPE_EVENT_STREAM = "text/event-stream"
+        const val SSE_EVENT_MESSAGE = "message"
         const val HEADER_ACCEPT = "Accept"
         const val HEADER_ALLOW = "Allow"
         const val HEADER_AUTHORIZATION = "Authorization"
@@ -504,6 +650,11 @@ class McpStreamableHttpBridge(
         const val HEADER_ORIGIN = "Origin"
         const val HEADER_PROTOCOL_VERSION = "MCP-Protocol-Version"
         const val HEADER_SESSION_ID = "Mcp-Session-Id"
+        const val HEADER_DPOP = "DPoP"
+        const val HEADER_FORWARDED = "Forwarded"
+        const val HEADER_X_FORWARDED_PROTO = "X-Forwarded-Proto"
+        const val HEADER_X_FORWARDED_HOST = "X-Forwarded-Host"
+        const val HEADER_X_FORWARDED_FOR = "X-Forwarded-For"
         const val METHOD_INITIALIZE = "initialize"
         const val METHOD_PING = "ping"
         const val METHOD_SERVER_DISCOVER = "server/discover"
@@ -530,6 +681,14 @@ class McpStreamableHttpBridge(
             METHOD_TOOLS_CALL,
         )
         val ALLOWED_TOOL_NAMES = setOf(TOOL_CAPTURE_CONTEXT, TOOL_PROPOSE_NAVIGATION)
+        val FORWARDING_HEADERS = listOf(
+            HEADER_FORWARDED,
+            HEADER_X_FORWARDED_PROTO,
+            HEADER_X_FORWARDED_HOST,
+            HEADER_X_FORWARDED_FOR,
+        )
+        val FORWARDED_PROTO_PATTERN =
+            Regex("proto=\"?([A-Za-z0-9+.-]+)", RegexOption.IGNORE_CASE)
     }
 }
 

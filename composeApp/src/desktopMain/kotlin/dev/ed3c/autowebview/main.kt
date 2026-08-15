@@ -21,6 +21,10 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import com.multiplatform.webview.util.addTempDirectoryRemovalHook
 import dev.datlag.kcef.KCEF
+import dev.ed3c.autowebview.mcp.BrowserMcpGateway
+import dev.ed3c.autowebview.mcp.http.DesktopMcpIntegration
+import dev.ed3c.autowebview.mcp.http.DesktopMcpRuntimeProfile
+import dev.ed3c.autowebview.runtime.AgentBrowserRuntime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -56,11 +60,30 @@ fun main() = application {
             }
         }
 
+        val runtime = remember { AgentBrowserRuntime() }
+        var mcpFailure by remember { mutableStateOf<String?>(null) }
+        val mcpIntegration = remember {
+            runCatching {
+                DesktopMcpIntegration.startIfEnabled(
+                    profile = DesktopMcpRuntimeProfile.fromEnvironment(),
+                    gateway = BrowserMcpGateway(runtime),
+                )
+            }.onFailure { failure ->
+                // An explicitly enabled listener that cannot start is reported, never ignored.
+                mcpFailure = failure.message ?: "Desktop MCP listener failed to start"
+            }.getOrNull()
+        }
+
+        DisposableEffect(mcpIntegration) {
+            onDispose { mcpIntegration?.close() }
+        }
+
         MaterialTheme {
             when {
                 restartRequired -> CenterMessage("KCEF installed. Restart the desktop app.")
                 errorMessage != null -> CenterMessage(errorMessage!!)
-                initialized -> App()
+                mcpFailure != null -> CenterMessage("MCP listener disabled: ${mcpFailure!!}")
+                initialized -> App(runtime)
                 else -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,

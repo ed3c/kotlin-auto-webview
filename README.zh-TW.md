@@ -14,13 +14,17 @@
 | WebView Observer、DOM、Selection、Fingerprint、Geometry | 已實作 | Common／Platform build `PASS` | `web/` |
 | Sensitive field 排除與 Kotlin Redaction | 已實作 | Common tests `PASS` | `privacy/` |
 | L1 Semantic Cache | In-memory 決定性基線 | Common tests `PASS` | `cache/`；永久化 #8 |
-| OpenClaw L2 Stream | 架構契約而已 | `NOT_IMPLEMENTED` | Epic #4；Transport #9 |
+| 永久化 L1 Cache 與稽核證據 | SQLDelight Schema、Migration 與 Append-only 稽核 | Common／Desktop tests `PASS` | `persistence/`；#8 |
+| OpenClaw L2 Stream | 具 Epoch 綁定的 Typed Admission 與 Ktor WebSocket Transport | Common tests `PASS`；實機私有節點 `NOT_EXERCISED` | Epic #4；實機 #51、#52 |
 | Cache-to-DOM Projection | Bubble／Context Rail MVP | Common tests `PASS` | `projection/` |
 | Capability Policy 與人類搶回控制權 | 已實作 | Common tests `PASS` | `capability/`、`dispatcher/` |
-| 受控 Browser Action Executor | 尚無 Privileged Executor | `NOT_IMPLEMENTED` | Contract #10；Executor #11 |
+| 受控 Browser Action Executor | Freshness 綁定並受 HITL 管制 | Common tests `PASS` | `executor/`；#11 |
 | MCP | 跨平台 JSON-RPC Discovery／Resource／Proposal Gateway | Common tests `PASS` | `mcp/` |
-| MCP Peer Authentication／Network Listener | Common Core 刻意不包含 | `NOT_IMPLEMENTED` | #9 |
-| Local Semantic Router | Lexical Ranking 位於 Cache 基線 | 基線已實作；拆分契約待完成 | #12 |
+| MCP HTTP Transport | 跨平台 Streamable HTTP Bridge；Desktop Loopback 與 HTTPS Listener | Common／Desktop tests `PASS` | `mcp/http/`；ADR-0011、0013、0021 |
+| MCP 呼叫端認證 | Bearer 生命週期、OAuth／DPoP、mTLS、Workload Identity | Desktop tests `PASS`；實際 Issuer／JWKS `NOT_EXERCISED` | ADR-0019、ADR-0022 |
+| MCP Replay 抑制 | 語意動作識別、記憶體與永久化 Journal | `PASS`；多節點協調 `IMPLEMENTED_NOT_EXERCISED` | ADR-0018、ADR-0024 |
+| 行動端 Inbound MCP Listener | 刻意不提供 | `DENIED_BY_ARCHITECTURE` | ADR-0013 |
+| Local Semantic Router | 決定性 Lexical Router 與可重現語料 | Common tests `PASS` | `semantics/`；#12 |
 | On-device Embedding／SLM Engine | 尚未選定 | `NOT_IMPLEMENTED` | #13 |
 | Android Play 交付 | 只有 Debug APK | Store Evidence `NOT_EXERCISED` | #2 |
 | iOS App Store／TestFlight | 只有 Simulator Framework | Store Evidence `NOT_EXERCISED` | #3 |

@@ -135,21 +135,38 @@ EV-###     evidence subject/receipt
 
 | Stack ID | Issue | Branch | Parent | Owned state/path | Status |
 |---|---:|---|---|---|---|
-| `STACK-000` | #1 | `feat/kmp-agent-browser-foundation` | `main` | executable architecture foundation | open draft; baseline CI `PASS` |
-| `STACK-006` | #6 | `docs/agent-integration-stack-index` | foundation | autonomous/Git/Harness/root documentation SSOT | open draft PR #15 |
-| `STACK-007` | #7 | `build/runtime-dependency-admission` | docs stack | SQLDelight/Ktor build + legal evidence | `NOT_IMPLEMENTED` |
-| `STACK-008` | #8 | `feat/persistent-memory` | #7 | persistence/schema/audit | `NOT_IMPLEMENTED` |
-| `STACK-009` | #9 | `feat/openclaw-stream-contract` | #7 | authenticated edge stream | `NOT_IMPLEMENTED` |
-| `STACK-010` | #10 | `feat/native-capability-contracts` | docs stack | Toolmaker contracts | `NOT_IMPLEMENTED` |
-| `STACK-011` | #11 | `feat/accessibility-action-executor` | #10 | bounded executor | `NOT_IMPLEMENTED` |
-| `STACK-012` | #12 | `feat/local-semantic-router-contract` | docs stack | semantic contract/fixtures | `NOT_IMPLEMENTED` |
-| `STACK-013` | #13 | `feat/local-embedding-engine` | #12 | selected engine/platform adapters | `NOT_IMPLEMENTED` |
-| `STACK-002` | #2 | `release/android-play-evidence` | #11 | Android delivery lane | `NOT_EXERCISED` |
-| `STACK-003` | #3 | `release/ios-app-store-evidence` | #11 | Apple delivery lane | `NOT_EXERCISED` |
-| `STACK-005` | #5 | `release/web-deployment-evidence` | docs stack | Web deployment lane | `NOT_EXERCISED` |
-| `STACK-014` | #14 | `converge/release-readiness-index` | docs stack after dependencies | shared evidence reconciliation | `NOT_IMPLEMENTED` |
+| `STACK-000` | #1 | `feat/kmp-agent-browser-foundation` | `main` | executable architecture foundation | landed in `main` |
+| `STACK-006` | #6 | `docs/agent-integration-stack-index` | foundation | autonomous/Git/Harness/root documentation SSOT | landed in `main` |
+| `STACK-007` | #7 | `build/runtime-dependency-admission` | docs stack | SQLDelight/Ktor build + legal evidence | landed in `main` |
+| `STACK-008` | #8 | `feat/persistent-memory` | #7 | persistence/schema/audit | landed in `main` |
+| `STACK-009` | #9 | `feat/openclaw-stream-contract` | #7 | authenticated edge stream | landed in `main` |
+| `STACK-010` | #10 | `feat/native-capability-contracts` | docs stack | Toolmaker contracts | landed in `main` |
+| `STACK-011` | #11 | `feat/accessibility-action-executor` | #10 | bounded executor | landed in `main` |
+| `STACK-012` | #12 | `feat/local-semantic-router-contract` | docs stack | semantic contract/fixtures | landed in `main` |
+| `STACK-013` | #13 | `feat/local-embedding-engine` | #12 | selected engine/platform adapters | `BLOCKED_EXTERNAL`: needs physical-device budgets and a licence decision |
+| `STACK-002` | #2 | `release/android-play-evidence` | #11 | Android delivery lane | `BLOCKED_EXTERNAL`: Play account, signing keys, physical devices |
+| `STACK-003` | #3 | `release/ios-app-store-evidence` | #11 | Apple delivery lane | `BLOCKED_EXTERNAL`: Apple account, provisioning, physical devices |
+| `STACK-005` | #5 | `release/web-deployment-evidence` | docs stack | Web deployment lane | landed in `main`; live Pages run `NOT_EXERCISED` |
+| `STACK-014` | #14 | this convergence pass | docs stack after dependencies | shared evidence reconciliation | reconciled here |
 
 See `docs/git/STACKED_PRS.md` for exact path leases, evals, controls, parallelism, and merge order.
+
+## Post-stack MCP hardening index
+
+These slices landed with the same convergence pass. Each row names the ADR that owns its evidence
+boundary; every `NOT_EXERCISED` or `NOT_IMPLEMENTED` below is deliberate and stated there.
+
+| Issue | Subject | Owner | ADR | Evidence state |
+|---:|---|---|---|---|
+| #46 | Runtime credential issuance, rotation, custody, revocation | `DesktopMcpCredentialLifecycle` | [0019](architecture/ADR-0019-mcp-credential-lifecycle.md) | implemented + tested; OS-keychain custody `NOT_IMPLEMENTED` |
+| #50 | Desktop application lifecycle for the listener | `DesktopMcpIntegration`, `DesktopMcpRuntimeProfile` | [0020](architecture/ADR-0020-desktop-mcp-application-lifecycle.md) | implemented + tested; packaged `jpackage` run `NOT_EXERCISED` |
+| #47 | Remote HTTPS termination and trusted-proxy admission | `DesktopMcpHttpsServer`, `McpHttpTransportPolicy` | [0021](architecture/ADR-0021-remote-https-and-trusted-proxy.md) | implemented + real TLS test; production proxy behaviour `NOT_EXERCISED` |
+| #48 | OAuth, mTLS, and workload-identity verifiers | `McpOAuthBearerVerifier`, `McpMutualTlsVerifier`, `McpWorkloadIdentityVerifier` | [0022](architecture/ADR-0022-production-mcp-authentication.md) | implemented + tested; JWKS fetch and OCSP `NOT_IMPLEMENTED` |
+| #54 | Bounded request-scoped SSE responses | `McpStreamableHttpBridge`, `McpHttpSseEvent` | [0023](architecture/ADR-0023-request-scoped-sse-responses.md) | implemented + tested; disconnect cancellation `PARTIAL` |
+| #53 | Durable and multi-node replay state | `DurableMcpHttpReplayGuard` | [0024](architecture/ADR-0024-durable-replay-state.md) | durability tested; multi-node coordination `IMPLEMENTED_NOT_EXERCISED` |
+| #49 | Generated Cordis patch parsing, HMR, tool-list replacement | `DeepSeekHarnessCordisBinding` | [0014](architecture/ADR-0014-deepseek-harness-process-e2e.md) | `NOT_EXERCISED`: needs the pinned upstream workspace, run by the DeepSeek Harness E2E workflow |
+| #51 | Android private-edge transport and physical pairing | Android source set | [0005](architecture/ADR-0005-openclaw-stream.md) | `BLOCKED_EXTERNAL`: physical device and private node required |
+| #52 | iOS private-edge transport and physical pairing | iOS source set | [0005](architecture/ADR-0005-openclaw-stream.md) | `BLOCKED_EXTERNAL`: physical device and private node required |
 
 ## Unknown register
 

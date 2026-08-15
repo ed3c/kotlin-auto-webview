@@ -14,13 +14,17 @@ A production-oriented Kotlin Multiplatform browser shell for Android, iOS, Web/W
 | WebView observer, DOM text, selection, fingerprints, geometry | Implemented | `PASS` through common/platform builds | `web/` |
 | Sensitive-field exclusion and Kotlin redaction | Implemented | `PASS` common tests | `privacy/` |
 | L1 semantic cache | In-memory deterministic baseline | `PASS` common tests | `cache/`; persistence #8 |
-| OpenClaw L2 stream | Contract only in architecture | `NOT_IMPLEMENTED` | epic #4; transport #9 |
+| Persistent L1 cache and audit evidence | SQLDelight schema, migration, and append-only audit | `PASS` common/desktop tests | `persistence/`; #8 |
+| OpenClaw L2 stream | Typed epoch-bound admission plus Ktor WebSocket transport | `PASS` common tests; live private node `NOT_EXERCISED` | epic #4; devices #51, #52 |
 | Cache-to-DOM projection | Bubble/context-rail MVP | `PASS` common tests | `projection/` |
 | Capability policy and human preemption | Implemented | `PASS` common tests | `capability/`, `dispatcher/` |
-| Bounded browser action executor | No privileged executor yet | `NOT_IMPLEMENTED` | contracts #10; executor #11 |
+| Bounded browser action executor | Freshness-bound executor behind HITL | `PASS` common tests | `executor/`; #11 |
 | MCP | Portable JSON-RPC discovery/resource/proposal gateway | `PASS` common tests | `mcp/` |
-| MCP peer authentication/network listener | Intentionally absent from common core | `NOT_IMPLEMENTED` | #9 |
-| Local semantic router | Lexical ranking embedded in cache baseline | baseline implemented; extraction contract pending | #12 |
+| MCP HTTP transport | Portable Streamable HTTP bridge, Desktop loopback and HTTPS listeners | `PASS` common/desktop tests | `mcp/http/`; ADR-0011, 0013, 0021 |
+| MCP caller authentication | Bearer lifecycle, OAuth/DPoP, mTLS, workload identity | `PASS` desktop tests; live issuer/JWKS `NOT_EXERCISED` | ADR-0019, ADR-0022 |
+| MCP replay suppression | Semantic action identity, in-memory and durable journal | `PASS`; multi-node coordination `IMPLEMENTED_NOT_EXERCISED` | ADR-0018, ADR-0024 |
+| Mobile inbound MCP listener | Deliberately absent | `DENIED_BY_ARCHITECTURE` | ADR-0013 |
+| Local semantic router | Deterministic lexical router with a reproducible corpus | `PASS` common tests | `semantics/`; #12 |
 | On-device embedding/SLM engine | No engine selected | `NOT_IMPLEMENTED` | #13 |
 | Android Play delivery | Debug APK only | `NOT_EXERCISED` as store evidence | #2 |
 | iOS App Store/TestFlight delivery | Simulator framework only | `NOT_EXERCISED` as store evidence | #3 |

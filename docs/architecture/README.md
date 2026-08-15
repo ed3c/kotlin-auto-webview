@@ -11,6 +11,35 @@
 7. **Web limitations are explicit** — same-origin/CSP/iframe restrictions are surfaced instead of bypassed.
 8. **Protocol is not authority** — MCP transports can discover/read/propose; capability policy, dispatcher state, and HITL still decide execution.
 
+## Decision records
+
+| ADR | Subject | Issue |
+|---|---|---:|
+| [0001](ADR-0001-platform-webview.md) | Platform WebView renderers | #1 |
+| [0002](ADR-0002-agent-boundary.md) | Agent boundary | #1 |
+| [0003](ADR-0003-mcp-platform-boundary.md) | Portable MCP platform boundary | #1 |
+| [0004](ADR-0004-persistent-memory.md) | Persistent memory and audit evidence | #8 |
+| [0005](ADR-0005-openclaw-stream.md) | OpenClaw stream contract | #9 |
+| [0006](ADR-0006-native-capabilities.md) | Native capability contracts | #10 |
+| [0007](ADR-0007-action-executor.md) | Bounded action executor | #11 |
+| [0008](ADR-0008-semantic-router.md) | Local semantic router baseline | #12 |
+| [0009](ADR-0009-agent-provider-compatibility.md) | Agent provider compatibility plane | #23 |
+| [0010](ADR-0010-deepseek-harness-compatibility.md) | DeepSeek Harness compatibility | #26 |
+| [0011](ADR-0011-streamable-http-bridge.md) | Streamable HTTP bridge | #29 |
+| [0012](ADR-0012-deepseek-loopback-auth-relock.md) | Loopback auth relock | #31 |
+| [0013](ADR-0013-desktop-loopback-listener.md) | Default-off Desktop loopback listener | #33 |
+| [0014](ADR-0014-deepseek-harness-process-e2e.md) | Pinned Cordis process E2E | #35 |
+| [0015](ADR-0015-deepseek-harness-startup-recovery.md) | Bounded startup recovery | #37 |
+| [0016](ADR-0016-deepseek-established-session-recovery-probe.md) | Established-session recovery probe | #39 |
+| [0017](ADR-0017-deepseek-stateless-call-recovery.md) | Stateless call recovery | #41 |
+| [0018](ADR-0018-semantic-action-replay-identity.md) | Semantic action replay identity | #43 |
+| [0019](ADR-0019-mcp-credential-lifecycle.md) | Runtime credential lifecycle | #46 |
+| [0020](ADR-0020-desktop-mcp-application-lifecycle.md) | Desktop application lifecycle | #50 |
+| [0021](ADR-0021-remote-https-and-trusted-proxy.md) | Remote HTTPS and trusted proxy | #47 |
+| [0022](ADR-0022-production-mcp-authentication.md) | OAuth, mTLS, workload identity | #48 |
+| [0023](ADR-0023-request-scoped-sse-responses.md) | Request-scoped SSE responses | #54 |
+| [0024](ADR-0024-durable-replay-state.md) | Durable and multi-node replay state | #53 |
+
 ## Runtime pipeline
 
 ```mermaid
