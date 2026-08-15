@@ -189,7 +189,7 @@ class OpenClawStreamContractTest {
                 session.admit(
                     actionChunk(
                         streamId = "sensitive-parameter",
-                        action = action(parameters = mapOf("token" to "private-token-value")),
+                        action = action(arguments = mapOf("token" to "private-token-value")),
                     ),
                     NOW,
                     CONTEXT,
@@ -505,14 +505,14 @@ class OpenClawStreamContractTest {
     private fun action(
         capabilityId: String = "browser.navigate",
         risk: ActionRisk = ActionRisk.MEDIUM,
-        parameters: Map<String, String> = mapOf("url" to "https://example.com"),
+        arguments: Map<String, String> = mapOf("url" to "https://example.com"),
     ) = AgentAction(
         id = "action-1",
         capabilityId = capabilityId,
         name = "Navigate",
         description = "Navigate to an approved public page",
         risk = risk,
-        parameters = parameters,
+        arguments = arguments,
     )
 
     private class RecordingTransport(
