@@ -23,7 +23,6 @@ kotlin {
     listOf(
         iosArm64(),
         iosSimulatorArm64(),
-        iosX64(),
     ).forEach { target ->
         target.binaries.framework {
             baseName = "KotlinAutoWebView"
@@ -58,7 +57,6 @@ kotlin {
             implementation(libs.compose.webview)
             implementation(libs.kotlinx.coroutines.core)
             implementation(libs.kotlinx.serialization.json)
-            implementation(libs.kotlinx.datetime)
         }
 
         commonTest.dependencies {

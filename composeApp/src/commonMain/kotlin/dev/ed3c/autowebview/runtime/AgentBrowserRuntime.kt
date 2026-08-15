@@ -20,9 +20,9 @@ import dev.ed3c.autowebview.projection.ProjectionEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.datetime.Clock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlin.time.Clock
 
 class AgentBrowserRuntime(
     private val cache: SemanticCache = InMemorySemanticCache(),
@@ -94,10 +94,10 @@ class AgentBrowserRuntime(
 
     private fun summarize(context: PageContext): String {
         val source = context.selection.ifBlank { context.markdown }
-        return source.replace(Regex("\\s+"), " ").trim().take(240).ifBlank { context.title }
+        return source.replace(Regex("\s+"), " ").trim().take(240).ifBlank { context.title }
     }
 
-    private fun keywords(text: String): Set<String> = Regex("[\\p{L}\\p{N}_-]{4,}")
+    private fun keywords(text: String): Set<String> = Regex("[\p{L}\p{N}_-]{4,}")
         .findAll(text.lowercase())
         .map { it.value }
         .groupingBy { it }
