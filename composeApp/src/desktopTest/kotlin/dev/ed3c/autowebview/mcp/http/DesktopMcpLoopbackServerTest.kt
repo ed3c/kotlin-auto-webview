@@ -29,11 +29,11 @@ class DesktopMcpLoopbackServerTest {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Test
-    fun listenerIsDefaultOffAndRuntimeCannotRequestUnsafeConfiguration() {
+    fun listenerIsDefaultOffAndConfigurationFailsClosed() {
         val disabled = DesktopMcpLoopbackServer.startIfEnabled(
             config = DesktopMcpLoopbackServerConfig.runtime(),
             bearerToken = TOKEN.encodeToByteArray(),
-            gateway = McpJsonRpcGateway { payload -> successFor(payload) },
+            gateway = McpJsonRpcGateway(::successFor),
         )
 
         assertNull(disabled)
@@ -44,20 +44,20 @@ class DesktopMcpLoopbackServerTest {
             DesktopMcpLoopbackServer.startIfEnabled(
                 config = DesktopMcpLoopbackServerConfig.forTest(),
                 bearerToken = "too-short".encodeToByteArray(),
-                gateway = McpJsonRpcGateway { payload -> successFor(payload) },
+                gateway = McpJsonRpcGateway(::successFor),
             )
         }
         assertFailsWith<IllegalArgumentException> {
             DesktopMcpLoopbackServer.startIfEnabled(
                 config = DesktopMcpLoopbackServerConfig.forTest(),
                 bearerToken = "a".repeat(32).encodeToByteArray(),
-                gateway = McpJsonRpcGateway { payload -> successFor(payload) },
+                gateway = McpJsonRpcGateway(::successFor),
             )
         }
     }
 
     @Test
-    fun realLoopbackHttpFlowPreservesSanitizationAndProposalOnlyAuthority() {
+    fun realLoopbackFlowPreservesSanitizationAndProposalOnlyAuthority() {
         val runtime = AgentBrowserRuntime()
         runBlocking {
             runtime.onPageContext(
@@ -69,35 +69,26 @@ class DesktopMcpLoopbackServerTest {
                 ),
             )
         }
-        val server = assertNotNull(
-            DesktopMcpLoopbackServer.startIfEnabled(
-                config = DesktopMcpLoopbackServerConfig.forTest(),
-                bearerToken = TOKEN.encodeToByteArray(),
-                gateway = BrowserMcpGateway(runtime),
-            ),
-        )
+        val server = startServer(gateway = BrowserMcpGateway(runtime))
 
         try {
             assertEquals("127.0.0.1", URI.create(server.endpoint).host)
 
-            val initialize = post(
-                server = server,
-                body = initializeBody(id = 1),
-            )
+            val initialize = post(server, initializeBody(id = 1))
             assertEquals(200, initialize.status)
-            assertEquals("2.0", responseObject(initialize).getValue("jsonrpc").jsonPrimitive.content)
+            assertEquals(
+                "2.0",
+                responseObject(initialize).getValue("jsonrpc").jsonPrimitive.content,
+            )
 
             val initialized = post(
-                server = server,
-                body = notificationBody("notifications/initialized"),
+                server,
+                notificationBody("notifications/initialized"),
             )
             assertEquals(202, initialized.status)
             assertTrue(initialized.body.isEmpty())
 
-            val tools = post(
-                server = server,
-                body = requestBody(id = 2, method = "tools/list"),
-            )
+            val tools = post(server, requestBody(id = 2, method = "tools/list"))
             assertEquals(200, tools.status)
             val names = responseObject(tools)
                 .getValue("result")
@@ -111,16 +102,16 @@ class DesktopMcpLoopbackServerTest {
             )
 
             val context = post(
-                server = server,
-                body = toolCallBody(id = 3, name = "browser_capture_context"),
+                server,
+                toolCallBody(id = 3, name = "browser_capture_context"),
             )
             assertEquals(200, context.status)
             assertTrue("[REDACTED]" in context.body)
             assertFalse("super-secret-value" in context.body)
 
             val navigation = post(
-                server = server,
-                body = toolCallBody(
+                server,
+                toolCallBody(
                     id = 4,
                     name = "browser_propose_navigation",
                     arguments = "\"url\":\"https://example.com/next\"",
@@ -128,7 +119,10 @@ class DesktopMcpLoopbackServerTest {
             )
             assertEquals(200, navigation.status)
             assertTrue("awaits user confirmation" in navigation.body)
-            assertEquals(DispatcherMode.WAITING_FOR_CONFIRMATION, runtime.dispatcherState.value.mode)
+            assertEquals(
+                DispatcherMode.WAITING_FOR_CONFIRMATION,
+                runtime.dispatcherState.value.mode,
+            )
             assertEquals(
                 "https://example.com/next",
                 runtime.dispatcherState.value.pendingAction?.arguments?.get("url"),
@@ -143,119 +137,96 @@ class DesktopMcpLoopbackServerTest {
     }
 
     @Test
-    fun authenticationRouteMediaOriginAndBodyFailuresStopBeforeGateway() {
+    fun transportAndAuthenticationFailuresStopBeforeGateway() {
         var gatewayCalls = 0
         val allowedOrigin = "http://127.0.0.1:3080"
-        val server = assertNotNull(
-            DesktopMcpLoopbackServer.startIfEnabled(
-                config = DesktopMcpLoopbackServerConfig.forTest(
-                    allowedOrigins = setOf(allowedOrigin),
-                    allowMissingOrigin = false,
-                    maxRequestBodyBytes = 128,
-                ),
-                bearerToken = TOKEN.encodeToByteArray(),
-                gateway = McpJsonRpcGateway { payload ->
-                    gatewayCalls += 1
-                    successFor(payload)
-                },
+        val server = startServer(
+            config = DesktopMcpLoopbackServerConfig.forTest(
+                allowedOrigins = setOf(allowedOrigin),
+                allowMissingOrigin = false,
+                maxRequestBodyBytes = 128,
             ),
+            gateway = McpJsonRpcGateway { payload ->
+                gatewayCalls += 1
+                successFor(payload)
+            },
         )
 
         try {
-            val missingAuth = post(
-                server,
-                requestBody(1, "tools/list"),
-                authorization = null,
-                origin = allowedOrigin,
-            )
-            val wrongAuth = post(
-                server,
-                requestBody(2, "tools/list"),
-                authorization = "Bearer ${"xYz9".repeat(12)}",
-                origin = allowedOrigin,
-            )
-            val wrongOrigin = post(
-                server,
-                requestBody(3, "tools/list"),
-                origin = "http://evil.example",
-            )
-            val missingOrigin = post(
-                server,
-                requestBody(4, "tools/list"),
-                origin = null,
-            )
-            val wrongContentType = post(
-                server,
-                requestBody(5, "tools/list"),
-                origin = allowedOrigin,
-                contentType = "text/plain",
-            )
-            val wrongAccept = post(
-                server,
-                requestBody(6, "tools/list"),
-                origin = allowedOrigin,
-                accept = "application/json",
-            )
-            val query = post(
-                server,
-                requestBody(7, "tools/list"),
-                origin = allowedOrigin,
-                suffix = "?token=forbidden",
-            )
-            val wrongPath = post(
-                server,
-                requestBody(8, "tools/list"),
-                origin = allowedOrigin,
-                path = "/mcp/extra",
-            )
-            val oversized = post(
-                server,
-                "{" + "x".repeat(256) + "}",
-                origin = allowedOrigin,
+            val failures = listOf(
+                post(
+                    server,
+                    requestBody(1, "tools/list"),
+                    authorization = null,
+                    origin = allowedOrigin,
+                ) to 401,
+                post(
+                    server,
+                    requestBody(2, "tools/list"),
+                    authorization = "Bearer ${"xYz9".repeat(12)}",
+                    origin = allowedOrigin,
+                ) to 403,
+                post(
+                    server,
+                    requestBody(3, "tools/list"),
+                    origin = "http://evil.example",
+                ) to 403,
+                post(
+                    server,
+                    requestBody(4, "tools/list"),
+                    origin = null,
+                ) to 403,
+                post(
+                    server,
+                    requestBody(5, "tools/list"),
+                    origin = allowedOrigin,
+                    contentType = "text/plain",
+                ) to 415,
+                post(
+                    server,
+                    requestBody(6, "tools/list"),
+                    origin = allowedOrigin,
+                    accept = "application/json",
+                ) to 406,
+                post(
+                    server,
+                    requestBody(7, "tools/list"),
+                    origin = allowedOrigin,
+                    suffix = "?token=forbidden",
+                ) to 400,
+                post(
+                    server,
+                    requestBody(8, "tools/list"),
+                    origin = allowedOrigin,
+                    path = "/mcp/extra",
+                ) to 404,
+                post(
+                    server,
+                    "{" + "x".repeat(256) + "}",
+                    origin = allowedOrigin,
+                ) to 413,
             )
 
-            assertEquals(401, missingAuth.status)
-            assertEquals(403, wrongAuth.status)
-            assertEquals(403, wrongOrigin.status)
-            assertEquals(403, missingOrigin.status)
-            assertEquals(415, wrongContentType.status)
-            assertEquals(406, wrongAccept.status)
-            assertEquals(400, query.status)
-            assertEquals(404, wrongPath.status)
-            assertEquals(413, oversized.status)
-            assertEquals(0, gatewayCalls)
-
-            for (result in listOf(
-                missingAuth,
-                wrongAuth,
-                wrongOrigin,
-                missingOrigin,
-                wrongContentType,
-                wrongAccept,
-                query,
-                wrongPath,
-                oversized,
-            )) {
+            for ((result, expectedStatus) in failures) {
+                assertEquals(expectedStatus, result.status)
                 assertFalse(TOKEN in result.body)
                 assertFalse("super-secret-value" in result.body)
             }
+            assertEquals(0, gatewayCalls)
         } finally {
             server.close()
         }
     }
 
     @Test
-    fun rawHttpDuplicateWrongHostAndChunkedOversizeRequestsFailClosed() {
+    fun rawDuplicateWrongHostAndChunkedOversizeRequestsFailClosed() {
         var gatewayCalls = 0
-        val server = assertNotNull(
-            DesktopMcpLoopbackServer.startIfEnabled(
-                config = DesktopMcpLoopbackServerConfig.forTest(maxRequestBodyBytes = 96),
-                bearerToken = TOKEN.encodeToByteArray(),
-                gateway = McpJsonRpcGateway { payload ->
-                    gatewayCalls += 1
-                    successFor(payload)
-                },
-            ),
+        val server = startServer(
+            config = DesktopMcpLoopbackServerConfig.forTest(maxRequestBodyBytes = 96),
+            gateway = McpJsonRpcGateway { payload ->
+                gatewayCalls += 1
+                successFor(payload)
+            },
         )
 
         try {
@@ -263,13 +234,9 @@ class DesktopMcpLoopbackServerTest {
             val duplicateAuthorization = rawRequest(
                 server,
                 buildString {
-                    append("POST /mcp HTTP/1.1\r\n")
-                    append("Host: 127.0.0.1:${server.port}\r\n")
-                    append("Content-Type: application/json\r\n")
-                    append("Accept: application/json, text/event-stream\r\n")
+                    appendBaseHeaders(server, bodyByteCount = body.encodeToByteArray().size)
                     append("Authorization: Bearer $TOKEN\r\n")
                     append("Authorization: Bearer ${"zY8x".repeat(12)}\r\n")
-                    append("Content-Length: ${body.encodeToByteArray().size}\r\n")
                     append("Connection: close\r\n\r\n")
                     append(body)
                 },
@@ -315,74 +282,70 @@ class DesktopMcpLoopbackServerTest {
     }
 
     @Test
-    fun bearerVerifierScopesIdentityUsesFixedDigestAndErasesOnClose() = runBlocking {
-        val verifier = DesktopMcpBearerAuthenticationVerifier(
-            expectedToken = TOKEN.encodeToByteArray(),
-            expectedAuthority = "127.0.0.1:3090",
-            subjectId = "desktop-verifier-test",
-            credentialEpoch = "epoch-v1",
-        )
-
-        try {
-            val accepted = verifier.verify(
-                McpHttpAuthenticationInput(
-                    authorizationHeader = "Bearer $TOKEN",
-                    scheme = "http",
-                    authority = "127.0.0.1:3090",
-                ),
-            )
-            val wrong = verifier.verify(
-                McpHttpAuthenticationInput(
-                    authorizationHeader = "Bearer ${"wrong-9Z".repeat(6)}",
-                    scheme = "http",
-                    authority = "127.0.0.1:3090",
-                ),
-            )
-            val wrongScope = verifier.verify(
-                McpHttpAuthenticationInput(
-                    authorizationHeader = "Bearer $TOKEN",
-                    scheme = "http",
-                    authority = "127.0.0.1:3091",
-                ),
+    fun bearerVerifierScopesIdentityUsesFixedDigestAndErasesOnClose() {
+        runBlocking {
+            val verifier = DesktopMcpBearerAuthenticationVerifier(
+                expectedToken = TOKEN.encodeToByteArray(),
+                expectedAuthority = "127.0.0.1:3090",
+                subjectId = "desktop-verifier-test",
+                credentialEpoch = "epoch-v1",
             )
 
-            assertIs<McpHttpAuthenticationDecision.Accepted>(accepted)
-            assertIs<McpHttpAuthenticationDecision.Rejected>(wrong)
-            assertEquals(
-                McpHttpAuthenticationRejectionReason.INSUFFICIENT_SCOPE,
-                assertIs<McpHttpAuthenticationDecision.Rejected>(wrongScope).reason,
+            try {
+                val accepted = verifier.verify(
+                    McpHttpAuthenticationInput(
+                        authorizationHeader = "Bearer $TOKEN",
+                        scheme = "http",
+                        authority = "127.0.0.1:3090",
+                    ),
+                )
+                val wrong = verifier.verify(
+                    McpHttpAuthenticationInput(
+                        authorizationHeader = "Bearer ${"wrong-9Z".repeat(6)}",
+                        scheme = "http",
+                        authority = "127.0.0.1:3090",
+                    ),
+                )
+                val wrongScope = verifier.verify(
+                    McpHttpAuthenticationInput(
+                        authorizationHeader = "Bearer $TOKEN",
+                        scheme = "http",
+                        authority = "127.0.0.1:3091",
+                    ),
+                )
+
+                assertIs<McpHttpAuthenticationDecision.Accepted>(accepted)
+                assertIs<McpHttpAuthenticationDecision.Rejected>(wrong)
+                assertEquals(
+                    McpHttpAuthenticationRejectionReason.INSUFFICIENT_SCOPE,
+                    assertIs<McpHttpAuthenticationDecision.Rejected>(wrongScope).reason,
+                )
+                assertFalse(TOKEN in verifier.toString())
+                assertFalse("127.0.0.1" in verifier.toString())
+            } finally {
+                verifier.close()
+            }
+
+            assertIs<McpHttpAuthenticationDecision.Rejected>(
+                verifier.verify(
+                    McpHttpAuthenticationInput(
+                        authorizationHeader = "Bearer $TOKEN",
+                        scheme = "http",
+                        authority = "127.0.0.1:3090",
+                    ),
+                ),
             )
-            assertFalse(TOKEN in verifier.toString())
-            assertFalse("127.0.0.1" in verifier.toString())
-        } finally {
-            verifier.close()
         }
-
-        assertIs<McpHttpAuthenticationDecision.Rejected>(
-            verifier.verify(
-                McpHttpAuthenticationInput(
-                    authorizationHeader = "Bearer $TOKEN",
-                    scheme = "http",
-                    authority = "127.0.0.1:3090",
-                ),
-            ),
-        )
     }
 
     @Test
-    fun listenerAndConfigRenderingDoNotExposeEndpointCredentialOrOrigin() {
+    fun listenerAndConfigRenderingAreRedacted() {
         val origin = "http://127.0.0.1:3080"
         val config = DesktopMcpLoopbackServerConfig.forTest(
             allowedOrigins = setOf(origin),
             allowMissingOrigin = false,
         )
-        val server = assertNotNull(
-            DesktopMcpLoopbackServer.startIfEnabled(
-                config = config,
-                bearerToken = TOKEN.encodeToByteArray(),
-                gateway = McpJsonRpcGateway { payload -> successFor(payload) },
-            ),
-        )
+        val server = startServer(config = config)
 
         try {
             for (rendered in listOf(config.toString(), server.toString())) {
@@ -395,6 +358,28 @@ class DesktopMcpLoopbackServerTest {
             server.close()
         }
     }
+
+    private fun startServer(
+        config: DesktopMcpLoopbackServerConfig = DesktopMcpLoopbackServerConfig.forTest(),
+        gateway: BrowserMcpGateway,
+    ): DesktopMcpLoopbackServer = assertNotNull(
+        DesktopMcpLoopbackServer.startIfEnabled(
+            config = config,
+            bearerToken = TOKEN.encodeToByteArray(),
+            gateway = gateway,
+        ),
+    )
+
+    private fun startServer(
+        config: DesktopMcpLoopbackServerConfig = DesktopMcpLoopbackServerConfig.forTest(),
+        gateway: McpJsonRpcGateway = McpJsonRpcGateway(::successFor),
+    ): DesktopMcpLoopbackServer = assertNotNull(
+        DesktopMcpLoopbackServer.startIfEnabled(
+            config = config,
+            bearerToken = TOKEN.encodeToByteArray(),
+            gateway = gateway,
+        ),
+    )
 
     private fun post(
         server: DesktopMcpLoopbackServer,
@@ -438,9 +423,10 @@ class DesktopMcpLoopbackServerTest {
         Socket().use { socket ->
             socket.soTimeout = 5_000
             socket.connect(InetSocketAddress("127.0.0.1", server.port), 5_000)
-            val output = socket.getOutputStream()
-            output.write(request.toByteArray(Charsets.ISO_8859_1))
-            output.flush()
+            socket.getOutputStream().use { output ->
+                output.write(request.toByteArray(Charsets.ISO_8859_1))
+                output.flush()
+            }
             socket.shutdownOutput()
             val raw = socket.getInputStream().readBytes().toString(Charsets.ISO_8859_1)
             val statusLine = raw.lineSequence().firstOrNull()
@@ -452,7 +438,19 @@ class DesktopMcpLoopbackServerTest {
         }
     }
 
-    private fun responseObject(result: HttpResult) = json.parseToJsonElement(result.body).jsonObject
+    private fun StringBuilder.appendBaseHeaders(
+        server: DesktopMcpLoopbackServer,
+        bodyByteCount: Int,
+    ) {
+        append("POST /mcp HTTP/1.1\r\n")
+        append("Host: 127.0.0.1:${server.port}\r\n")
+        append("Content-Type: application/json\r\n")
+        append("Accept: application/json, text/event-stream\r\n")
+        append("Content-Length: $bodyByteCount\r\n")
+    }
+
+    private fun responseObject(result: HttpResult) =
+        json.parseToJsonElement(result.body).jsonObject
 
     private fun initializeBody(id: Int): String =
         """{"jsonrpc":"2.0","id":$id,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"desktop-listener-test","version":"1"}}}"""
