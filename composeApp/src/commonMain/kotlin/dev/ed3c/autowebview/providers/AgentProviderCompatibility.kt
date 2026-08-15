@@ -28,13 +28,6 @@ enum class AgentProviderProtocol {
     NETWORK_POLICY,
 }
 
-/**
- * Remote providers never receive direct application execution authority.
- *
- * PROPOSE_TYPED_ACTIONS means the provider may supply a proposal that still
- * has to pass local privacy, capability policy, dispatcher state, HITL, and
- * executor freshness checks.
- */
 @Serializable
 enum class RemoteAuthorityCeiling {
     NONE,
@@ -52,12 +45,12 @@ data class AgentProviderProfile(
     val authorityCeiling: RemoteAuthorityCeiling,
     val requiresLocalHitl: Boolean = true,
     val upstreamRepository: String,
-    val observedUpstreamCommit: String,
+    val observedUpstreamCommit: String? = null,
 ) {
     init {
         require(id.isNotBlank())
         require(upstreamRepository.isNotBlank())
-        require(observedUpstreamCommit.length == 40)
+        require(observedUpstreamCommit == null || observedUpstreamCommit.length == 40)
         require(protocols.isNotEmpty())
         require(authorityCeiling != RemoteAuthorityCeiling.DIRECT_EXECUTION) {
             "Remote providers cannot receive direct application execution authority"
@@ -150,7 +143,7 @@ object BuiltInAgentProviders {
         protocols = setOf(AgentProviderProtocol.ORDERED_PRIVATE_STREAM),
         authorityCeiling = RemoteAuthorityCeiling.PROPOSE_TYPED_ACTIONS,
         upstreamRepository = "openclaw/openclaw",
-        observedUpstreamCommit = "0000000000000000000000000000000000000000",
+        observedUpstreamCommit = null,
     )
 
     val hermes = AgentProviderProfile(
