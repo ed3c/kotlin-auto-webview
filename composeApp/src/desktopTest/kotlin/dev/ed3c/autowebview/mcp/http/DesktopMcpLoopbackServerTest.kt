@@ -9,12 +9,16 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.URI
+import java.net.http.HttpClient
+import java.net.http.HttpRequest
+import java.net.http.HttpResponse
+import java.nio.charset.StandardCharsets
+import java.time.Duration
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -27,6 +31,10 @@ import kotlin.test.fail
 
 class DesktopMcpLoopbackServerTest {
     private val json = Json { ignoreUnknownKeys = true }
+    private val httpClient = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(5))
+        .followRedirects(HttpClient.Redirect.NEVER)
+        .build()
 
     @Test
     fun listenerIsDefaultOffAndConfigurationFailsClosed() {
@@ -391,32 +399,24 @@ class DesktopMcpLoopbackServerTest {
         path: String = "/mcp",
         suffix: String = "",
     ): HttpResult {
-        val connection = URI.create("http://127.0.0.1:${server.port}$path$suffix")
-            .toURL()
-            .openConnection() as HttpURLConnection
-        connection.requestMethod = "POST"
-        connection.instanceFollowRedirects = false
-        connection.connectTimeout = 5_000
-        connection.readTimeout = 5_000
-        connection.doOutput = true
-        connection.setRequestProperty("Content-Type", contentType)
-        connection.setRequestProperty("Accept", accept)
-        if (authorization != null) connection.setRequestProperty("Authorization", authorization)
-        if (origin != null) connection.setRequestProperty("Origin", origin)
-        val bytes = body.encodeToByteArray()
-        connection.setFixedLengthStreamingMode(bytes.size)
-        connection.outputStream.use { output -> output.write(bytes) }
+        val builder = HttpRequest.newBuilder(
+            URI.create("http://127.0.0.1:${server.port}$path$suffix"),
+        )
+            .timeout(Duration.ofSeconds(5))
+            .header("Content-Type", contentType)
+            .header("Accept", accept)
+            .POST(HttpRequest.BodyPublishers.ofByteArray(body.encodeToByteArray()))
+        authorization?.let { builder.header("Authorization", it) }
+        origin?.let { builder.header("Origin", it) }
 
-        return try {
-            val status = connection.responseCode
-            val stream = if (status >= 400) connection.errorStream else connection.inputStream
-            HttpResult(
-                status = status,
-                body = stream?.use { it.readBytes().decodeToString() }.orEmpty(),
-            )
-        } finally {
-            connection.disconnect()
-        }
+        val response = httpClient.send(
+            builder.build(),
+            HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8),
+        )
+        return HttpResult(
+            status = response.statusCode(),
+            body = response.body(),
+        )
     }
 
     private fun rawRequest(server: DesktopMcpLoopbackServer, request: String): HttpResult {
