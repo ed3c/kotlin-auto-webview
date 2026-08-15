@@ -1,0 +1,64 @@
+CREATE TABLE semantic_cache_record (
+  id TEXT NOT NULL PRIMARY KEY,
+  source_url TEXT NOT NULL,
+  title TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_at_epoch_ms INTEGER NOT NULL,
+  tags_json TEXT NOT NULL
+);
+
+CREATE INDEX semantic_cache_created_idx
+ON semantic_cache_record(created_at_epoch_ms DESC, id ASC);
+
+CREATE TABLE audit_event (
+  sequence INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  at_epoch_ms INTEGER NOT NULL,
+  category TEXT NOT NULL,
+  message TEXT NOT NULL,
+  metadata_json TEXT NOT NULL
+);
+
+CREATE INDEX audit_event_time_idx
+ON audit_event(at_epoch_ms DESC, sequence DESC);
+
+upsertCache:
+INSERT OR REPLACE INTO semantic_cache_record(
+  id,
+  source_url,
+  title,
+  summary,
+  content,
+  created_at_epoch_ms,
+  tags_json
+) VALUES (?, ?, ?, ?, ?, ?, ?);
+
+selectAllCache:
+SELECT id, source_url, title, summary, content, created_at_epoch_ms, tags_json
+FROM semantic_cache_record
+ORDER BY created_at_epoch_ms DESC, id ASC;
+
+deleteCacheById:
+DELETE FROM semantic_cache_record
+WHERE id = ?;
+
+deleteAllCache:
+DELETE FROM semantic_cache_record;
+
+appendAudit:
+INSERT INTO audit_event(
+  at_epoch_ms,
+  category,
+  message,
+  metadata_json
+) VALUES (?, ?, ?, ?);
+
+selectRecentAudit:
+SELECT at_epoch_ms, category, message, metadata_json
+FROM audit_event
+ORDER BY sequence DESC
+LIMIT ?;
+
+pruneAuditBefore:
+DELETE FROM audit_event
+WHERE at_epoch_ms < ?;
