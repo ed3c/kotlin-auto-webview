@@ -1,6 +1,6 @@
 # DeepSeek Harness process E2E
 
-This directory owns the repository-side specification for the pinned DeepSeek Harness/Cordis interoperability test.
+This directory owns the repository-side specifications for pinned DeepSeek Harness/Cordis interoperability and startup-recovery tests.
 
 ## Exact evidence subject
 
@@ -13,9 +13,13 @@ pnpm: 11.7.0
 license: MIT
 ```
 
-The CI workflow checks out that exact commit into an ephemeral directory, verifies the commit identity, installs its frozen lockfile with lifecycle scripts disabled, and copies [`deepseek-harness-cordis.e2e.ts`](deepseek-harness-cordis.e2e.ts) into the upstream test directory. No upstream source is copied into this repository.
+The CI workflow checks out that exact commit into an ephemeral directory, verifies the commit identity, installs its frozen lockfile with lifecycle scripts disabled, and copies the repository-owned TypeScript specifications into the upstream test directory. No upstream source is copied into this repository.
 
-## Data flow
+## Evidence lanes
+
+### Immediate-connect interoperability
+
+[`deepseek-harness-cordis.e2e.ts`](deepseek-harness-cordis.e2e.ts) runs after the Desktop listener is ready:
 
 ```text
 Desktop JVM test
@@ -31,9 +35,27 @@ Desktop JVM test
   -> JVM-side dispatcher oracle
 ```
 
-The external TypeScript subject asserts only model-facing behavior. The owning JVM test independently verifies the local dispatcher reached `WAITING_FOR_CONFIRMATION` with the exact proposed URL.
+### Initially unavailable endpoint recovery
 
-## Evidence laws
+[`deepseek-harness-startup-recovery.external.e2e.ts`](deepseek-harness-startup-recovery.external.e2e.ts) starts the pinned plugin before the listener exists:
+
+```text
+No listener on selected numeric-loopback port
+  -> failOnStartupError=false
+  -> first MCP attempt fails
+  -> bounded reconnect supervisor starts
+  -> external process writes initial-failure marker
+  -> JVM starts listener on the exact port
+  -> MCP client reconnects
+  -> one current ctx.tools generation appears
+  -> sanitized read and proposal-only navigation succeed
+```
+
+The marker is a control-plane synchronization artifact in a JVM-created temporary directory. It contains no token, endpoint, request, response, page context, or tool argument.
+
+## Independent authority oracle
+
+The external TypeScript subjects assert model-facing schemas and tool results. The owning JVM tests independently verify the local dispatcher reached `WAITING_FOR_CONFIRMATION` with the exact proposed URL.
 
 ```text
 DeepSeek Harness process started
@@ -49,21 +71,37 @@ MCP tool call succeeded
   != browser/native side effect occurred
 ```
 
-The test never invokes a model provider. It uses a synthetic page fixture, synthetic token, numeric loopback endpoint, and the two existing KMP MCP tools.
+The tests never invoke a model provider. They use synthetic page fixtures, a synthetic token, numeric loopback endpoints, and the two existing KMP MCP tools.
 
-## Secret and output handling
+## Supply-chain and secret handling
 
+- The upstream repository, Node version, pnpm version, and GitHub Action commits are exact.
+- Installation uses the frozen upstream lockfile with lifecycle scripts disabled.
 - The token is generated per CI run and masked immediately.
 - The token is passed only through process environment and the transient Authorization header.
-- Test output must not contain the token, endpoint, or secret fixture.
+- Child output must not contain the token or secret fixture.
 - Failure output is bounded and redacted before it can enter Gradle diagnostics.
-- No request body, page context, tool argument, or response payload is uploaded as an artifact.
+- No request body, page context, tool argument, response payload, or upstream workspace is uploaded as an artifact.
+
+## Evidence distinction
+
+```text
+immediate-connect PASS
+  != startup-recovery PASS
+
+startup-recovery PASS
+  != reconnect after an established listener fails
+
+reconnect PASS
+  != Cordis HMR or tool-list generation replacement
+```
 
 ## Deliberately not proved
 
 ```yaml
+reconnect_after_established_listener_failure: NOT_EXERCISED
 cordis_hmr: NOT_EXERCISED
-reconnect_after_listener_failure: NOT_EXERCISED
+tool_list_change_generation_replacement: NOT_EXERCISED
 production_token_custody: NOT_IMPLEMENTED
 oauth_or_mtls: NOT_IMPLEMENTED
 remote_tls: NOT_IMPLEMENTED

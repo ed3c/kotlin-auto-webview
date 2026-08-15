@@ -5,9 +5,10 @@ on:
     paths:
       - '.github/workflows/deepseek-harness-e2e.yml'
       - 'composeApp/src/desktopMain/kotlin/dev/ed3c/autowebview/mcp/http/**'
-      - 'composeApp/src/desktopTest/kotlin/dev/ed3c/autowebview/mcp/http/DeepSeekHarnessCordisE2ETest.kt'
+      - 'composeApp/src/desktopTest/kotlin/dev/ed3c/autowebview/mcp/http/DeepSeekHarness*E2ETest.kt'
       - 'integrations/deepseek-harness/e2e/**'
       - 'docs/architecture/ADR-0014-deepseek-harness-process-e2e.md'
+      - 'docs/architecture/ADR-0015-deepseek-harness-startup-recovery.md'
   workflow_dispatch:
 
 permissions:
@@ -16,7 +17,7 @@ permissions:
 jobs:
   cordis-mcp-e2e:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 35
     env:
       DSH_E2E_COMMIT: 47f943859bef60e4160492346772ded9b24f765a
       DSH_E2E_ROOT: ${{ github.workspace }}/.e2e/deepseek-harness
@@ -72,13 +73,19 @@ jobs:
             --frozen-lockfile \
             --ignore-scripts
 
-      - name: Stage repository-owned external E2E specification
+      - name: Stage repository-owned external E2E specifications
         shell: bash
         run: |
           set -euo pipefail
-          destination="$DSH_E2E_ROOT/packages/mcp/mcp-client/tests/kotlin-auto-webview.external.e2e.ts"
-          cp integrations/deepseek-harness/e2e/deepseek-harness-cordis.e2e.ts "$destination"
-          test -s "$destination"
+          destination="$DSH_E2E_ROOT/packages/mcp/mcp-client/tests"
+          cp \
+            integrations/deepseek-harness/e2e/deepseek-harness-cordis.e2e.ts \
+            "$destination/kotlin-auto-webview.external.e2e.ts"
+          cp \
+            integrations/deepseek-harness/e2e/deepseek-harness-startup-recovery.external.e2e.ts \
+            "$destination/kotlin-auto-webview-startup-recovery.external.e2e.ts"
+          test -s "$destination/kotlin-auto-webview.external.e2e.ts"
+          test -s "$destination/kotlin-auto-webview-startup-recovery.external.e2e.ts"
 
       - name: Create masked synthetic credential
         shell: bash
@@ -93,7 +100,7 @@ jobs:
           echo "::add-mask::$token"
           echo "DSH_E2E_TOKEN=$token" >> "$GITHUB_ENV"
 
-      - name: Exercise pinned Cordis MCP client against the Desktop listener
+      - name: Exercise pinned Cordis MCP client and startup recovery
         shell: bash
         run: |
           set -euo pipefail
@@ -102,4 +109,4 @@ jobs:
           scripts/ci/run-gradle-with-annotations.sh \
             --no-daemon \
             :composeApp:desktopTest \
-            --tests 'dev.ed3c.autowebview.mcp.http.DeepSeekHarnessCordisE2ETest'
+            --tests 'dev.ed3c.autowebview.mcp.http.DeepSeekHarness*E2ETest'
