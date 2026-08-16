@@ -176,7 +176,7 @@ this table is the join between the two.
 
 | Issue | Gap | Declared in | Why it is not already proven |
 |---:|---|---|---|
-| #55 | Two tracked paths differing only by case | this landing | The collision is invisible on a case-sensitive CI filesystem; only a case-insensitive checkout reveals it |
+| ~~#55~~ | Two tracked paths differing only by case | this landing | **Closed.** `scripts/ci/check-path-collisions.sh` gates CI; its `--selftest` plants collisions and proves the check goes red, and it reports the original `docs/release/WEB.md` / `web.md` pair when run against the pre-fix tree |
 | #56 | Committed SQLDelight snapshots are not integrity-checked | this landing | A corrupt snapshot reports itself as a schema disagreement, which sent #25 after the wrong file three times |
 | #57 | `multi_node_replay_coordination` | [0024](architecture/ADR-0024-durable-replay-state.md) | Two `FileChannel` locks in one JVM raise `OverlappingFileLockException` instead of blocking, so evidence needs a second process |
 | #58 | `sse_disconnect_cancellation: PARTIAL` | [0023](architecture/ADR-0023-request-scoped-sse-responses.md) | Events are materialised before the first byte, so the gateway work is done before a disconnect is observable |

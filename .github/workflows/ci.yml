@@ -13,6 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      # Runs before the toolchain: it needs only the checkout, and a tree that cannot be checked
+      # out safely on every platform should not spend a runner on Gradle first.
+      - name: Reject case-colliding tracked paths
+        run: scripts/ci/check-path-collisions.sh
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
