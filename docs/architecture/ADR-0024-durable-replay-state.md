@@ -1,9 +1,41 @@
 # ADR-0024: Durable and multi-node semantic replay state
 
-- Status: proposed
-- Issue: #53
+- Status: proposed; multi-node claim **falsified and corrected** (see Refutation)
+- Issue: #53; correction: #57
 - Depends on: #43 (semantic action replay identity), #41, #29
 - Dependency delta: none
+
+## Refutation, 2026-08-16 (#57)
+
+The multi-node claim recorded below as `IMPLEMENTED_NOT_EXERCISED` was **wrong, not merely
+unproven**. The first cross-process test showed four contenders all admitting the same digest.
+
+The mechanism was defeated by POSIX record-lock ownership. `readLiveEntries` read the journal with
+`Files.readAllLines(journal)`, which opens a second descriptor for the same file and closes it —
+and on POSIX, closing *any* descriptor for a file releases *every* lock the process holds on it.
+The lock was therefore dropped microseconds after being taken, inside the very block that appeared
+to hold it.
+
+Isolated, single-variable evidence — identical program, identical file, only a second descriptor
+opened and closed inside the critical section:
+
+```text
+without the second descriptor   lock waits: 4 ms, 1218 ms, 2431 ms   (serialised)
+with the second descriptor      lock waits: 23 ms, 25 ms, 29 ms      (not serialised)
+```
+
+**Why it was believed.** The code named the mechanism correctly, held the lock across the whole
+read-decide-append sequence, and every existing test passed — because they were single-process,
+where the in-process `Mutex` provides the exclusion the file lock was supposed to provide. Static
+reading could not distinguish "holds a lock" from "holds a lock that something else silently
+releases", and no test could either until a second process existed. The ADR's own caveat named the
+missing evidence and still understated the risk: it treated the mechanism as correct-but-unwitnessed
+rather than as an unverified claim that could be false.
+
+**Correction.** Every journal access inside the locked block now goes through the same
+`RandomAccessFile` that holds the lock. The fix is a rule about descriptors, not a change of
+algorithm, so the rule is recorded next to the code — a later tidy-up back to `Files.readAllLines`
+would silently reintroduce it.
 
 ## Context
 

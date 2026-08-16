@@ -79,12 +79,20 @@ class DurableMcpHttpReplayGuard(
      *
      * The lock — not the read — is what makes two nodes safe: a competing node blocks until this
      * decision has been durably appended, so the same digest can never be admitted twice.
+     *
+     * **Every access to the journal inside this block goes through [file].** POSIX record locks are
+     * owned by the process and released when it closes *any* descriptor for the file, so a single
+     * `Files.readAllLines(journal)` here would open a second descriptor, close it, and silently
+     * drop the lock this function is holding — leaving every contender free to admit the same
+     * digest while the code still reads as if it were serialised. That is not hypothetical: it is
+     * how this guard originally shipped, and it is why the fix is a rule about descriptors rather
+     * than a change of algorithm.
      */
     private fun admitUnderFileLock(key: McpHttpReplayKey, nowEpochMs: Long): McpHttpReplayDecision {
         journal.parent?.let(Files::createDirectories)
         RandomAccessFile(journal.toFile(), "rw").use { file ->
             file.channel.lock().use {
-                val live = readLiveEntries(nowEpochMs)
+                val live = readLiveEntries(file, nowEpochMs)
                 if (key.value in live) return McpHttpReplayDecision.DUPLICATE
                 if (live.size >= maxEntries) return McpHttpReplayDecision.CAPACITY_EXHAUSTED
 
@@ -109,11 +117,23 @@ class DurableMcpHttpReplayGuard(
         }
     }
 
-    /** A malformed or truncated line is dropped, never treated as a live entry. */
-    private fun readLiveEntries(nowEpochMs: Long): Map<String, Long> {
-        if (!Files.exists(journal)) return emptyMap()
+    /**
+     * Read the journal through the already-locked descriptor.
+     *
+     * Taking [file] rather than the path is the whole point: see [admitUnderFileLock]. A malformed
+     * or truncated line is dropped, never treated as a live entry.
+     */
+    private fun readLiveEntries(file: RandomAccessFile, nowEpochMs: Long): Map<String, Long> {
+        val length = file.length()
+        if (length == 0L) return emptyMap()
+        check(length <= MAX_JOURNAL_BYTES) { "Replay journal is larger than the admitted ceiling" }
+
+        val contents = ByteArray(length.toInt())
+        file.seek(0)
+        file.readFully(contents)
+
         val live = linkedMapOf<String, Long>()
-        Files.readAllLines(journal).forEach { line ->
+        contents.decodeToString().lineSequence().forEach { line ->
             val digest = line.substringBefore(' ', missingDelimiterValue = "")
             val expiresAt = line.substringAfter(' ', missingDelimiterValue = "").toLongOrNull()
             if (digest.isNotEmpty() && expiresAt != null && expiresAt > nowEpochMs) {
@@ -125,6 +145,9 @@ class DurableMcpHttpReplayGuard(
 
     private companion object {
         const val COMPACTION_THRESHOLD_BYTES = 1L * 1_024 * 1_024
+
+        /** Compaction keeps the journal near the threshold; well beyond it means something is wrong. */
+        const val MAX_JOURNAL_BYTES = 64L * 1_024 * 1_024
 
         fun saturatingAdd(left: Long, right: Long): Long =
             if (Long.MAX_VALUE - left < right) Long.MAX_VALUE else left + right
