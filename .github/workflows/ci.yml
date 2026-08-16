@@ -17,6 +17,10 @@ jobs:
       # out safely on every platform should not spend a runner on Gradle first.
       - name: Reject case-colliding tracked paths
         run: scripts/ci/check-path-collisions.sh
+      # Also checkout-only: a stray NUL makes a source file binary to git, so its diffs stop being
+      # reviewable while everything still compiles and every test still passes.
+      - name: Reject undeclared NUL bytes in tracked sources
+        run: python3 scripts/ci/check-text-sources.py
       - uses: actions/setup-java@v5
         with:
           distribution: temurin

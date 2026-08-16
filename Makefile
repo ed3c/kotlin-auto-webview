@@ -1,4 +1,4 @@
-.PHONY: test desktop web android ios check paths paths-selftest snapshots snapshots-selftest
+.PHONY: test desktop web android ios check paths paths-selftest snapshots snapshots-selftest sources sources-selftest
 
 test:
 	./gradlew :composeApp:allTests
@@ -17,6 +17,13 @@ snapshots:
 snapshots-selftest:
 	python3 scripts/ci/check-schema-snapshots.py --selftest
 
+# A NUL byte turns a source file binary to git; nothing else notices.
+sources:
+	python3 scripts/ci/check-text-sources.py
+
+sources-selftest:
+	python3 scripts/ci/check-text-sources.py --selftest
+
 desktop:
 	./gradlew :composeApp:run
 
@@ -29,5 +36,5 @@ android:
 ios:
 	./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64
 
-check: paths snapshots test
+check: paths sources snapshots test
 	./gradlew :composeApp:compileKotlinDesktop :composeApp:wasmJsBrowserDistribution :composeApp:assembleDebug
