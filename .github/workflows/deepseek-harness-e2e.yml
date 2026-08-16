@@ -110,6 +110,17 @@ jobs:
           echo "::add-mask::$token"
           echo "DSH_E2E_TOKEN=$token" >> "$GITHUB_ENV"
 
+      # DeepSeekHarnessEstablishedSessionRecoveryE2ETest is absent from this list on purpose.
+      #
+      # It is a probe (issue #39, ADR-0016), and it was run: at the pinned upstream subject it
+      # returns the admitted outcome FAIL_TRANSPORT_CLOSE_NOT_OBSERVED — a real tool-call outage
+      # occurs, but the client never emits the onclose/re-synchronisation evidence the oracle
+      # requires within the bounded deadline. That is an answer about upstream behaviour, not a
+      # broken test, so the oracle is preserved unweakened in source rather than deleted, and it is
+      # kept out of the recurring run so a settled negative result does not red every pipeline.
+      #
+      # Re-run it deliberately (`--tests '...EstablishedSessionRecoveryE2ETest'`) when the pinned
+      # upstream commit moves; that is the only event that can change the answer.
       - name: Exercise admitted pinned Cordis MCP subjects
         shell: bash
         run: |
