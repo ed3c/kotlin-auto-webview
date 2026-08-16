@@ -168,6 +168,23 @@ boundary; every `NOT_EXERCISED` or `NOT_IMPLEMENTED` below is deliberate and sta
 | #51 | Android private-edge transport and physical pairing | Android source set | [0005](architecture/ADR-0005-openclaw-stream.md) | `BLOCKED_EXTERNAL`: physical device and private node required |
 | #52 | iOS private-edge transport and physical pairing | iOS source set | [0005](architecture/ADR-0005-openclaw-stream.md) | `BLOCKED_EXTERNAL`: physical device and private node required |
 
+## Open evidence gaps
+
+Every `NOT_IMPLEMENTED`, `NOT_EXERCISED`, or `PARTIAL` state that an ADR above declares now has an
+owning issue. A gap without an issue is how a stated limitation quietly becomes a forgotten one, so
+this table is the join between the two.
+
+| Issue | Gap | Declared in | Why it is not already proven |
+|---:|---|---|---|
+| #55 | Two tracked paths differing only by case | this landing | The collision is invisible on a case-sensitive CI filesystem; only a case-insensitive checkout reveals it |
+| #56 | Committed SQLDelight snapshots are not integrity-checked | this landing | A corrupt snapshot reports itself as a schema disagreement, which sent #25 after the wrong file three times |
+| #57 | `multi_node_replay_coordination` | [0024](architecture/ADR-0024-durable-replay-state.md) | Two `FileChannel` locks in one JVM raise `OverlappingFileLockException` instead of blocking, so evidence needs a second process |
+| #58 | `sse_disconnect_cancellation: PARTIAL` | [0023](architecture/ADR-0023-request-scoped-sse-responses.md) | Events are materialised before the first byte, so the gateway work is done before a disconnect is observable |
+| #59 | `jwks_endpoint_fetching_and_caching`, revocation | [0022](architecture/ADR-0022-production-mcp-authentication.md) | Key distribution is behind `McpJwtKeySource`; every deployment currently re-solves caching and refresh |
+| #60 | `os_keychain_or_hsm_custody` | [0019](architecture/ADR-0019-mcp-credential-lifecycle.md) | Custody today is in-process only; the child process receives the credential through an environment variable |
+| #61 | `desktop_packaging_with_jdk_httpserver` | [0020](architecture/ADR-0020-desktop-mcp-application-lifecycle.md) | `modules("jdk.httpserver")` is verified by review, not by a packaging run |
+| #62 | `arbitrary_proxy_or_remote_network_behavior` | [0021](architecture/ADR-0021-remote-https-and-trusted-proxy.md) | The boundary is proven against headers the tests send, not against headers a real proxy sends |
+
 ## Unknown register
 
 | Unknown | Classification | Cheapest probe | Current state |
