@@ -21,6 +21,11 @@ class DesktopMcpCredentialLifecycle(
     private val credentialLifetimeMillis: Long = DEFAULT_CREDENTIAL_LIFETIME_MILLIS,
     private val handoverMillis: Long = DEFAULT_HANDOVER_MILLIS,
     private val random: SecureRandom = SecureRandom(),
+    /**
+     * Optional at-rest custody. When absent, custody stays in-process exactly as before and a
+     * restart requires a fresh issuance — the caller decides that, this class never assumes it.
+     */
+    private val keyStore: McpHostKeyStore? = null,
 ) : McpHttpAuthenticationVerifier, AutoCloseable {
     private val lock = Any()
     private val closed = AtomicBoolean(false)
@@ -83,13 +88,19 @@ class DesktopMcpCredentialLifecycle(
         mint(nowEpochMs)
     }
 
-    /** Immediately reject every previously issued credential, including the active epoch. */
+    /**
+     * Immediately reject every previously issued credential, including the active epoch.
+     *
+     * Revocation removes the value from at-rest custody too. Clearing memory while leaving a
+     * restorable copy on disk would make the next start silently un-revoke it.
+     */
     fun revoke() = synchronized(lock) {
         revoked = true
         active?.digest?.fill(0)
         retiring?.digest?.fill(0)
         active = null
         retiring = null
+        runCatching { keyStore?.delete(storeAccount()) }
     }
 
     override suspend fun verify(input: McpHttpAuthenticationInput): McpHttpAuthenticationDecision {
@@ -156,8 +167,50 @@ class DesktopMcpCredentialLifecycle(
             digest = digest,
             notAfterEpochMs = nowEpochMs + credentialLifetimeMillis,
         )
+        // The epoch travels with the value: a restored credential has to verify under the same
+        // epoch it was issued with, or the semantic replay keys from #43 would silently change
+        // domain across a restart.
+        keyStore?.store(storeAccount(), "$epoch ${token.decodeToString()}".encodeToByteArray())
         return DesktopMcpCredentialMaterial(epoch = epoch, token = token)
     }
+
+    /**
+     * Re-establish the credential a previous process issued, without minting a new one.
+     *
+     * Returns `null` when nothing is stored, which is a different answer from "a credential is
+     * available" and is the caller's cue to [issue] instead. The stored epoch is restored with the
+     * value, and the ordinal continues past it so a later [rotate] cannot reuse a retired epoch.
+     */
+    fun restore(nowEpochMs: Long): DesktopMcpCredentialMaterial? = synchronized(lock) {
+        check(!closed.get()) { "MCP credential lifecycle is closed" }
+        check(!revoked) { "MCP credential lifecycle is revoked" }
+        check(active == null) { "MCP credential is already issued" }
+
+        val store = keyStore ?: return null
+        val stored = store.retrieve(storeAccount()) ?: return null
+        val text = stored.decodeToString()
+        stored.fill(0)
+
+        val epoch = text.substringBefore(' ', missingDelimiterValue = "")
+        val value = text.substringAfter(' ', missingDelimiterValue = "")
+        if (!epoch.matches(OPAQUE_ID_PATTERN) || value.isEmpty()) {
+            // A damaged record is not a credential. Removing it makes the next call a clean issue
+            // rather than an unexplained repeated failure.
+            store.delete(storeAccount())
+            return null
+        }
+
+        val token = value.encodeToByteArray()
+        active = AdmittedCredential(
+            epoch = epoch,
+            digest = sha256(token),
+            notAfterEpochMs = nowEpochMs + credentialLifetimeMillis,
+        )
+        nextEpochOrdinal = maxOf(nextEpochOrdinal, (epoch.substringAfterLast('-').toIntOrNull() ?: 0) + 1)
+        return DesktopMcpCredentialMaterial(epoch = epoch, token = token)
+    }
+
+    private fun storeAccount(): String = "$subjectId@$expectedAuthority"
 
     private fun generateToken(): ByteArray {
         val entropy = ByteArray(CREDENTIAL_ENTROPY_BYTES)
