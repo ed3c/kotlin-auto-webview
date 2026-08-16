@@ -40,6 +40,7 @@
 | [0023](ADR-0023-request-scoped-sse-responses.md) | Request-scoped SSE responses | #54 |
 | [0024](ADR-0024-durable-replay-state.md) | Durable and multi-node replay state | #53 |
 | [0025](ADR-0025-deepseek-cordis-patch-as-configuration.md) | Generated Cordis patch as configuration | #49 |
+| [0026](ADR-0026-mcp-jwks-key-retrieval.md) | JWKS retrieval, caching, and key retirement | #59 |
 
 ## Runtime pipeline
 
