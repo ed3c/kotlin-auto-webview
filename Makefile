@@ -1,4 +1,4 @@
-.PHONY: test desktop web android ios check paths paths-selftest
+.PHONY: test desktop web android ios check paths paths-selftest snapshots snapshots-selftest
 
 test:
 	./gradlew :composeApp:allTests
@@ -9,6 +9,13 @@ paths:
 
 paths-selftest:
 	scripts/ci/check-path-collisions.sh --selftest
+
+# Also runs automatically as a dependency of the SQLDelight generator.
+snapshots:
+	python3 scripts/ci/check-schema-snapshots.py
+
+snapshots-selftest:
+	python3 scripts/ci/check-schema-snapshots.py --selftest
 
 desktop:
 	./gradlew :composeApp:run
@@ -22,5 +29,5 @@ android:
 ios:
 	./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64
 
-check: paths test
+check: paths snapshots test
 	./gradlew :composeApp:compileKotlinDesktop :composeApp:wasmJsBrowserDistribution :composeApp:assembleDebug

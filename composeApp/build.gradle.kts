@@ -113,6 +113,24 @@ sqldelight {
     }
 }
 
+// An unreadable schema snapshot makes `verifyMigrations` infer an empty schema, which it then
+// reports as every statement in the migration referring to something that does not exist. The
+// errors all name the migration, so the migration is what gets edited — that cost three attempts
+// in issue #25 while the migration was already correct.
+//
+// This is wired as a dependency of the generator rather than as a CI step so that every caller
+// gets it: a local `./gradlew` run reaches the same gate as a runner, and nobody has to remember.
+val checkSchemaSnapshots by tasks.registering(Exec::class) {
+    group = "verification"
+    description = "Reject an unreadable SQLDelight schema snapshot before the generator sees it."
+    val checker = rootProject.layout.projectDirectory.file("scripts/ci/check-schema-snapshots.py")
+    val migrations = layout.projectDirectory.dir("src/commonMain/sqldelight/migrations")
+    commandLine("python3", checker.asFile.absolutePath, migrations.asFile.absolutePath)
+}
+
+tasks.matching { it.name.startsWith("generate") && it.name.contains("AppDatabase") }
+    .configureEach { dependsOn(checkSchemaSnapshots) }
+
 android {
     namespace = "dev.ed3c.autowebview"
     compileSdk = 36

@@ -177,7 +177,7 @@ this table is the join between the two.
 | Issue | Gap | Declared in | Why it is not already proven |
 |---:|---|---|---|
 | ~~#55~~ | Two tracked paths differing only by case | this landing | **Closed.** `scripts/ci/check-path-collisions.sh` gates CI; its `--selftest` plants collisions and proves the check goes red, and it reports the original `docs/release/WEB.md` / `web.md` pair when run against the pre-fix tree |
-| #56 | Committed SQLDelight snapshots are not integrity-checked | this landing | A corrupt snapshot reports itself as a schema disagreement, which sent #25 after the wrong file three times |
+| ~~#56~~ | Committed SQLDelight snapshots are not integrity-checked | this landing | **Closed.** `scripts/ci/check-schema-snapshots.py` is a dependency of the SQLDelight generator, so every caller passes it; run against the historical `1.db` it reports `header declares 6 x 512 = 3072 bytes, file holds 2994` |
 | #57 | `multi_node_replay_coordination` | [0024](architecture/ADR-0024-durable-replay-state.md) | Two `FileChannel` locks in one JVM raise `OverlappingFileLockException` instead of blocking, so evidence needs a second process |
 | #58 | `sse_disconnect_cancellation: PARTIAL` | [0023](architecture/ADR-0023-request-scoped-sse-responses.md) | Events are materialised before the first byte, so the gateway work is done before a disconnect is observable |
 | #59 | `jwks_endpoint_fetching_and_caching`, revocation | [0022](architecture/ADR-0022-production-mcp-authentication.md) | Key distribution is behind `McpJwtKeySource`; every deployment currently re-solves caching and refresh |
