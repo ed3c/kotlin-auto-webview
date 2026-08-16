@@ -39,6 +39,7 @@
 | [0022](ADR-0022-production-mcp-authentication.md) | OAuth, mTLS, workload identity | #48 |
 | [0023](ADR-0023-request-scoped-sse-responses.md) | Request-scoped SSE responses | #54 |
 | [0024](ADR-0024-durable-replay-state.md) | Durable and multi-node replay state | #53 |
+| [0025](ADR-0025-deepseek-cordis-patch-as-configuration.md) | Generated Cordis patch as configuration | #49 |
 
 ## Runtime pipeline
 

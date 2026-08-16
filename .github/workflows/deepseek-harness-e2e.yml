@@ -6,11 +6,13 @@ on:
       - '.github/workflows/deepseek-harness-e2e.yml'
       - 'composeApp/src/desktopMain/kotlin/dev/ed3c/autowebview/mcp/http/**'
       - 'composeApp/src/desktopTest/kotlin/dev/ed3c/autowebview/mcp/http/DeepSeekHarness*E2ETest.kt'
+      - 'composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/providers/DeepSeekHarnessCordisBinding.kt'
       - 'integrations/deepseek-harness/e2e/**'
       - 'docs/architecture/ADR-0014-deepseek-harness-process-e2e.md'
       - 'docs/architecture/ADR-0015-deepseek-harness-startup-recovery.md'
       - 'docs/architecture/ADR-0016-deepseek-established-session-recovery-probe.md'
       - 'docs/architecture/ADR-0017-deepseek-stateless-call-recovery.md'
+      - 'docs/architecture/ADR-0025-deepseek-cordis-patch-as-configuration.md'
   workflow_dispatch:
 
 permissions:
@@ -92,10 +94,14 @@ jobs:
           cp \
             integrations/deepseek-harness/e2e/deepseek-harness-stateless-call-recovery.external.e2e.ts \
             "$destination/kotlin-auto-webview-stateless-call-recovery.external.e2e.ts"
+          cp \
+            integrations/deepseek-harness/e2e/deepseek-harness-cordis-patch.external.e2e.ts \
+            "$destination/kotlin-auto-webview-cordis-patch.external.e2e.ts"
           test -s "$destination/kotlin-auto-webview.external.e2e.ts"
           test -s "$destination/kotlin-auto-webview-startup-recovery.external.e2e.ts"
           test -s "$destination/kotlin-auto-webview-established-session-recovery.external.e2e.ts"
           test -s "$destination/kotlin-auto-webview-stateless-call-recovery.external.e2e.ts"
+          test -s "$destination/kotlin-auto-webview-cordis-patch.external.e2e.ts"
 
       - name: Create masked synthetic credential
         shell: bash
@@ -132,4 +138,5 @@ jobs:
             :composeApp:desktopTest \
             --tests 'dev.ed3c.autowebview.mcp.http.DeepSeekHarnessCordisE2ETest' \
             --tests 'dev.ed3c.autowebview.mcp.http.DeepSeekHarnessStartupRecoveryE2ETest' \
-            --tests 'dev.ed3c.autowebview.mcp.http.DeepSeekHarnessStatelessCallRecoveryE2ETest'
+            --tests 'dev.ed3c.autowebview.mcp.http.DeepSeekHarnessStatelessCallRecoveryE2ETest' \
+            --tests 'dev.ed3c.autowebview.mcp.http.DeepSeekHarnessCordisPatchE2ETest'
