@@ -1,174 +1,161 @@
-# Stacked PR graph and traceability index
+# Git Town Stacked PR graph and molecular traceability
 
-This document is the branch/issue/path/eval SSOT for Git Town work. It separates the **actual remote graph** from the **planned implementation graph**. A planned row does not prove that its branch, worktree, local verification, or PR exists.
+This is the repository-wide branch/issue/path/eval index for the Creator Capability Browser convergence. It separates actual remote ancestry, planned Git parents, process/completion dependencies, and evidence ceilings.
 
-## Evidence vocabulary
-
-```text
-PASS
-FAIL
-ABSENT
-NOT_IMPLEMENTED
-NOT_EXERCISED
-SKIPPED_BY_POLICY
-EXTERNAL_AUTHORITY_REQUIRED
-```
-
-## Actual remote graph at the autonomous v2 binding
+## Laws
 
 ```text
-main @ e447dea815d63e89afd6acf58845f222bee07b6f
-└── feat/kmp-agent-browser-foundation @ a449fac24b8ee602b3c36ae60e972fe25f35c516
-    └── docs/agent-integration-stack-index @ <current PR #15 head>
+Git parent edge = child consumes unmerged parent bytes
+process dependency = required subject/receipt, not necessarily Git ancestry
+one writer = one active path lease
+issue/branch/PR/sync/CI/merge/release are separate states
+moved or integrated bytes require fresh evidence
 ```
 
-| Branch | Issue / PR | Remote state | Verification |
+Canonical procedure: `ed3c/skills-shared/skills/git-town-stacked-pr-worker`.
+
+Live Git Town executable, linked worktrees, leases, dry-run/no-push sync, conflict canaries and publication receipts remain `ABSENT` / `NOT_EXERCISED`. This document does not authorize Git Town execution or merge.
+
+## Actual Creator remote graph
+
+```text
+main@290a82f0394a42e0c20949a36ab575229b95051d
+└── agent/media-rights-risk-register@8e2181e11144ae5bb349c1a0aa9b790485d60c4d
+    issue #80 / Draft PR #81 / base main
+    └── agent/community-skill-edition-design@d8b105ba1bb7be88caf9ae52eaa5bc31bf4667c9
+        issue #82 / Draft PR #83 / base agent/media-rights-risk-register
+        └── docs/creator-capability-convergence
+            issue #98; exact moving head is GitHub branch metadata
+```
+
+| Branch | Issue / PR | Actual state | Evidence ceiling |
 |---|---|---|---|
-| `main` | default branch | exists | preservation subject; no mutation admitted |
-| `feat/kmp-agent-browser-foundation` | PR #1 | open draft, mergeable | CI `PASS` at `a449fac...` |
-| `docs/agent-integration-stack-index` | issue #6 / PR #15 | open draft child PR | forge branch/PR lane admitted; local Git Town/worktree `NOT_EXERCISED` |
+| `main` | default | exists | repository preservation subject |
+| `agent/media-rights-risk-register` | #80 / PR #81 | open Draft | risk/documentation only |
+| `agent/community-skill-edition-design` | #82 / PR #83 | open Draft child | architecture/schema only |
+| `docs/creator-capability-convergence` | #98 | branch exists | documentation in progress |
 
-No other planned branch is created by this document.
+All branches named below are planned unless later GitHub metadata proves they exist.
 
-## Planned graph
+## Creator implementation topology
 
 ```text
-main
-└── feat/kmp-agent-browser-foundation                     # PR #1
-    └── docs/agent-integration-stack-index                # issue #6 / PR #15
-        ├── build/runtime-dependency-admission            # issue #7
-        │   ├── feat/persistent-memory                    # issue #8
-        │   └── feat/openclaw-stream-contract             # issue #9
-        ├── feat/native-capability-contracts              # issue #10
-        │   └── feat/accessibility-action-executor        # issue #11
-        │       ├── release/android-play-evidence         # issue #2
-        │       └── release/ios-app-store-evidence        # issue #3
-        ├── feat/local-semantic-router-contract           # issue #12
-        │   └── feat/local-embedding-engine               # issue #13
-        ├── release/web-deployment-evidence               # issue #5
-        └── converge/release-readiness-index              # issue #14, create last
+#80 / PR #81  D0 risk and rights architecture
+└── #82 / PR #83  D1 Community Edition architecture
+    └── #84  C0 creator contracts
+        ├── #85  A1 YouTube source adapter
+        ├── #86  K1 v7.2 automatic indexer
+        ├── #87  U1 card/graph/procedure editor
+        ├── #88  C1 procedural compiler
+        ├── #89  E1 independent qualifier
+        ├── #90  P1 model/destination router
+        └── #91  X1 core convergence
+            process completion requires #85–#90 exact receipts
+            └── #92  C2 Community SkillPatch store
+                ├── #93  M1 UGC moderation
+                ├── #94  R1 source/rights revocation
+                ├── #95  A2 reference edition
+                │   └── #96  A3 licensed render/native PiP [rights-gated]
+                └── #97  E2 evidence convergence
+
+#98 D2 shared docs convergence [current writer]
+├── #99 E3 exact-head docs CI
+├── #100 H1 Local Handoff Queue after concrete runtime commands
+├── #101 P2 zero-context prompt pack
+└── #111–#117 supporting index/snapshot/review/roadmap/DoD/non-claim/policy atoms
 ```
 
-`converge/release-readiness-index` has logical dependencies on admitted leaf/release heads but one Git parent. It is created only after required branches are admitted/reparented. It never attempts an automatic multi-parent merge.
+### Cross-media source topology
 
-Issue #4 is the umbrella epic for private L2, persistence, and semantic-runtime work. Issues #8, #9, #12, and #13 are its atomized execution units.
+```text
+#102 source-adapter epic
+├── #85  YouTube timestamp/player
+├── #103 PDF page/region/text/figure
+├── #104 EPUB chapter/CFI/section
+├── #105 Notion workspace/page/block
+├── #106 X post/thread/article observation
+├── #107 generic Web origin/navigation/DOM anchor
+├── #108 Drive/Docs file/revision/structure
+├── #109 local file digest/structural-or-temporal locator
+└── #110 X2 source-registry convergence
+    process completion requires every selected adapter receipt
+```
 
-## Stack index
+## Start vs completion dependencies
 
-| Sequence | Stack ID | Issue | Head branch | PR base / parent | Class | Goal | State |
+- #84 starts after PR #83 contracts are readable; completion requires admitted parent contract subject.
+- #85–#88/#90 are path-disjoint children of #84 and may proceed in parallel after #84 contract admission.
+- #89 may prepare fixtures after #84 and candidate schema after #88; it completes only against exact compiler candidate subjects and remains independent.
+- #91 has one chosen Git parent but process completion requires #85–#90 receipts and fresh integrated tests.
+- #92 starts after #91 exact contract/runtime subject.
+- #93/#94 are disjoint children of #92. #95 consumes #85/#87/#92/#94 process subjects; its Git parent is one selected admitted branch.
+- #96 is serial after #95 and blocked until exact external media rights exist. It is not a reference-MVP dependency.
+- #97 prepares evidence schemas early but completes only against selected implementation/device/provider subjects.
+- #102 adapters are post-MVP siblings unless explicitly selected; #110 is their process convergence.
+- #98 may document planned states, but cannot call them implemented. #99 is a true child because it consumes #98 files.
+- #100 remains `ABSENT` until owning runtime issues expose exact commands and receipts.
+
+## Molecular Stack table
+
+| Order | ID | Issue | Planned head | Parent/base | Class | Writable owner | Current state |
 |---:|---|---:|---|---|---|---|---|
-| 0 | `STACK-000` | #1 | `feat/kmp-agent-browser-foundation` | `main` | foundation | Executable four-platform Agent-browser MVP | open draft; CI `PASS` |
-| 1 | `STACK-006` | #6 | `docs/agent-integration-stack-index` | foundation | foundation | Agent/docs/autonomous dual-lane/Git Town SSOT | open draft PR #15 |
-| 2 | `STACK-007` | #7 | `build/runtime-dependency-admission` | docs stack | foundation | Exact SQLDelight/Ktor dependency and legal admission | `NOT_IMPLEMENTED` |
-| 3A | `STACK-008` | #8 | `feat/persistent-memory` | runtime deps | child | SQLDelight L1 + append-only audit | `NOT_IMPLEMENTED` |
-| 3B | `STACK-009` | #9 | `feat/openclaw-stream-contract` | runtime deps | child | Authenticated ordered OpenClaw L2 transport | `NOT_IMPLEMENTED` |
-| 2B | `STACK-010` | #10 | `feat/native-capability-contracts` | docs stack | sibling | Toolmaker contracts and permission mapping | `NOT_IMPLEMENTED` |
-| 3C | `STACK-011` | #11 | `feat/accessibility-action-executor` | capability contracts | child | Freshness-bound executor behind HITL | `NOT_IMPLEMENTED` |
-| 2C | `STACK-012` | #12 | `feat/local-semantic-router-contract` | docs stack | sibling | Semantic adapter contract and reproducible baseline | `NOT_IMPLEMENTED` |
-| 3D | `STACK-013` | #13 | `feat/local-embedding-engine` | semantic contract | child | Select one admitted physical-device engine | `NOT_IMPLEMENTED` |
-| 4A | `STACK-002` | #2 | `release/android-play-evidence` | action executor | release | Signed AAB, Play, device evidence | `NOT_EXERCISED` |
-| 4B | `STACK-003` | #3 | `release/ios-app-store-evidence` | action executor | release | Signed archive, TestFlight, device evidence | `NOT_EXERCISED` |
-| 2D | `STACK-005` | #5 | `release/web-deployment-evidence` | docs stack | sibling | Publish and verify Wasm deployment | `NOT_EXERCISED` |
-| 5 | `STACK-014` | #14 | `converge/release-readiness-index` | docs stack after admitted dependencies | convergence | Shared index and release evidence reconciliation | `NOT_IMPLEMENTED` |
+| 0 | `CRT-D0` | #80 / PR #81 | `agent/media-rights-risk-register` | `main` | architecture | `docs/security/**` | Draft published |
+| 1 | `CRT-D1` | #82 / PR #83 | `agent/community-skill-edition-design` | D0 | architecture child | selected `docs/creator/**` design files | Draft published |
+| 2 | `CRT-C0` | #84 | `feat/creator-content-contracts` | D1 | contract child | creator contracts/policy/schemas | `NOT_IMPLEMENTED` |
+| 3a | `CRT-A1` | #85 | `feat/youtube-source-adapter` | C0 | source child | YouTube adapter paths | `NOT_IMPLEMENTED` |
+| 3b | `CRT-K1` | #86 | `feat/v72-auto-indexer` | C0 | sibling | indexing paths | `NOT_IMPLEMENTED` |
+| 3c | `CRT-U1` | #87 | `feat/creator-card-editor` | C0 | sibling | editor/UI paths | `NOT_IMPLEMENTED` |
+| 3d | `CRT-C1` | #88 | `feat/procedural-skill-compiler` | C0 | sibling | compiler paths | `NOT_IMPLEMENTED` |
+| 3e | `CRT-E1` | #89 | `test/procedural-skill-qualifier` | C0 + candidate dependency | independent qualifier | qualification paths | `NOT_IMPLEMENTED` |
+| 3f | `CRT-P1` | #90 | `feat/creator-model-destination-router` | C0 | sibling | provider/export paths | `NOT_IMPLEMENTED` |
+| 4 | `CRT-X1` | #91 | `feat/creator-pipeline-convergence` | selected C0 child | process convergence | creator runtime/e2e paths | `NOT_IMPLEMENTED` |
+| 5 | `CRT-C2` | #92 | `feat/community-skill-patches` | X1 | child | community model/store | `NOT_IMPLEMENTED` |
+| 6a | `CRT-M1` | #93 | `feat/community-edition-moderation` | C2 | child | moderation/abuse | `NOT_IMPLEMENTED` |
+| 6b | `CRT-R1` | #94 | `feat/creator-source-revocation` | C2 | child | freshness/revocation | `NOT_IMPLEMENTED` |
+| 6c | `CRT-A2` | #95 | `feat/community-reference-edition` | C2 + process deps | product convergence | reference playback/UI | `NOT_IMPLEMENTED` |
+| 7 | `CRT-A3` | #96 | `feat/licensed-community-render` | A2 | rights-gated child | licensed render/PiP | blocked / `NOT_IMPLEMENTED` |
+| 7b | `CRT-E2` | #97 | `test/creator-capability-evidence` | selected implementation | evidence convergence | tests/scripts/receipts | `NOT_IMPLEMENTED` |
+| D | `CRT-D2` | #98 | `docs/creator-capability-convergence` | D1 | shared docs convergence | root/creator indexes | in progress |
+| D+ | `CRT-E3` | #99 | `ci/creator-docs-convergence` | D2 | true child | docs CI/receipts | planned |
+| H | `CRT-H1` | #100 | future | D2 + runtime commands | local handoff | handoff docs/queue | `ABSENT` |
+| P | `CRT-P2` | #101 | future | D2 | prompt docs | creator prompts | planned |
+| S | `CRT-SRC` | #102 | epic | C0 | source expansion | issue routing | planned |
+| S1–S7 | `CRT-A4..A9` | #103–#109 | source-specific heads | C0 | source siblings | adapter-specific paths | `NOT_IMPLEMENTED` |
+| SX | `CRT-X2` | #110 | `feat/creator-source-registry` | one selected adapter | process convergence | source registry | `NOT_IMPLEMENTED` |
+| DA | `CRT-D3` | #111–#117 | #98-owned or later | D2 | docs/review | exact issue leases | planned |
 
-## Path leases
+## Single-writer lease index
 
-Shared files are intentionally excluded from leaf branches. This prevents multiple Workers from rewriting aggregate state.
+- #98 is the current writer for root `README.md`, `README.zh-TW.md`, `AGENTS.md`, `docs/TRACEABILITY.md`, and `docs/git/STACKED_PRS.md` plus current creator index files.
+- #75 retains nested OpenDroid integration ownership. It must not start a concurrent root writer; later root reconciliation consumes or supersedes exact #98 head and reruns global checks.
+- Runtime/source/compiler/community leaves exclude shared indexes.
+- #91/#95/#110 each own only convergence code paths; they do not rewrite leaf implementations.
 
-| Issue | Exclusive writable paths | Named exclusions |
-|---:|---|---|
-| #6 | `.git-town.toml`, `AGENTS.md`, `README*`, `docs/automation/**`, `docs/git/**`, `docs/harness/**`, `docs/TRACEABILITY.md`, task/PR templates | `composeApp/src/**`, `iosApp/**`, `LICENSE`, `NOTICE`, signing/secret material |
-| #7 | Gradle catalogs/build files, `NOTICE`, `docs/dependencies/**` | all feature source directories; `LICENSE`; removal/reinterpretation of existing notices |
-| #8 | `persistence/**`, `commonMain/sqldelight/**`, persistence tests, ADR-0004 | build files, `README*`, traceability, edge/tool/executor paths |
-| #9 | `edge/**` in common/Android/iOS, edge tests, ADR-0005 | build files, cache/dispatcher/MCP internals, shared indexes |
-| #10 | `toolmaker/**`, toolmaker tests, ADR-0006 | platform actuals, dispatcher/MCP internals, shared indexes |
-| #11 | `executor/**` in common/platforms, executor tests, ADR-0007 | observer source, cache/MCP internals, shared indexes |
-| #12 | `semantics/**` contract/fixtures, semantic eval corpus, ADR-0008 | build files, cache/projection internals, shared indexes |
-| #13 | selected engine dependency lines, semantic engine/platform adapters, engine tests, dependency evidence | cache/projection/dispatcher, shared indexes |
-| #2 | Android release workflow/config/metadata/runbook and Android-only attestation actual | iOS/Web, shared architecture indexes |
-| #3 | iOS signing/config/metadata/runbook and iOS-only attestation actual | Android/Web, shared architecture indexes |
-| #5 | Pages workflow/config, Web deployment smoke fixtures/receipts | mobile release paths, shared architecture indexes |
-| #14 | `README*`, `AGENTS.md`, `docs/TRACEABILITY.md`, aggregate architecture/release indexes | all implementation source |
+Overlap returns `BLOCKED_BRANCH_LEASE`.
 
-A task packet can narrow these paths but cannot broaden them without updating this SSOT through an admitted governance/convergence packet. Sibling overlap produces `BLOCKED_BRANCH_LEASE`.
+## Eval and negative-control index
 
-## Dependency and parallelism rules
+| Atom | Required proof | Planted failure |
+|---|---|---|
+| #84 | sealed contract/schema round trips and mode laws | broad allow, case→law, rights laundering, source leakage |
+| #85 | official player/identity/seek/fallback state | overlay/ads/PiP/Premium/transcript misuse |
+| #86 | semantic segmentation/stable cards/dedup | fixed chunks, lost locator/edge, contradiction collapse |
+| #87 | immutable editor revisions and typed source navigation | player overlap, evidence mutation, seek→view claim |
+| #88 | deterministic IR/candidate rendering | raw-source fill, self-verdict, generic hollow rule, style leak |
+| #89 | G1–G8 independent qualification | no stop/oracle/negative trigger, shared compiler state |
+| #90 | destination/minimization/host portability | consumer token reuse, private egress, provider authority |
+| #91 | end-to-end exact digests and boundary bypass tests | skip rights, compiler self-qualify, stale cards, model→authority |
+| #92 | immutable patch/version/conflict/tombstone | likes→truth, raw source payload, history rewrite |
+| #93 | executable UGC controls | prose-only controls, self-moderation, model legal verdict |
+| #94 | impact/reindex/takedown/cleanup | cached playback after deletion, stale locator, fake deletion receipt |
+| #95 | reference edition source dock/seek/fallback | hidden montage, YouTube PiP label, cached source, seek→view |
+| #96 | exact rights/render/PiP subject | standard YouTube/partial CC/voice clone/expired rights |
+| #97 | literal evidence lanes and receipts | emulator→device, integrity→rights, black frame→empty, hidden absence |
+| #98/#99 | issue/PR/head/DAG/lease/index consistency | issue→implementation, fake ancestry, #75/#98 overlap, omitted gates |
+| #103–#110 | source-specific locator/rights/capability behavior | DRM/auth/CSP/action bypass, stale revision, fake parity |
 
-- #8 and #9 are sibling children of #7 and may run in parallel because source leases are disjoint.
-- #7, #10, #12, and #5 may run in parallel after #6 is admitted; only #7 owns shared build/dependency files at that stage.
-- #11 is serial after #10 because it consumes Toolmaker contracts.
-- #13 is serial after #12 and owns only the selected semantic-engine dependency changes after the contract baseline exists.
-- #2 and #3 are sibling release stacks after #11. They may be reviewed in parallel but cannot claim completion until logical transport/attestation dependencies are admitted.
-- #14 is not parallel implementation work. It is created last and owns shared reconciliation only.
-- A blocked transition or Worker does not starve independent admitted siblings.
+## Publication and merge
 
-## Per-stack eval index
+A branch may publish only after its exact task packet, path lease, local-state snapshot, fixed evals, Shadow checkpoints, disclosure scan and remote ancestry checks are satisfied. The current connector session does not prove local checkout or Git Town execution.
 
-| Issue | Required positive evals | Required negative controls | Evidence boundary |
-|---:|---|---|---|
-| #6 | Markdown/link/Mermaid consistency; autonomous/Shadow state and safety profile; exact-head full CI matrix; before/after metadata | local Skill shadow, authority expansion, fake local PASS, visibility/access/license/private-egress mutation, path overlap, config-as-tool-admission, missing merge preauthorization | docs/static/forge policy only; local worktree/Git Town `NOT_EXERCISED` |
-| #7 | exact variants on Android/iOS/Desktop/Wasm; full build matrix; license/notices/provenance | dynamic version, missing target, opaque installer, feature code in dependency PR | dependency/build admission only |
-| #8 | migrations, restart, ordering, retention, deletion, corruption, redaction | destructive schema without migration; secret fixture persistence | local persistence only |
-| #9 | identity, order, duplicate/replay, expiry, cancellation, jitter, reconnect, backpressure | anonymous/wrong-origin/old-sequence/replayed action | transport tests are not production pairing |
-| #10 | descriptor, permission, risk, availability, typed result contracts | Tool without descriptor/policy/audit; MCP enabling a Tool | contracts only |
-| #11 | page/anchor freshness, HITL receipt, timeout, completion/failure, user preemption | raw selector, coordinate-only click, stale/hidden/ambiguous/sensitive target | fixtures are not arbitrary-site permission |
-| #12 | reproducible precision/recall fixtures; latency/memory budget; fallback | vendor selection from prose; score overriding policy | adapter contract/baseline only |
-| #13 | same corpus across candidates; physical-device budget; license/variant evidence | simulator-only benchmark, unsupported target, remote leakage | engine compile is not shipping readiness |
-| #2 | signed AAB, Play App Signing, device/API matrix, pre-launch, privacy/attestation | debug APK relabeled as release | Google Play lane only |
-| #3 | signed archive, Organizer validation, TestFlight, physical devices, privacy/attestation | simulator framework relabeled as release | Apple delivery lane only |
-| #5 | deployed HTTPS URL, MIME/cache headers, browser/accessibility/CSP smoke | build artifact relabeled as deployment; origin bypass | Web deployment lane only |
-| #14 | fetched ancestry, exact-head full matrix, current receipts, safety postconditions, state vocabulary | old-SHA CI, skipped draft job as PASS, semantic fixes in convergence | aggregate evidence only |
-
-The executable commands, Shadow checkpoints, safety postconditions, and state-machine-specific tests are in `../harness/README.md` and each issue body.
-
-## Branch and delivery lifecycle
-
-After exact local executable/worktree admission:
-
-1. Snapshot immutable repository, local user, legal, ref, remote, and path-lease state.
-2. Create/attach the branch in one admitted linked worktree.
-3. Record the parent edge before implementation.
-4. Run task evals and Shadow checkpoints before publication.
-5. Run dry-run no-push stack sync.
-6. Run bounded no-push sync.
-7. Verify ancestry and safety postconditions independently; rerun evals.
-8. Produce an exact-head local verification receipt.
-9. Call the publication gate for one allowed intent.
-10. Execute at most the returned operation; fetch and verify remote ancestry.
-11. Record CI separately.
-12. Merge only when repository-owned policy already preauthorizes trusted automation; otherwise record `EXTERNAL_AUTHORITY_REQUIRED`.
-
-```bash
-git town sync --stack --dry-run --non-interactive --no-auto-resolve --no-push
-git town sync --stack --non-interactive --no-auto-resolve --no-push
-```
-
-No live Git Town command or local worktree inventory has been exercised in the current forge-only session. PR #15 is maintained through the existing GitHub review surface without claiming those local lanes.
-
-## Reparent and merge order
-
-The branch graph requires this order; actual merge remains external unless a repository policy later preauthorizes trusted automation:
-
-1. Review PR #1 and PR #15 independently while preserving the declared base relationship.
-2. Admit/merge #6 before Worker-controlled leaf stacks.
-3. Admit #7 before #8/#9.
-4. Admit #10 before #11.
-5. Admit #12 before #13.
-6. Begin mobile release branches only after required executor/platform/security dependencies are admitted.
-7. Web release #5 may proceed independently.
-8. Create #14 only after selected leaf/release heads are stable and receipts exist.
-9. Reparent children after parent merge through the exact admitted workflow and rerun ancestry evals.
-10. Without merge preauthorization, leave PRs open with `EXTERNAL_AUTHORITY_REQUIRED`; do not ask, ship, weaken checks, or change rulesets.
-
-## Rollback and blocked state
-
-Every task packet names an immutable rollback subject. Workers do not run `git town undo` automatically. On conflict, drift, or immutable-boundary failure:
-
-- stop the named transition;
-- preserve worktree, branch, conflict state, logs, and receipt;
-- avoid semantic edits, continue/skip/reset/force-push, destructive cleanup, or overwrite of user work;
-- update the authoritative issue when forge write exists;
-- return the stable blocked outcome;
-- continue independent safe siblings.
-
-Shared outcomes and receipt requirements are defined in `WORKER_PROTOCOL.md`.
+Merge, reparenting after parent merge, branch deletion, legal/platform/store acceptance, release and production remain `EXTERNAL_AUTHORITY_REQUIRED`. Leave Draft PRs open rather than weakening the contract.
