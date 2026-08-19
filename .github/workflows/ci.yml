@@ -60,28 +60,38 @@ jobs:
             :composeApp:reportAndroidDistributionSourceSets \
             :composeApp:testPlaySafeDebugUnitTest \
             :composeApp:testEnterpriseDebugUnitTest \
+            :composeApp:assemblePlaySafeDebug \
+            :composeApp:assembleEnterpriseDebug \
             :composeApp:assemblePlaySafeRelease \
             :composeApp:assembleEnterpriseRelease
       - name: Capture generated task and dependency surfaces
         run: |
           mkdir -p build/reports/android-distribution
           ./gradlew :composeApp:tasks --all > build/reports/android-distribution/tasks.txt
+          ./gradlew :composeApp:dependencies --configuration playSafeDebugRuntimeClasspath \
+            > build/reports/android-distribution/playSafe-debug-runtime-classpath.txt
           ./gradlew :composeApp:dependencies --configuration playSafeReleaseRuntimeClasspath \
             > build/reports/android-distribution/playSafe-release-runtime-classpath.txt
+          ./gradlew :composeApp:dependencies --configuration enterpriseDebugRuntimeClasspath \
+            > build/reports/android-distribution/enterprise-debug-runtime-classpath.txt
           ./gradlew :composeApp:dependencies --configuration enterpriseReleaseRuntimeClasspath \
             > build/reports/android-distribution/enterprise-release-runtime-classpath.txt
       - name: Prove generic release selection is fail-closed
         shell: bash
         run: |
-          set +e
-          ./gradlew :composeApp:assembleRelease > build/reports/android-distribution/ambiguous-release.txt 2>&1
-          status=$?
-          set -e
-          if [ "$status" -eq 0 ]; then
-            echo "generic assembleRelease unexpectedly succeeded" >&2
-            exit 1
-          fi
-          grep -F "Ambiguous Android release task is forbidden" build/reports/android-distribution/ambiguous-release.txt
+          set -euo pipefail
+          for task in assembleRelease bundleRelease; do
+            log="build/reports/android-distribution/ambiguous-${task}.txt"
+            set +e
+            ./gradlew ":composeApp:${task}" > "$log" 2>&1
+            status=$?
+            set -e
+            if [ "$status" -eq 0 ]; then
+              echo "generic ${task} unexpectedly succeeded" >&2
+              exit 1
+            fi
+            grep -F "Ambiguous Android release task is forbidden" "$log"
+          done
       - name: Verify packaged profile ceilings and emit exact-head receipt
         env:
           KAW_C2_SOURCE_HEAD: b70ea4544b56e4ec34b11a467808814913c27dc7
@@ -95,7 +105,9 @@ jobs:
             build/receipts/android-distribution-profiles.json
             build/reports/android-distribution/**
             composeApp/build/reports/android-distribution/**
+            composeApp/build/outputs/apk/playSafe/debug/*.apk
             composeApp/build/outputs/apk/playSafe/release/*.apk
+            composeApp/build/outputs/apk/enterprise/debug/*.apk
             composeApp/build/outputs/apk/enterprise/release/*.apk
           if-no-files-found: warn
 

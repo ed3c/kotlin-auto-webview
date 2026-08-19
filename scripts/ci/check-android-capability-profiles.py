@@ -12,18 +12,30 @@ import tempfile
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
 BUILD_ROOT = ROOT / "composeApp" / "build"
 REPORT_ROOT = ROOT / "build" / "reports" / "android-distribution"
 RECEIPT_PATH = ROOT / "build" / "receipts" / "android-distribution-profiles.json"
-PROFILE_SOURCE = ROOT / "composeApp" / "src" / "androidMain" / "kotlin" / "dev" / "ed3c" / "autowebview" / "device" / "profile" / "AndroidCompiledDistributionProfile.kt"
+PROFILE_SOURCE = (
+    ROOT
+    / "composeApp"
+    / "src"
+    / "androidMain"
+    / "kotlin"
+    / "dev"
+    / "ed3c"
+    / "autowebview"
+    / "device"
+    / "profile"
+    / "AndroidCompiledDistributionProfile.kt"
+)
 SOURCE_SET_REPORT = BUILD_ROOT / "reports" / "android-distribution" / "source-sets.txt"
 
 ANDROID_NS = "{http://schemas.android.com/apk/res/android}"
-
+BUILD_TYPES = ("debug", "release")
 EXPECTED = {
     "playSafe": {
         "distribution_profile": "PLAY_SAFE",
@@ -83,23 +95,29 @@ DYNAMIC_PROFILE_SOURCE_MARKERS = (
     "MODEL",
 )
 
+
 @dataclass(frozen=True)
 class ManifestFacts:
     permissions: tuple[str, ...]
+    declared_permissions: tuple[tuple[str, str], ...]
     exported_components: tuple[tuple[str, str], ...]
     accessibility_services: tuple[str, ...]
     shizuku_components: tuple[str, ...]
     allow_backup: str | None
     uses_cleartext_traffic: str | None
 
+
 class VerificationError(RuntimeError):
     pass
+
 
 def fail(message: str) -> None:
     raise VerificationError(message)
 
+
 def sha256_bytes(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
+
 
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
@@ -107,6 +125,7 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
 
 def run_git(*args: str) -> str:
     proc = subprocess.run(
@@ -121,12 +140,14 @@ def run_git(*args: str) -> str:
         fail(f"git {' '.join(args)} failed: {proc.stdout.strip()}")
     return proc.stdout.strip()
 
+
 def normalize_component_name(name: str, namespace: str) -> str:
     if name.startswith("."):
         return namespace + name
     if "." not in name:
         return namespace + "." + name
     return name
+
 
 def load_json(path: Path) -> dict[str, Any]:
     try:
@@ -136,6 +157,11 @@ def load_json(path: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         fail(f"JSON object required: {path}")
     return data
+
+
+def expected_internal_permission(application_id: str) -> str:
+    return f"{application_id}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+
 
 def validate_source_contract(profile: str, contract: dict[str, Any]) -> None:
     expected = EXPECTED[profile]
@@ -148,6 +174,18 @@ def validate_source_contract(profile: str, contract: dict[str, Any]) -> None:
         fail(f"{profile} namespace mismatch")
     if contract.get("distribution_profile") == "ACCESSIBILITY_TOOL":
         fail("ACCESSIBILITY_TOOL cannot be a distributable profile")
+
+    allowed_permissions = contract.get("allowed_permissions")
+    if allowed_permissions != ["android.permission.INTERNET"]:
+        fail(f"{profile} capability permissions must remain INTERNET-only at C2")
+
+    expected_internal = [expected_internal_permission(expected["application_id"])]
+    if contract.get("allowed_internal_signature_permissions") != expected_internal:
+        fail(
+            f"{profile} internal signature permission contract mismatch: "
+            f"{contract.get('allowed_internal_signature_permissions')!r} != {expected_internal!r}"
+        )
+
     if profile == "playSafe":
         if contract.get("allow_accessibility_service") is not False:
             fail("playSafe cannot allow AccessibilityService")
@@ -158,28 +196,34 @@ def validate_source_contract(profile: str, contract: dict[str, Any]) -> None:
         if contract.get("inbound_mobile_mcp") is not False:
             fail("playSafe cannot allow inbound mobile MCP")
 
-def find_single_release_apk(profile: str) -> Path:
+
+def find_single_apk(profile: str, build_type: str) -> Path:
     candidates = sorted(
         path
         for path in (BUILD_ROOT / "outputs" / "apk").rglob("*.apk")
         if profile.lower() in path.as_posix().lower()
-        and "release" in path.as_posix().lower()
+        and build_type.lower() in path.as_posix().lower()
         and "androidtest" not in path.as_posix().lower()
     )
     if len(candidates) != 1:
-        fail(f"expected one {profile} release APK, found {len(candidates)}: {[str(p) for p in candidates]}")
+        fail(
+            f"expected one {profile} {build_type} APK, found {len(candidates)}: "
+            f"{[str(p) for p in candidates]}"
+        )
     return candidates[0]
 
-def find_output_metadata(profile: str) -> Path:
+
+def find_output_metadata(profile: str, build_type: str) -> Path:
     candidates = sorted(
         path
         for path in (BUILD_ROOT / "outputs" / "apk").rglob("output-metadata.json")
         if profile.lower() in path.as_posix().lower()
-        and "release" in path.as_posix().lower()
+        and build_type.lower() in path.as_posix().lower()
     )
     if len(candidates) != 1:
-        fail(f"expected one {profile} release output-metadata.json, found {len(candidates)}")
+        fail(f"expected one {profile} {build_type} output-metadata.json, found {len(candidates)}")
     return candidates[0]
+
 
 def application_id_from_metadata(path: Path) -> str:
     metadata = load_json(path)
@@ -187,6 +231,7 @@ def application_id_from_metadata(path: Path) -> str:
     if not isinstance(app_id, str) or not app_id:
         fail(f"applicationId absent from {path}")
     return app_id
+
 
 def read_packaged_contract(apk: Path) -> tuple[dict[str, Any], str]:
     with zipfile.ZipFile(apk) as archive:
@@ -203,11 +248,12 @@ def read_packaged_contract(apk: Path) -> tuple[dict[str, Any], str]:
         fail(f"{apk} packaged capability profile is not an object")
     return parsed, sha256_bytes(data)
 
-def locate_merged_manifest(profile: str) -> Path:
+
+def locate_merged_manifest(profile: str, build_type: str) -> Path:
     candidates: list[Path] = []
     for path in (BUILD_ROOT / "intermediates").rglob("AndroidManifest.xml"):
         text = path.as_posix().lower()
-        if profile.lower() not in text or "release" not in text:
+        if profile.lower() not in text or build_type.lower() not in text:
             continue
         try:
             root = ET.parse(path).getroot()
@@ -219,7 +265,7 @@ def locate_merged_manifest(profile: str) -> Path:
         if application.findall("activity"):
             candidates.append(path)
     if not candidates:
-        fail(f"no parsed release merged manifest found for {profile}")
+        fail(f"no parsed merged manifest found for {profile} {build_type}")
     preference = ("packaged_manifests", "merged_manifests", "merged_manifest")
     candidates.sort(
         key=lambda p: (
@@ -229,6 +275,7 @@ def locate_merged_manifest(profile: str) -> Path:
         )
     )
     return candidates[0]
+
 
 def manifest_facts(path: Path, namespace: str) -> ManifestFacts:
     root = ET.parse(path).getroot()
@@ -243,6 +290,14 @@ def manifest_facts(path: Path, namespace: str) -> ManifestFacts:
             for element in root.findall(tag)
             if element.get(ANDROID_NS + "name")
         }
+    )
+    declared_permissions = sorted(
+        (
+            element.get(ANDROID_NS + "name", ""),
+            element.get(ANDROID_NS + "protectionLevel", ""),
+        )
+        for element in root.findall("permission")
+        if element.get(ANDROID_NS + "name")
     )
 
     exported: list[tuple[str, str]] = []
@@ -272,12 +327,14 @@ def manifest_facts(path: Path, namespace: str) -> ManifestFacts:
 
     return ManifestFacts(
         permissions=tuple(permissions),
+        declared_permissions=tuple(declared_permissions),
         exported_components=tuple(sorted(exported)),
         accessibility_services=tuple(sorted(accessibility_services)),
         shizuku_components=tuple(sorted(shizuku_components)),
         allow_backup=application.get(ANDROID_NS + "allowBackup"),
         uses_cleartext_traffic=application.get(ANDROID_NS + "usesCleartextTraffic"),
     )
+
 
 def expected_exported(contract: dict[str, Any]) -> tuple[tuple[str, str], ...]:
     result: list[tuple[str, str]] = []
@@ -295,10 +352,23 @@ def expected_exported(contract: dict[str, Any]) -> tuple[tuple[str, str], ...]:
         result.append((component_type, normalize_component_name(name, namespace)))
     return tuple(sorted(result))
 
+
 def validate_manifest(profile: str, contract: dict[str, Any], facts: ManifestFacts) -> None:
-    allowed_permissions = tuple(sorted(contract.get("allowed_permissions", [])))
-    if facts.permissions != allowed_permissions:
-        fail(f"{profile} permission set mismatch: {facts.permissions} != {allowed_permissions}")
+    capability_permissions = tuple(sorted(contract.get("allowed_permissions", [])))
+    internal_signature_permissions = tuple(
+        sorted(contract.get("allowed_internal_signature_permissions", []))
+    )
+    expected_uses = tuple(sorted(capability_permissions + internal_signature_permissions))
+    if facts.permissions != expected_uses:
+        fail(f"{profile} permission set mismatch: {facts.permissions} != {expected_uses}")
+
+    expected_declarations = tuple((name, "signature") for name in internal_signature_permissions)
+    if facts.declared_permissions != expected_declarations:
+        fail(
+            f"{profile} internal permission declarations mismatch: "
+            f"{facts.declared_permissions} != {expected_declarations}"
+        )
+
     if facts.exported_components != expected_exported(contract):
         fail(
             f"{profile} exported component set mismatch: "
@@ -318,6 +388,7 @@ def validate_manifest(profile: str, contract: dict[str, Any], facts: ManifestFac
         if facts.shizuku_components:
             fail(f"playSafe contains Shizuku manifest components: {facts.shizuku_components}")
 
+
 def validate_dependency_report(profile: str, report: Path) -> str:
     if not report.is_file():
         fail(f"dependency report missing for {profile}: {report}")
@@ -329,6 +400,7 @@ def validate_dependency_report(profile: str, report: Path) -> str:
             fail(f"playSafe runtime classpath contains forbidden dependency markers: {markers}")
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
+
 def validate_apk_markers(profile: str, apk: Path) -> None:
     if profile != "playSafe":
         return
@@ -336,6 +408,7 @@ def validate_apk_markers(profile: str, apk: Path) -> None:
     hits = [marker.decode("ascii") for marker in PLAY_SAFE_FORBIDDEN_APK_MARKERS if marker in data]
     if hits:
         fail(f"playSafe APK contains forbidden privileged markers: {hits}")
+
 
 def validate_profile_source(source_text: str) -> None:
     if "BuildConfig.DISTRIBUTION_PROFILE_ID" not in source_text:
@@ -345,6 +418,7 @@ def validate_profile_source(source_text: str) -> None:
     found = [marker for marker in DYNAMIC_PROFILE_SOURCE_MARKERS if marker in source_text]
     if found:
         fail(f"compiled profile binder contains runtime override inputs: {found}")
+
 
 def validate_source_set_report(text: str) -> None:
     header = next((line for line in text.splitlines() if line.startswith("AGP productFlavors=")), "")
@@ -359,8 +433,11 @@ def validate_source_set_report(text: str) -> None:
         if f"sourceSet={profile};" not in text:
             fail(f"AGP source-set report does not include {profile}")
 
+
 def validate_tasks_report(text: str) -> None:
     required = (
+        "assemblePlaySafeDebug",
+        "assembleEnterpriseDebug",
         "assemblePlaySafeRelease",
         "assembleEnterpriseRelease",
         "bundlePlaySafeRelease",
@@ -368,9 +445,10 @@ def validate_tasks_report(text: str) -> None:
     )
     for task in required:
         if task not in text:
-            fail(f"explicit profile release task missing: {task}")
+            fail(f"explicit profile task missing: {task}")
     if re.search(r"assembleAccessibilityTool|bundleAccessibilityTool", text):
         fail("accessibilityTool release tasks must not exist")
+
 
 def verify_identity_bindings() -> tuple[str, str, str, str]:
     source_head = os.environ.get("KAW_C2_SOURCE_HEAD", "")
@@ -395,9 +473,9 @@ def verify_identity_bindings() -> tuple[str, str, str, str]:
     tree = run_git("rev-parse", "HEAD^{tree}")
     return source_head, source_tree, head, tree
 
+
 def verify() -> dict[str, Any]:
     source_head, source_tree, head, tree = verify_identity_bindings()
-
     validate_profile_source(PROFILE_SOURCE.read_text(encoding="utf-8"))
 
     if not SOURCE_SET_REPORT.is_file():
@@ -413,55 +491,78 @@ def verify() -> dict[str, Any]:
     profiles: dict[str, Any] = {}
     seen_application_ids: set[str] = set()
     for profile, expected in EXPECTED.items():
-        source_contract_path = ROOT / "composeApp" / "src" / profile / "assets" / "capability-profile.json"
+        source_contract_path = (
+            ROOT / "composeApp" / "src" / profile / "assets" / "capability-profile.json"
+        )
         contract = load_json(source_contract_path)
         validate_source_contract(profile, contract)
 
-        apk = find_single_release_apk(profile)
-        metadata = find_output_metadata(profile)
-        application_id = application_id_from_metadata(metadata)
-        if application_id != expected["application_id"]:
-            fail(f"{profile} packaged applicationId mismatch: {application_id}")
+        variants: dict[str, Any] = {}
+        profile_application_ids: set[str] = set()
+        for build_type in BUILD_TYPES:
+            apk = find_single_apk(profile, build_type)
+            metadata = find_output_metadata(profile, build_type)
+            application_id = application_id_from_metadata(metadata)
+            if application_id != expected["application_id"]:
+                fail(f"{profile} {build_type} packaged applicationId mismatch: {application_id}")
+            profile_application_ids.add(application_id)
+
+            packaged_contract, packaged_contract_sha = read_packaged_contract(apk)
+            if packaged_contract != contract:
+                fail(
+                    f"{profile} {build_type} packaged capability profile differs from source contract"
+                )
+
+            manifest_path = locate_merged_manifest(profile, build_type)
+            facts = manifest_facts(manifest_path, str(contract["namespace"]))
+            validate_manifest(profile, contract, facts)
+
+            dependency_report = REPORT_ROOT / f"{profile}-{build_type}-runtime-classpath.txt"
+            dependency_digest = validate_dependency_report(profile, dependency_report)
+            validate_apk_markers(profile, apk)
+
+            if profile.lower() not in apk.name.lower() or build_type.lower() not in apk.name.lower():
+                fail(f"{profile} {build_type} artifact filename is ambiguous: {apk.name}")
+
+            capability_permissions = tuple(sorted(contract.get("allowed_permissions", [])))
+            internal_signature_permissions = tuple(
+                sorted(contract.get("allowed_internal_signature_permissions", []))
+            )
+            variants[build_type] = {
+                "application_id": application_id,
+                "apk": str(apk.relative_to(ROOT)),
+                "apk_sha256": sha256_file(apk),
+                "apk_size": apk.stat().st_size,
+                "capability_profile_sha256": packaged_contract_sha,
+                "manifest": str(manifest_path.relative_to(ROOT)),
+                "capability_permissions": list(capability_permissions),
+                "internal_signature_permissions": list(internal_signature_permissions),
+                "manifest_permission_uses": list(facts.permissions),
+                "manifest_permission_declarations": [
+                    {"name": name, "protection_level": protection}
+                    for name, protection in facts.declared_permissions
+                ],
+                "exported_components": [
+                    {"type": kind, "name": name}
+                    for kind, name in facts.exported_components
+                ],
+                "accessibility_services": list(facts.accessibility_services),
+                "shizuku_components": list(facts.shizuku_components),
+                "runtime_classpath_sha256": dependency_digest,
+            }
+
+        if len(profile_application_ids) != 1:
+            fail(f"{profile} application identity differs between debug and release")
+        application_id = next(iter(profile_application_ids))
         if application_id in seen_application_ids:
             fail("Play-safe and enterprise package identities must be distinct")
         seen_application_ids.add(application_id)
-
-        packaged_contract, packaged_contract_sha = read_packaged_contract(apk)
-        if packaged_contract != contract:
-            fail(f"{profile} packaged capability profile differs from source contract")
-
-        manifest_path = locate_merged_manifest(profile)
-        facts = manifest_facts(manifest_path, str(contract["namespace"]))
-        validate_manifest(profile, contract, facts)
-
-        dependency_report = REPORT_ROOT / f"{profile}-release-runtime-classpath.txt"
-        dependency_digest = validate_dependency_report(profile, dependency_report)
-        validate_apk_markers(profile, apk)
-
-        if profile.lower() not in apk.name.lower():
-            fail(f"{profile} artifact filename is ambiguous: {apk.name}")
-
         profiles[profile] = {
             "distribution_profile": contract["distribution_profile"],
             "artifact_class": contract["artifact_class"],
             "application_id": application_id,
-            "apk": str(apk.relative_to(ROOT)),
-            "apk_sha256": sha256_file(apk),
-            "apk_size": apk.stat().st_size,
-            "capability_profile_sha256": packaged_contract_sha,
-            "manifest": str(manifest_path.relative_to(ROOT)),
-            "permissions": list(facts.permissions),
-            "exported_components": [
-                {"type": kind, "name": name}
-                for kind, name in facts.exported_components
-            ],
-            "accessibility_services": list(facts.accessibility_services),
-            "shizuku_components": list(facts.shizuku_components),
-            "runtime_classpath_sha256": dependency_digest,
+            "variants": variants,
         }
-
-    if profiles["playSafe"]["application_id"] == profiles["enterprise"]["application_id"]:
-        fail("enterprise must not share the Play-safe application identity")
 
     receipt = {
         "schema": "kotlin-auto-webview/android-distribution-profiles-receipt/v1",
@@ -478,11 +579,15 @@ def verify() -> dict[str, Any]:
             "source_set_report": "PASS",
             "profile_source_static_override_scan": "PASS",
             "explicit_release_tasks": "PASS",
-            "generic_release_task": "REJECTED_BY_BUILD_CONFIGURATION",
+            "generic_assemble_release": "REJECTED_BY_BUILD_CONFIGURATION",
+            "generic_bundle_release": "REJECTED_BY_BUILD_CONFIGURATION",
             "accessibility_tool_variant": "ABSENT",
             "play_safe_accessibility_service": "ABSENT",
             "play_safe_shizuku": "ABSENT",
             "play_safe_broad_permissions": "ABSENT",
+            "profile_installer_exported_receiver": "REMOVED_BY_APP_MANIFEST",
+            "androidx_internal_receiver_permission": "SIGNATURE_ONLY_AND_APP_SCOPED",
+            "every_variant_capability_manifest_and_apk_sha256": "PASS",
         },
         "evidence_ceiling": {
             "maximum_claim": "ANDROID_COMPILE_PACKAGE_PROFILE_SEPARATION_ONLY",
@@ -499,21 +604,26 @@ def verify() -> dict[str, Any]:
     RECEIPT_PATH.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return receipt
 
-def expect_failure(name: str, function, *args) -> None:
+
+def expect_failure(name: str, function: Callable[..., Any], *args: Any) -> None:
     try:
         function(*args)
     except VerificationError:
         return
     raise VerificationError(f"negative control did not fail: {name}")
 
+
 def self_test() -> None:
+    app_id = "dev.ed3c.autowebview"
+    internal_permission = expected_internal_permission(app_id)
     play = {
         "schema": "kotlin-auto-webview/android-capability-profile/v1",
         "distribution_profile": "PLAY_SAFE",
         "artifact_class": "PLAY_STORE_REVIEW_CANDIDATE",
-        "namespace": "dev.ed3c.autowebview",
-        "application_id": "dev.ed3c.autowebview",
+        "namespace": app_id,
+        "application_id": app_id,
         "allowed_permissions": ["android.permission.INTERNET"],
+        "allowed_internal_signature_permissions": [internal_permission],
         "allowed_exported_components": [
             {"type": "activity", "name": "dev.ed3c.autowebview.MainActivity"}
         ],
@@ -524,7 +634,8 @@ def self_test() -> None:
     }
     validate_source_contract("playSafe", play)
     good_facts = ManifestFacts(
-        permissions=("android.permission.INTERNET",),
+        permissions=("android.permission.INTERNET", internal_permission),
+        declared_permissions=((internal_permission, "signature"),),
         exported_components=(("activity", "dev.ed3c.autowebview.MainActivity"),),
         accessibility_services=(),
         shizuku_components=(),
@@ -539,7 +650,12 @@ def self_test() -> None:
         "playSafe",
         play,
         ManifestFacts(
-            permissions=("android.permission.INTERNET", "android.permission.READ_SMS"),
+            permissions=(
+                "android.permission.INTERNET",
+                "android.permission.READ_SMS",
+                internal_permission,
+            ),
+            declared_permissions=good_facts.declared_permissions,
             exported_components=good_facts.exported_components,
             accessibility_services=(),
             shizuku_components=(),
@@ -554,8 +670,40 @@ def self_test() -> None:
         play,
         ManifestFacts(
             permissions=good_facts.permissions,
+            declared_permissions=good_facts.declared_permissions,
             exported_components=good_facts.exported_components,
             accessibility_services=("dev.ed3c.BadService",),
+            shizuku_components=(),
+            allow_backup="false",
+            uses_cleartext_traffic="false",
+        ),
+    )
+    expect_failure(
+        "internal permission loses signature protection",
+        validate_manifest,
+        "playSafe",
+        play,
+        ManifestFacts(
+            permissions=good_facts.permissions,
+            declared_permissions=((internal_permission, "normal"),),
+            exported_components=good_facts.exported_components,
+            accessibility_services=(),
+            shizuku_components=(),
+            allow_backup="false",
+            uses_cleartext_traffic="false",
+        ),
+    )
+    expect_failure(
+        "unexpected exported library receiver",
+        validate_manifest,
+        "playSafe",
+        play,
+        ManifestFacts(
+            permissions=good_facts.permissions,
+            declared_permissions=good_facts.declared_permissions,
+            exported_components=good_facts.exported_components
+            + (("receiver", "androidx.profileinstaller.ProfileInstallReceiver"),),
+            accessibility_services=(),
             shizuku_components=(),
             allow_backup="false",
             uses_cleartext_traffic="false",
@@ -586,6 +734,7 @@ def self_test() -> None:
         "AGP sourceSet=enterprise;manifest=x;java=x;assets=x\n"
     )
     validate_tasks_report(
+        "assemblePlaySafeDebug\nassembleEnterpriseDebug\n"
         "assemblePlaySafeRelease\nassembleEnterpriseRelease\n"
         "bundlePlaySafeRelease\nbundleEnterpriseRelease\n"
     )
@@ -598,6 +747,7 @@ def self_test() -> None:
         "AGP sourceSet=accessibilityTool;manifest=x;java=x;assets=x\n",
     )
     print("android distribution profile checker self-test: PASS")
+
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser()
@@ -616,6 +766,7 @@ def main(argv: list[str]) -> int:
     except VerificationError as exc:
         print(f"android distribution profile verification: FAIL: {exc}", file=sys.stderr)
         return 1
+
 
 if __name__ == "__main__":
     raise SystemExit(main(sys.argv[1:]))

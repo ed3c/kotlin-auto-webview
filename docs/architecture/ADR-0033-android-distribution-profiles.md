@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted as the Stage-5 C2 source contract for issue #71. This ADR binds source/build behavior only; merge, signing, Google Play declarations/review, accessibility-tool eligibility, release and production rollout remain outside the claim.
+Accepted as the Stage-5 C2 source contract for issue #71. This ADR describes source/build behavior only; merge, signing, Google Play declarations/review, accessibility-tool eligibility, release and production rollout remain outside the claim.
 
 ## Exact parent subject
 
@@ -35,16 +35,25 @@ The enterprise package identity is deliberately different from the Play-review c
 Each flavor owns `assets/capability-profile.json`. The JSON is a package-time contract, not a runtime permission grant. CI requires the packaged asset to match the checked-in source contract and cross-checks it against:
 
 - AGP output metadata / application id;
-- the merged release manifest;
+- the merged debug and release manifests;
 - exported component surface;
-- release runtime classpath;
-- packaged APK contents;
+- debug and release runtime classpaths;
+- packaged debug and release APK contents;
 - explicit release task surface;
-- artifact SHA-256.
+- APK SHA-256 for all four app variants.
 
-The Play-safe hard boundary cannot be widened by editing the asset alone. The checker independently denies broad permissions, AccessibilityService declarations and Shizuku package/component markers.
+The capability contract distinguishes two permission classes:
 
-At this stage both profiles still package only the existing INTERNET permission and launcher activity. Enterprise Accessibility/Shizuku implementation is owned by later issue #73; C2 merely creates the compile/package boundary that later child must remain inside.
+1. `allowed_permissions`: product capability permissions. At C2 this remains exactly `android.permission.INTERNET` for both profiles.
+2. `allowed_internal_signature_permissions`: app-scoped implementation permissions contributed by dependencies. AndroidX Core contributes `${applicationId}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`; the oracle requires that exact application-id-qualified name and requires the merged `<permission>` declaration to remain `protectionLevel="signature"`.
+
+The second class is not authority widening and may not be used as a general extra-permission allowlist. Any unexpected permission or broader protection level fails the package oracle.
+
+AndroidX ProfileInstaller contributes an exported DUMP-protected `ProfileInstallReceiver`. This product does not need that externally addressable receiver, so the app manifest removes it with manifest-merger `tools:node="remove"`. CI therefore preserves the product invariant that the only exported component at C2 is the launcher activity. AndroidX Startup's provider may remain because it is not exported.
+
+The Play-safe hard boundary cannot be widened by editing the asset alone. The checker independently denies broad permissions, AccessibilityService declarations, unexpected exported components, Shizuku dependency/package markers and runtime profile override inputs.
+
+At this stage both profiles still package only the existing product INTERNET capability and launcher activity. Enterprise Accessibility/Shizuku implementation is owned by later issue #73; C2 merely creates the compile/package boundary that later child must remain inside.
 
 ## Release selection
 
@@ -53,7 +62,7 @@ Generic `assembleRelease` and `bundleRelease` are fail-closed during Gradle conf
 - `assemblePlaySafeRelease` / `bundlePlaySafeRelease`;
 - `assembleEnterpriseRelease` / `bundleEnterpriseRelease`.
 
-Debug aggregation is not treated as a release authority decision.
+Debug variants are explicitly built and hashed for evidence but are not treated as release-authority decisions.
 
 ## Mechanical evidence
 
@@ -62,18 +71,21 @@ The existing `android` CI check keeps its check identity but becomes the C2 pack
 1. runs planted checker controls;
 2. asks AGP to report the resolved product-flavor/source-set graph;
 3. runs Play-safe and enterprise Android unit tests;
-4. builds both explicit release APKs;
-5. records the generated task surface and both release runtime classpaths;
-6. proves generic `assembleRelease` fails before release execution;
-7. validates profile source, packaged capability contracts, manifest permissions/components, dependency markers, application ids and APK names;
-8. writes `android-distribution-profiles-receipt/v1` with exact parent/head/tree and APK hashes.
+4. builds Play-safe debug/release and enterprise debug/release APKs;
+5. records the generated task surface and all four runtime classpaths;
+6. proves generic `assembleRelease` and `bundleRelease` fail before release execution;
+7. validates profile source, packaged capability contracts, manifest permissions/protection levels/components, dependency markers, application ids and APK names for every variant;
+8. writes `android-distribution-profiles-receipt/v1` with exact parent/head/tree and SHA-256 for all four APKs.
 
-Negative controls include broad Play-safe permission, AccessibilityService declaration, Shizuku dependency, runtime profile override input and an `accessibilityTool` distributable flavor. A later Shadow review must treat a green build without the machine-readable receipt as insufficient.
+Planted negative controls include broad Play-safe permission, AccessibilityService declaration, Shizuku dependency, runtime profile override input, non-signature internal permission, unexpected exported library receiver and an `accessibilityTool` distributable flavor. A later Shadow review must treat a green build without the machine-readable receipt as insufficient.
 
 ## Preserved invariants
 
-- Play-safe retains the primary application id, `allowBackup=false`, `usesCleartextTraffic=false` and INTERNET-only manifest posture.
+- Play-safe retains the primary application id, `allowBackup=false`, `usesCleartextTraffic=false` and INTERNET-only product capability posture.
+- AndroidX internal receiver permission remains application-scoped and signature-only; it is recorded separately from product capability permissions.
+- The unnecessary exported ProfileInstaller receiver is removed from the merged app surface.
 - Enterprise has a visibly separate package identity.
+- Every debug/release variant packages a capability manifest and has an exact APK SHA-256 receipt.
 - No new dependency or license surface is introduced by C2.
 - No AccessibilityService, Shizuku, root, raw shell, terminal or inbound mobile MCP authority is added by C2.
 - Successful packaging is not Google Play eligibility or release evidence.

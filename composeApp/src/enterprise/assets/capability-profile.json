@@ -7,6 +7,9 @@
   "allowed_permissions": [
     "android.permission.INTERNET"
   ],
+  "allowed_internal_signature_permissions": [
+    "dev.ed3c.autowebview.enterprise.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+  ],
   "allowed_exported_components": [
     {
       "type": "activity",
