@@ -56,7 +56,12 @@ class DeviceAutomationRuntime(
         }
 
         val descriptor = capabilityCatalog.capabilityForCanonicalAction(proposal.canonicalActionId)
-        if (descriptor == null || descriptor.id != proposal.capabilityId || proposal.kind !in descriptor.actionKinds) {
+        if (
+            descriptor == null ||
+            descriptor.id != proposal.capabilityId ||
+            proposal.kind !in descriptor.actionKinds ||
+            descriptor.auditCategory != proposal.auditCategory
+        ) {
             return reject(request, trace, DeviceRuntimeTerminalCode.CANONICAL_ACTION_MISMATCH, "canonical-action-mismatch")
         }
         mark(DeviceRuntimeState.CANONICAL_ACTION_RESOLVED, "canonical-action-resolved")
@@ -479,6 +484,7 @@ class DeviceAutomationRuntime(
             action.canonicalActionId == proposal.canonicalActionId &&
             action.kind == proposal.kind &&
             action.profile == proposal.profile &&
+            action.risk == proposal.risk &&
             action.verifierId == proposal.verifierId &&
             action.requiresConfirmation == (proposal.confirmationClass != DeviceConfirmationClass.NONE)
 
