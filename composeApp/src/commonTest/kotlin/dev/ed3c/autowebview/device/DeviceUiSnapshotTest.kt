@@ -17,10 +17,11 @@ class DeviceUiSnapshotTest {
     private val json = Json { encodeDefaults = true }
 
     @Test
-    fun sanitized_snapshot_round_trips_with_exact_subject_and_schema() {
+    fun sanitized_snapshot_round_trips_with_exact_subject_task_and_schema() {
         val snapshot = snapshot()
         val encoded = json.encodeToString(DeviceUiSnapshot.serializer(), snapshot)
         assertTrue(encoded.contains("\"schemaVersion\":\"${DeviceUiSnapshotSchema.VERSION}\""))
+        assertTrue(encoded.contains("\"taskId\":\"task-42\""))
         assertEquals(snapshot, json.decodeFromString(DeviceUiSnapshot.serializer(), encoded))
     }
 
@@ -52,6 +53,12 @@ class DeviceUiSnapshotTest {
     }
 
     @Test
+    fun blank_or_command_like_task_identity_fails_closed() {
+        assertFailsWith<IllegalArgumentException> { snapshot(taskId = "") }
+        assertFailsWith<IllegalArgumentException> { snapshot(taskId = "task;rm") }
+    }
+
+    @Test
     fun freshness_is_exactly_bound_to_capture_time_and_maximum_age() {
         val snapshot = snapshot()
         assertTrue(snapshot.isFresh(nowEpochMs = 1_500, maximumAgeMs = 500))
@@ -78,6 +85,7 @@ class DeviceUiSnapshotTest {
     }
 
     private fun snapshot(
+        taskId: String = "task-42",
         elements: List<DeviceUiElementSnapshot> = listOf(element("node-1")),
     ) = DeviceUiSnapshot(
         subject = DeviceSubjectRef(
@@ -87,6 +95,7 @@ class DeviceUiSnapshotTest {
             snapshotVersion = 7,
             capturedAtEpochMs = 1_000,
         ),
+        taskId = taskId,
         eventSequence = 42,
         privacyPolicyVersion = "privacy-v1",
         contentDigestSha256 = "d".repeat(64),
