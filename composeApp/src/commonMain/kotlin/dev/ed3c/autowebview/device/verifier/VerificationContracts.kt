@@ -103,10 +103,13 @@ data class PostconditionEvidence(
 data class VerificationPlan(
     val key: VerificationPlanKey,
     val maximumObservationAgeMs: Long,
+    val maximumVerificationDurationMs: Long = 30_000,
     val requiresIndependentPostcondition: Boolean = true,
+    val current: Boolean = true,
 ) {
     init {
         require(maximumObservationAgeMs in 0..120_000) { "Verification observation age is outside the bounded range" }
+        require(maximumVerificationDurationMs in 1..120_000) { "Verification duration is outside the bounded range" }
     }
 }
 
@@ -121,6 +124,7 @@ enum class VerificationVerdictCode {
     IDENTITY_MISMATCH,
     STALE_EVIDENCE,
     INVALID_TIME_ORDER,
+    DEADLINE_EXCEEDED,
 }
 
 @Serializable
@@ -143,10 +147,11 @@ data class VerificationVerdict(
 class VerificationRegistry(
     plans: List<VerificationPlan>,
 ) {
-    private val plansByKey = plans.associateBy(VerificationPlan::key)
+    val plans: List<VerificationPlan> = plans.toList()
+    private val plansByKey = this.plans.associateBy(VerificationPlan::key)
 
     init {
-        require(plansByKey.size == plans.size) { "Duplicate verification plan key" }
+        require(plansByKey.size == this.plans.size) { "Duplicate verification plan key" }
     }
 
     fun plan(key: VerificationPlanKey): VerificationPlan? = plansByKey[key]
@@ -158,6 +163,7 @@ class VerificationRegistry(
         nowEpochMs: Long,
     ): VerificationVerdict {
         val plan = plansByKey[key] ?: return unknown(VerificationVerdictCode.UNKNOWN_PLAN)
+        if (!plan.current) return unknown(VerificationVerdictCode.UNKNOWN_PLAN)
         if (precondition.identity.planKey() != key || postcondition.identity.planKey() != key) {
             return unknown(VerificationVerdictCode.IDENTITY_MISMATCH)
         }
@@ -166,6 +172,9 @@ class VerificationRegistry(
         }
         if (postcondition.observedAtEpochMs < precondition.observedAtEpochMs) {
             return unknown(VerificationVerdictCode.INVALID_TIME_ORDER)
+        }
+        if (postcondition.observedAtEpochMs - precondition.observedAtEpochMs > plan.maximumVerificationDurationMs) {
+            return unknown(VerificationVerdictCode.DEADLINE_EXCEEDED, postcondition.evidenceDigestSha256)
         }
         if (
             nowEpochMs < postcondition.observedAtEpochMs ||
@@ -209,13 +218,13 @@ class VerificationRegistry(
     )
 }
 
-private val canonicalIdentifier = Regex("[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
-private val sha256Digest = Regex("[0-9a-f]{64}")
+internal val verificationCanonicalIdentifier = Regex("[A-Za-z0-9][A-Za-z0-9._:-]{0,127}")
+internal val verificationSha256Digest = Regex("[0-9a-f]{64}")
 
-private fun requireCanonical(value: String, field: String) {
-    require(canonicalIdentifier.matches(value)) { "$field must be a bounded canonical identifier" }
+internal fun requireCanonical(value: String, field: String) {
+    require(verificationCanonicalIdentifier.matches(value)) { "$field must be a bounded canonical identifier" }
 }
 
-private fun requireSha256(value: String, field: String) {
-    require(sha256Digest.matches(value)) { "$field must be a lowercase SHA-256 digest" }
+internal fun requireSha256(value: String, field: String) {
+    require(verificationSha256Digest.matches(value)) { "$field must be a lowercase SHA-256 digest" }
 }
