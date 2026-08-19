@@ -34,7 +34,7 @@ The A1 evidence child `75e01b21f92c33b5e424fef9aff157954e05c997` is a completion
 14. emit a workflow receipt only from verifier/postcondition evidence; `UNKNOWN` therefore blocks dependents and retry in the K1 admission/recovery contracts;
 15. commit a sanitized audit record containing identities and effect state, never raw payload/user text.
 
-The existing `LocalDispatcher` can be composed through `LocalDispatcherDeviceRuntimeAuthoritySource`. Only `READY` admits the device runtime; `OBSERVING_USER` sets explicit user preemption and every other non-ready mode removes platform availability. This preserves the existing temporal rule that user activity outranks automation without giving the older browser dispatcher device execution authority.
+The existing `LocalDispatcher` is mandatory rather than advisory: `DeviceAutomationRuntime` accepts a `LocalDispatcherDeviceRuntimeAuthoritySource`, not an arbitrary authority source. The wrapper composes the existing dispatcher with a delegate that supplies environment/subject/profile/policy facts. `READY` admits an unoccupied runtime boundary, `EXECUTING` preserves a device action already admitted through the existing confirmation flow, `OBSERVING_USER` asserts user preemption, and `PROPOSING`, `WAITING_FOR_CONFIRMATION`, `SUSPENDED`, or any other non-admitted mode removes platform availability. Common tests drive the real `LocalDispatcher.dispatch()` transitions so X1 does not replace it with a parallel dispatcher state machine.
 
 The two authority reads are intentionally separate. The first prevents automation from observing/targeting while authority is already stale or human-owned. The second catches changes that occur after observation/target resolution but before dispatch. Platform adapters must still fail closed if cancellation arrives during dispatch before an effect begins; `NotDispatched` and `FailureBeforeEffect` preserve `NONE`, while an uncertain post-dispatch failure is `UNKNOWN` and requires reconciliation.
 
@@ -59,6 +59,7 @@ Common tests mechanically prove:
 - package/window/generation, screen lock, service/platform loss, profile, policy, workflow and capability movement fail closed before observation when already present;
 - target-token expiry and prebound token-digest disagreement fail closed after resolution but before dispatch;
 - stale workflow authority binding fails before precondition capture;
+- the real Local Dispatcher keeps `WAITING_FOR_CONFIRMATION`, `PROPOSING`, `SUSPENDED`, and `OBSERVING_USER` fail closed while confirmed `EXECUTING` is admitted;
 - an admitted platform operation that reports `NotDispatched` terminates `NONE` without a workflow completion receipt;
 - platform callback success plus inconclusive verification yields `UNKNOWN`, never `APPLIED`;
 - UNKNOWN verifier receipts block dependent completion and idempotent retry;
