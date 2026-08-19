@@ -73,9 +73,10 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# The PR head is intentionally checked out at depth 1. Fetch a bounded history
-# rooted at the exact immutable HEAD plus the exact frozen source object, then
-# prove ancestry and the source tree before looking at changed paths.
+# The exact PR head is checked out at depth 1. Fetch a bounded history rooted at
+# that immutable HEAD, then fetch the exact frozen source object. Ancestry + tree
+# identity + a 5-path allowlist jointly prove that the evidence branch did not
+# rewrite A1 source while still allowing evidence-only repair commits.
 head_sha="$(git rev-parse HEAD)"
 git fetch --no-tags --depth=32 origin "$head_sha"
 git fetch --no-tags --depth=1 origin "$SOURCE_HEAD"
