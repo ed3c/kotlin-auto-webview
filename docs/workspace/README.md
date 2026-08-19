@@ -81,7 +81,7 @@ ai-content-notes #41 decision
         ↓ DUAL_RUN_PROJECTION_ONLY
 ai-content-notes #55 note-specific Google projection
 
-a i-content-notes #51 source registry
+ai-content-notes #51 source registry
         ↓
 ai-content-notes #56 private/full URL registry
         ↕ same stable REF-* IDs
@@ -139,9 +139,16 @@ Do not create a manually maintained control-plane Doc or Sheet before #123 provi
 
 ## Reference URL registry
 
-All material public platform documentation, policy pages, public repositories, technology candidates and research URLs used by this architecture must be assigned a stable `REF-*` in [`REFERENCE_INDEX.md`](REFERENCE_INDEX.md) and [`reference-index.public.json`](reference-index.public.json).
+All material public platform documentation, policy pages, public repositories, technology candidates, canonical prompt/architecture artifacts and research URLs used by this architecture must be assigned a stable `REF-*`.
 
-Private Google Docs/Sheets/Drive and private repository locators are deliberately absent from this public repository. Their full locators live under private `ed3c/ai-content-notes#56`, while KAW retains only opaque shared `REF-*` identities.
+Public machine shards:
+
+- [`reference-index.public.json`](reference-index.public.json)
+- [`reference-index.public.research.json`](reference-index.public.research.json)
+
+Human index: [`REFERENCE_INDEX.md`](REFERENCE_INDEX.md).
+
+Private Google Docs/Sheets/Drive, private repository locators and private canonical Skill/method URLs are deliberately absent from this public repository. Their full locators live under private `ed3c/ai-content-notes#56`, while KAW retains only opaque shared `REF-*` identities.
 
 ```text
 public reference → full URL in KAW
@@ -155,9 +162,10 @@ URL/title remains a locator, not authority. Future W0/W2/W3/source-registry impl
 1. `docs/workspace/AGENTS.md`
 2. `docs/workspace/REFERENCE_INDEX.md`
 3. `docs/workspace/reference-index.public.json`
-4. `docs/workspace/AUTHORITY_AND_IDENTITY.md`
-5. `docs/workspace/STATE_MACHINES_AND_DAG.md`
-6. `docs/workspace/TECHNOLOGY_ADMISSION.md`
-7. `docs/workspace/CURRENT_STATE.md`
-8. exact issues #119–#130 as applicable
-9. destination repository's own `AGENTS.md` / README / exact receipts
+4. `docs/workspace/reference-index.public.research.json`
+5. `docs/workspace/AUTHORITY_AND_IDENTITY.md`
+6. `docs/workspace/STATE_MACHINES_AND_DAG.md`
+7. `docs/workspace/TECHNOLOGY_ADMISSION.md`
+8. `docs/workspace/CURRENT_STATE.md`
+9. exact issues #119–#130 as applicable
+10. destination repository's own `AGENTS.md` / README / exact receipts
