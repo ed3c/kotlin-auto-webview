@@ -27,6 +27,10 @@ import tempfile
 # quietly re-admit the class of defect this check exists to catch.
 DECLARED_BINARY = (
     "composeApp/src/commonMain/sqldelight/migrations/*.db",
+    # W1 #121 stores the v2 migration fixture compressed because some remote mutation carriers
+    # cannot safely transport the expanded SQLite blob. Gradle verifies its pinned digest and
+    # materializes the exact .db before the existing snapshot/migration checks run.
+    "composeApp/src/commonMain/sqldelight/migrations/2.db.gz",
 )
 
 EXIT_OK = 0
@@ -131,14 +135,31 @@ def selftest() -> int:
             "NUL byte at offset",
         )
 
-        # A declared binary stays allowed, or the check would be unusable here.
+        # Declared migration snapshots stay allowed, or the check would be unusable here.
         expect(
-            "a declared binary file is allowed",
+            "a declared sqlite snapshot is allowed",
             EXIT_OK,
             repository(
-                base / "declared",
+                base / "declared-db",
                 {"composeApp/src/commonMain/sqldelight/migrations/1.db": b"SQLite\x00\x00"},
             ),
+        )
+        expect(
+            "the specifically declared compressed v2 snapshot is allowed",
+            EXIT_OK,
+            repository(
+                base / "declared-gzip",
+                {"composeApp/src/commonMain/sqldelight/migrations/2.db.gz": b"gzip\x00\x00"},
+            ),
+        )
+        expect(
+            "another compressed snapshot is not silently allowlisted",
+            EXIT_PROBLEM,
+            repository(
+                base / "undeclared-gzip",
+                {"composeApp/src/commonMain/sqldelight/migrations/3.db.gz": b"gzip\x00\x00"},
+            ),
+            "3.db.gz",
         )
 
         # An undeclared binary must be a decision, not a silent addition.
