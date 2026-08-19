@@ -52,6 +52,7 @@ data class DeviceUiElementSnapshot(
 data class DeviceUiSnapshot(
     val schemaVersion: String = DeviceUiSnapshotSchema.VERSION,
     val subject: DeviceSubjectRef,
+    val taskId: String,
     val eventSequence: Long,
     val privacyPolicyVersion: String,
     val contentDigestSha256: String,
@@ -59,6 +60,7 @@ data class DeviceUiSnapshot(
 ) {
     init {
         require(schemaVersion == DeviceUiSnapshotSchema.VERSION) { "Unknown device UI snapshot schema" }
+        DeviceContractValidation.requireIdentifier(taskId, "task id")
         require(eventSequence >= 0) { "Accessibility event sequence cannot be negative" }
         DeviceContractValidation.requireIdentifier(privacyPolicyVersion, "privacy policy version")
         DeviceContractValidation.requireSha256(contentDigestSha256, "snapshot content digest")
