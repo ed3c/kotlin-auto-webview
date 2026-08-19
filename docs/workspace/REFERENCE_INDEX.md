@@ -1,15 +1,18 @@
 # Capability Workspace Reference URL Index
 
 Owner: `ed3c/kotlin-auto-webview#129`  
-Machine index: [`reference-index.public.json`](reference-index.public.json)  
-Private/full locator registry: `ed3c/ai-content-notes#56` / parent `#51`
+Machine indexes:
+- [`reference-index.public.json`](reference-index.public.json) — platform docs, repositories, technology candidates and base research sources;
+- [`reference-index.public.research.json`](reference-index.public.research.json) — pinned prompts/architecture and additional Agent Skills research sources.
+
+Private/full locator registry: `ed3c/ai-content-notes#56` / parent `#51`.
 
 ## Purpose
 
-This is the public, privacy-safe URL/provenance index for important websites, official platform documents, public repositories, technology candidates and research sources used by the Federated Capability Workspace.
+This is the public, privacy-safe URL/provenance index for important websites, official platform documents, public repositories, canonical prompt/architecture artifacts, technology candidates and research sources used by the Federated Capability Workspace.
 
 ```text
-URL / repository / official document
+URL / repository / official document / prompt
 → stable REF-* identity
 → role + authority class
 → issue / requirement usage
@@ -27,14 +30,14 @@ A URL is a locator, **not** proof of claim truth, current freshness, legal right
 PUBLIC URL
 → full URL may appear here
 
-PRIVATE GOOGLE DOC/SHEET/DRIVE OR PRIVATE REPOSITORY
+PRIVATE GOOGLE DOC/SHEET/DRIVE OR PRIVATE REPOSITORY/SKILL
 → full URL stays in private ai-content-notes registry
 → this repository stores only an opaque REF-* ID
 ```
 
 Never put Drive file IDs, private repository URLs, customer/private source URLs, credentials, OAuth/session tokens or signed bearer URLs into this public registry.
 
-## Public ed3c repositories
+## Public ed3c repositories and pinned architecture artifacts
 
 | REF | Source | URL | Role |
 |---|---|---|---|
@@ -45,8 +48,12 @@ Never put Drive file IDs, private repository URLs, customer/private source URLs,
 | REF-0005 | agent-skills-repo | https://github.com/ed3c/agent-skills-repo | Skill research/qualification history |
 | REF-0006 | paid-content-create | https://github.com/ed3c/paid-content-create | Creator outcome/product lane |
 | REF-0007 | openwiki-source-anchoring | https://github.com/ed3c/openwiki-source-anchoring | Source anchoring reference |
+| REF-0008 | Procedural Skill Compiler System Prompt | https://github.com/ed3c/kotlin-auto-webview/blob/290a82f0394a42e0c20949a36ab575229b95051d/docs/creator/PROCEDURAL_SKILL_COMPILER_SYSTEM_PROMPT.md | Pinned canonical creator compiler prompt |
+| REF-0009 | Community Skill Edition Architecture | https://github.com/ed3c/kotlin-auto-webview/blob/d8b105ba1bb7be88caf9ae52eaa5bc31bf4667c9/docs/creator/COMMUNITY_SKILL_EDITION_ARCHITECTURE.md | Pinned community architecture |
+| REF-0010 | Content Platform and Media Risk Register | https://github.com/ed3c/kotlin-auto-webview/blob/8e2181e11144ae5bb349c1a0aa9b790485d60c4d/docs/security/CONTENT_PLATFORM_MEDIA_RISK_REGISTER.md | Pinned media/platform risk contract |
+| REF-0011 | Federated Capability Workspace Draft PR | https://github.com/ed3c/kotlin-auto-webview/pull/128 | Preimplementation review subject |
 
-Private authority repositories are indexed as `REF-1101`–`REF-1106` only in this public file; their real URLs are stored in the private registry.
+Private authority repositories are represented only by opaque `REF-1101`–`REF-1112`; canonical private methods use `REF-1201`–`REF-1207`. Their real URLs live in the private registry.
 
 ## Android / WebView official references
 
@@ -130,14 +137,22 @@ These are candidates only. The URL index does not admit them into production. Ex
 | REF-0606 | Vercel Labs agent-skills | https://github.com/vercel-labs/agent-skills |
 | REF-0607 | Cisco AI Defense skill-scanner | https://github.com/cisco-ai-defense/skill-scanner |
 | REF-0608 | Snyk agent-scan | https://github.com/snyk/agent-scan |
+| REF-0609 | SkillTrustBench | https://matrix.tencent.com/skilltrustbench/ |
+| REF-0610 | NVIDIA SkillSpector / scanning Agent Skills | https://docs.nvidia.com/skills/scanning-agent-skills |
+| REF-0611 | Gemini CLI Agent Skills | https://geminicli.com/docs/cli/skills/ |
+| REF-0612 | Manage Agent Skills with GitHub CLI | https://github.blog/changelog/2026-04-16-manage-agent-skills-with-github-cli/ |
+| REF-0613 | LangChain Skills and Deep Agents | https://www.langchain.com/blog/langchain-skills |
+| REF-0614 | Agent Skills with Anthropic course | https://www.deeplearning.ai/courses/agent-skills-with-anthropic |
+| REF-0615 | SkillsMP Agent Skills Marketplace | https://skillsmp.com/ |
 
 ## Private reference bindings
 
 The following identities intentionally expose no URL in this public repository:
 
 ```text
-REF-1001..REF-1007  private Google Docs/Sheets/Drive research sources
-REF-1101..REF-1106  private domain/control/runtime repositories
+REF-1001..REF-1012  private Google Docs/Sheets/Drive research sources
+REF-1101..REF-1112  private domain/control/runtime/device repositories
+REF-1201..REF-1207  private canonical Skills/method/prompt pointers
 ```
 
 The full locator map is owned by private `ed3c/ai-content-notes#56`, under parent source-registry work `#51`.
@@ -156,7 +171,7 @@ URL_INDEXED
 → CURRENT | STALE | SUPERSEDED | REVOKED
 ```
 
-This initial index establishes only `URL_INDEXED` unless another exact artifact already proves a stronger state.
+This initial index establishes only `URL_INDEXED` unless another exact artifact already proves a stronger state. Pinned Git commit URLs may establish artifact identity, but not claim truth or current policy freshness.
 
 ## Rules for future references
 
@@ -167,3 +182,4 @@ This initial index establishes only `URL_INDEXED` unless another exact artifact 
 5. Public repo license metadata is discovery only; dependency admission still reads exact license/notice files.
 6. Private URLs remain private even when their derived requirement is public.
 7. A source deletion/revocation changes freshness/availability and propagates to downstream evidence; it does not erase history.
+8. Canonical prompts/Skills should move from mutable branch URLs to exact commit/tree/blob identities as soon as a release/admission subject exists.
