@@ -91,6 +91,19 @@ class DeviceAutomationRuntimeTest {
     }
 
     @Test
+    fun canonical_audit_category_drift_is_rejected_before_policy_targeting_or_dispatch() {
+        val fixture = Fixture()
+        val drifted = fixture.proposal().copy(auditCategory = "different-audit-category")
+        val result = fixture.runtime().execute(fixture.request().copy(proposal = drifted))
+
+        assertEquals(DeviceRuntimeTerminalCode.CANONICAL_ACTION_MISMATCH, result.terminalCode)
+        assertEquals(0, fixture.preconditionCount)
+        assertEquals(0, fixture.targetResolutionCount)
+        assertEquals(0, fixture.dispatchCount)
+        assertNull(result.effectRecord)
+    }
+
+    @Test
     fun all_remote_and_model_ingress_remain_proposal_only_and_cannot_bypass_policy() {
         for (ingress in listOf(DeviceRuntimeIngress.MCP_PROPOSAL, DeviceRuntimeIngress.REMOTE_PROPOSAL, DeviceRuntimeIngress.MODEL_PROPOSAL)) {
             val fixture = Fixture(enabledCapabilities = emptySet())
@@ -122,6 +135,28 @@ class DeviceAutomationRuntimeTest {
         assertEquals(0, fixture.preconditionCount)
         assertEquals(0, fixture.targetResolutionCount)
         assertEquals(0, fixture.dispatchCount)
+    }
+
+    @Test
+    fun workflow_risk_drift_is_rejected_before_precondition_targeting_or_dispatch() {
+        val fixture = Fixture()
+        val original = fixture.workflow()
+        val drifted = original.copy(
+            nodes = original.nodes.map { node ->
+                if (node is WorkflowNode.ActionTemplate && node.nodeId == "action-1") {
+                    node.copy(risk = DeviceActionRisk.LOW)
+                } else {
+                    node
+                }
+            },
+        )
+        val result = fixture.runtime().execute(fixture.request().copy(workflow = drifted))
+
+        assertEquals(DeviceRuntimeTerminalCode.WORKFLOW_INVALID, result.terminalCode)
+        assertEquals(0, fixture.preconditionCount)
+        assertEquals(0, fixture.targetResolutionCount)
+        assertEquals(0, fixture.dispatchCount)
+        assertNull(result.effectRecord)
     }
 
     @Test
