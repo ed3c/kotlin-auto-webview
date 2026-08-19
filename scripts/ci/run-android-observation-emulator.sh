@@ -3,6 +3,8 @@ set -euo pipefail
 
 readonly SOURCE_HEAD="${KAW_A1_SOURCE_HEAD:?KAW_A1_SOURCE_HEAD is required}"
 readonly SOURCE_TREE="${KAW_A1_SOURCE_TREE:?KAW_A1_SOURCE_TREE is required}"
+readonly SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:?ANDROID_SDK_ROOT or ANDROID_HOME is required}}"
+readonly EMULATOR_BIN="${SDK_ROOT}/emulator/emulator"
 readonly AVD_NAME="kaw-observation-api35"
 readonly SYSTEM_IMAGE="system-images;android-35;google_apis;x86_64"
 readonly RECEIPT_DIR="build/receipts"
@@ -118,6 +120,10 @@ done < <(git diff --name-only "$SOURCE_HEAD" HEAD)
 
 yes | sdkmanager --licenses >/dev/null 2>&1 || true
 sdkmanager --install 'platform-tools' 'emulator' "$SYSTEM_IMAGE"
+if [[ ! -x "$EMULATOR_BIN" ]]; then
+  echo "Android emulator binary is absent after sdkmanager install: ${EMULATOR_BIN}" >&2
+  exit 23
+fi
 
 export ANDROID_AVD_HOME="${RUNNER_TEMP:-/tmp}/kaw-avd-home"
 mkdir -p "$ANDROID_AVD_HOME"
@@ -130,7 +136,7 @@ else
   ACCEL_ARGS=(-accel off)
 fi
 
-emulator -avd "$AVD_NAME" \
+"$EMULATOR_BIN" -avd "$AVD_NAME" \
   -no-window -no-audio -no-boot-anim -no-snapshot -wipe-data -no-metrics \
   -gpu swiftshader_indirect "${ACCEL_ARGS[@]}" >"$EMULATOR_LOG" 2>&1 &
 EMULATOR_PID=$!
@@ -142,7 +148,7 @@ connect_deadline=$((SECONDS + CONNECT_TIMEOUT_SECONDS))
 while [[ "$SECONDS" -lt "$connect_deadline" ]]; do
   if ! kill -0 "$EMULATOR_PID" >/dev/null 2>&1; then
     echo "Android emulator terminated before registering with adb" >&2
-    exit 23
+    exit 24
   fi
   if timeout 5s adb devices | awk 'NR > 1 && $2 == "device" { found=1 } END { exit(found ? 0 : 1) }'; then
     CONNECT_STATE="PASS"
@@ -152,14 +158,14 @@ while [[ "$SECONDS" -lt "$connect_deadline" ]]; do
 done
 if [[ "$CONNECT_STATE" != "PASS" ]]; then
   echo "Android emulator did not register with adb within ${CONNECT_TIMEOUT_SECONDS}s" >&2
-  exit 24
+  exit 25
 fi
 
 boot_deadline=$((SECONDS + BOOT_TIMEOUT_SECONDS))
 while [[ "$SECONDS" -lt "$boot_deadline" ]]; do
   if ! kill -0 "$EMULATOR_PID" >/dev/null 2>&1; then
     echo "Android emulator terminated before boot completed" >&2
-    exit 25
+    exit 26
   fi
   boot_value="$(timeout 5s adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
   if [[ "$boot_value" == "1" ]]; then
@@ -170,7 +176,7 @@ while [[ "$SECONDS" -lt "$boot_deadline" ]]; do
 done
 if [[ "$BOOT_STATE" != "PASS" ]]; then
   echo "Android emulator did not boot within ${BOOT_TIMEOUT_SECONDS}s" >&2
-  exit 26
+  exit 27
 fi
 
 set +e
