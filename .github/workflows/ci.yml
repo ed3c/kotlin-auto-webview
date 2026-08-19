@@ -55,6 +55,38 @@ jobs:
           name: android-debug
           path: composeApp/build/outputs/apk/debug/*.apk
 
+  device-runtime-emulator:
+    if: github.event_name == 'pull_request' && github.head_ref == 'test/device-runtime-convergence-evidence'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.11.1'
+      - name: Run X1 device runtime emulator fixture evidence
+        env:
+          KAW_X1_SOURCE_HEAD: b70ea4544b56e4ec34b11a467808814913c27dc7
+          KAW_X1_SOURCE_TREE: f110894117a38ab0ad7c4d5c65299d2ef8c0949b
+        run: scripts/ci/run-device-runtime-emulator.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: device-runtime-emulator-receipt
+          path: |
+            build/receipts/device-runtime-emulator.json
+            build/receipts/device-runtime-emulator.log
+            composeApp/build/reports/androidTests/connected/**
+            composeApp/build/outputs/androidTest-results/connected/**
+          if-no-files-found: warn
+
   ios:
     runs-on: macos-15
     steps:
