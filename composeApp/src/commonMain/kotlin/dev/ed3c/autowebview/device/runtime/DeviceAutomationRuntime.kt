@@ -37,7 +37,7 @@ class DeviceAutomationRuntime(
     private val preconditionProvider: DevicePreconditionProvider,
     private val postconditionProvider: DevicePostconditionProvider,
     private val platformDispatcher: DevicePlatformDispatcher,
-    private val authoritySource: DeviceRuntimeAuthoritySource,
+    private val authoritySource: LocalDispatcherDeviceRuntimeAuthoritySource,
     private val auditSink: DeviceRuntimeAuditSink,
     private val clock: DeviceRuntimeClock,
     private val workflowValidator: WorkflowValidator = WorkflowValidator(capabilityCatalog),
