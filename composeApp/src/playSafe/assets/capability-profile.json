@@ -1,0 +1,21 @@
+{
+  "schema": "kotlin-auto-webview/android-capability-profile/v1",
+  "distribution_profile": "PLAY_SAFE",
+  "artifact_class": "PLAY_STORE_REVIEW_CANDIDATE",
+  "namespace": "dev.ed3c.autowebview",
+  "application_id": "dev.ed3c.autowebview",
+  "allowed_permissions": [
+    "android.permission.INTERNET"
+  ],
+  "allowed_exported_components": [
+    {
+      "type": "activity",
+      "name": "dev.ed3c.autowebview.MainActivity"
+    }
+  ],
+  "allow_accessibility_service": false,
+  "allow_shizuku": false,
+  "allow_root_or_shell": false,
+  "inbound_mobile_mcp": false,
+  "store_eligibility": "HUMAN_EXTERNAL_REVIEW_REQUIRED"
+}

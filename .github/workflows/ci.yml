@@ -39,6 +39,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -48,12 +51,53 @@ jobs:
         with:
           gradle-version: '8.11.1'
       - run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
-      - name: Assemble Android
-        run: scripts/ci/run-gradle-with-annotations.sh :composeApp:assembleDebug
+      - name: Run profile-oracle planted controls
+        run: python3 scripts/ci/check-android-capability-profiles.py self-test
+      - name: Build and test explicit Android distribution profiles
+        run: |
+          mkdir -p build/reports/android-distribution
+          scripts/ci/run-gradle-with-annotations.sh \
+            :composeApp:reportAndroidDistributionSourceSets \
+            :composeApp:testPlaySafeDebugUnitTest \
+            :composeApp:testEnterpriseDebugUnitTest \
+            :composeApp:assemblePlaySafeRelease \
+            :composeApp:assembleEnterpriseRelease
+      - name: Capture generated task and dependency surfaces
+        run: |
+          mkdir -p build/reports/android-distribution
+          ./gradlew :composeApp:tasks --all > build/reports/android-distribution/tasks.txt
+          ./gradlew :composeApp:dependencies --configuration playSafeReleaseRuntimeClasspath \
+            > build/reports/android-distribution/playSafe-release-runtime-classpath.txt
+          ./gradlew :composeApp:dependencies --configuration enterpriseReleaseRuntimeClasspath \
+            > build/reports/android-distribution/enterprise-release-runtime-classpath.txt
+      - name: Prove generic release selection is fail-closed
+        shell: bash
+        run: |
+          set +e
+          ./gradlew :composeApp:assembleRelease > build/reports/android-distribution/ambiguous-release.txt 2>&1
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "generic assembleRelease unexpectedly succeeded" >&2
+            exit 1
+          fi
+          grep -F "Ambiguous Android release task is forbidden" build/reports/android-distribution/ambiguous-release.txt
+      - name: Verify packaged profile ceilings and emit exact-head receipt
+        env:
+          KAW_C2_SOURCE_HEAD: b70ea4544b56e4ec34b11a467808814913c27dc7
+          KAW_C2_SOURCE_TREE: f110894117a38ab0ad7c4d5c65299d2ef8c0949b
+        run: python3 scripts/ci/check-android-capability-profiles.py verify
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: android-debug
-          path: composeApp/build/outputs/apk/debug/*.apk
+          name: android-distribution-profiles
+          path: |
+            build/receipts/android-distribution-profiles.json
+            build/reports/android-distribution/**
+            composeApp/build/reports/android-distribution/**
+            composeApp/build/outputs/apk/playSafe/release/*.apk
+            composeApp/build/outputs/apk/enterprise/release/*.apk
+          if-no-files-found: warn
 
   ios:
     runs-on: macos-15

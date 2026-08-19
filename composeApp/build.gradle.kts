@@ -80,6 +80,10 @@ kotlin {
             implementation(libs.sqldelight.android.driver)
         }
 
+        androidUnitTest.dependencies {
+            implementation(kotlin("test"))
+        }
+
         val iosArm64Main by getting
         iosArm64Main.dependencies {
             implementation(libs.sqldelight.native.driver)
@@ -131,6 +135,16 @@ val checkSchemaSnapshots by tasks.registering(Exec::class) {
 tasks.matching { it.name.startsWith("generate") && it.name.contains("AppDatabase") }
     .configureEach { dependsOn(checkSchemaSnapshots) }
 
+val ambiguousAndroidReleaseTasks = setOf("assembleRelease", "bundleRelease")
+val requestedAndroidTasks = gradle.startParameter.taskNames.map { it.substringAfterLast(':') }.toSet()
+val ambiguousRequested = requestedAndroidTasks.intersect(ambiguousAndroidReleaseTasks)
+if (ambiguousRequested.isNotEmpty()) {
+    throw GradleException(
+        "Ambiguous Android release task is forbidden: ${ambiguousRequested.sorted().joinToString()}. " +
+            "Use an explicit profile task such as assemblePlaySafeRelease or assembleEnterpriseRelease.",
+    )
+}
+
 android {
     namespace = "dev.ed3c.autowebview"
     compileSdk = 36
@@ -141,6 +155,22 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+    }
+
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("playSafe") {
+            dimension = "distribution"
+            buildConfigField("String", "DISTRIBUTION_PROFILE_ID", "\"PLAY_SAFE\"")
+            manifestPlaceholders["appLabel"] = "Kotlin Auto WebView"
+        }
+        create("enterprise") {
+            dimension = "distribution"
+            applicationIdSuffix = ".enterprise"
+            versionNameSuffix = "-enterprise"
+            buildConfigField("String", "DISTRIBUTION_PROFILE_ID", "\"ENTERPRISE_SIDELOAD\"")
+            manifestPlaceholders["appLabel"] = "Kotlin Auto WebView Enterprise"
+        }
     }
 
     compileOptions {
@@ -158,6 +188,35 @@ android {
                 "/META-INF/{AL2.0,LGPL2.1}",
                 "/META-INF/DEPENDENCIES",
             )
+        }
+    }
+
+    val observedSourceSets = sourceSets
+    val observedProductFlavors = productFlavors
+    tasks.register("reportAndroidDistributionSourceSets") {
+        group = "verification"
+        description = "Write the resolved AGP distribution flavor/source-set graph for evidence."
+        val outputFile = layout.buildDirectory.file("reports/android-distribution/source-sets.txt")
+        outputs.file(outputFile)
+        doLast {
+            val lines = buildList {
+                add(
+                    "AGP productFlavors=" +
+                        observedProductFlavors.map { it.name }.sorted().joinToString(","),
+                )
+                observedSourceSets.sortedBy { it.name }.forEach { sourceSet ->
+                    add(
+                        "AGP sourceSet=${sourceSet.name};" +
+                            "manifest=${sourceSet.manifest.srcFile.invariantSeparatorsPath};" +
+                            "java=${sourceSet.java.srcDirs.map { it.invariantSeparatorsPath }.sorted().joinToString("|")};" +
+                            "assets=${sourceSet.assets.srcDirs.map { it.invariantSeparatorsPath }.sorted().joinToString("|")}",
+                    )
+                }
+            }
+            val file = outputFile.get().asFile
+            file.parentFile.mkdirs()
+            file.writeText(lines.joinToString(separator = "\n", postfix = "\n"))
+            lines.forEach(::println)
         }
     }
 }
