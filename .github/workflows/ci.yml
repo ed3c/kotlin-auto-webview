@@ -55,6 +55,36 @@ jobs:
           name: android-debug
           path: composeApp/build/outputs/apk/debug/*.apk
 
+  android-observation-emulator:
+    if: github.event_name == 'pull_request' && github.head_ref == 'test/android-observation-evidence'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.11.1'
+      - name: Run Android observation emulator fixture evidence
+        env:
+          KAW_A1_SOURCE_HEAD: b1c96e129009adc4c83b98a3728a9f1a39850025
+          KAW_A1_SOURCE_TREE: 90f1a0ca98b5d1e35928abb61be19fe8eae96d9b
+        run: scripts/ci/run-android-observation-emulator.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-observation-emulator-receipt
+          path: |
+            build/receipts/android-observation-emulator.json
+            composeApp/build/reports/androidTests/connected/**
+          if-no-files-found: warn
+
   ios:
     runs-on: macos-15
     steps:
