@@ -65,7 +65,9 @@ No arrow inherits authority from the previous layer. A model answer cannot grant
     └── #125 W5 read-only Workspace UI
          └── #126 W6 cross-system evidence
 
-#127 W7 pre-implementation docs convergence [this branch]
+#127 W7 pre-implementation docs convergence
+└── #129 W8 public/private reference URL registry [this child stack]
+    └── #130 registry privacy/parity CI [planned]
 ```
 
 Cross-repository consumers:
@@ -78,6 +80,12 @@ bettor-arena #197
 ai-content-notes #41 decision
         ↓ DUAL_RUN_PROJECTION_ONLY
 ai-content-notes #55 note-specific Google projection
+
+a i-content-notes #51 source registry
+        ↓
+ai-content-notes #56 private/full URL registry
+        ↕ same stable REF-* IDs
+kotlin-auto-webview #129 public/privacy-safe URL registry
 ```
 
 ## Planned code topology
@@ -111,9 +119,10 @@ SKIPPED_BY_POLICY
 DENIED_BY_ARCHITECTURE
 EXTERNAL_AUTHORITY_REQUIRED
 PREIMPLEMENTATION_CLOSED
+URL_INDEXED
 ```
 
-`PREIMPLEMENTATION_CLOSED` means owners, contracts, path leases, DAGs, negative controls and evidence ceilings are ready. It does not mean any workspace runtime is implemented.
+`PREIMPLEMENTATION_CLOSED` means owners, contracts, path leases, DAGs, negative controls and evidence ceilings are ready. It does not mean any workspace runtime is implemented. `URL_INDEXED` means a locator is registered; it is weaker than identity/revision/read-back/rights/claim verification.
 
 ## Current decision about Google Workspace
 
@@ -128,12 +137,27 @@ manual Google edit        = ChangeProposal only
 
 Do not create a manually maintained control-plane Doc or Sheet before #123 provides file-ID/revision binding, idempotent outbox, authenticated read-back and conflict semantics. That would recreate the split-brain state this design removes.
 
+## Reference URL registry
+
+All material public platform documentation, policy pages, public repositories, technology candidates and research URLs used by this architecture must be assigned a stable `REF-*` in [`REFERENCE_INDEX.md`](REFERENCE_INDEX.md) and [`reference-index.public.json`](reference-index.public.json).
+
+Private Google Docs/Sheets/Drive and private repository locators are deliberately absent from this public repository. Their full locators live under private `ed3c/ai-content-notes#56`, while KAW retains only opaque shared `REF-*` identities.
+
+```text
+public reference → full URL in KAW
+private reference → opaque REF-* in KAW → full locator in private registry
+```
+
+URL/title remains a locator, not authority. Future W0/W2/W3/source-registry implementation must bind exact revisions/digests/read-back before stronger evidence states.
+
 ## Start here
 
 1. `docs/workspace/AGENTS.md`
-2. `docs/workspace/AUTHORITY_AND_IDENTITY.md`
-3. `docs/workspace/STATE_MACHINES_AND_DAG.md`
-4. `docs/workspace/TECHNOLOGY_ADMISSION.md`
-5. `docs/workspace/CURRENT_STATE.md`
-6. exact issue #120–#127
-7. destination repository's own `AGENTS.md` / README / exact receipts
+2. `docs/workspace/REFERENCE_INDEX.md`
+3. `docs/workspace/reference-index.public.json`
+4. `docs/workspace/AUTHORITY_AND_IDENTITY.md`
+5. `docs/workspace/STATE_MACHINES_AND_DAG.md`
+6. `docs/workspace/TECHNOLOGY_ADMISSION.md`
+7. `docs/workspace/CURRENT_STATE.md`
+8. exact issues #119–#130 as applicable
+9. destination repository's own `AGENTS.md` / README / exact receipts
