@@ -215,9 +215,11 @@ class LocalDispatcherDeviceRuntimeAuthoritySource(
     override fun snapshot(): DeviceRuntimeAuthoritySnapshot {
         val base = delegate.snapshot()
         val dispatcherMode = dispatcher.state.value.mode
+        val dispatcherAllowsExecution =
+            dispatcherMode == DispatcherMode.READY || dispatcherMode == DispatcherMode.EXECUTING
         return base.copy(
             userInteractionActive = base.userInteractionActive || dispatcherMode == DispatcherMode.OBSERVING_USER,
-            platformAvailable = base.platformAvailable && dispatcherMode == DispatcherMode.READY,
+            platformAvailable = base.platformAvailable && dispatcherAllowsExecution,
         )
     }
 }
