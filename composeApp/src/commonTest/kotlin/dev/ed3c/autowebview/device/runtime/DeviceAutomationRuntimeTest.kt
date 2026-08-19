@@ -229,7 +229,6 @@ class DeviceAutomationRuntimeTest {
         private val digestB = "b".repeat(64)
         private val digestC = "c".repeat(64)
         private val digestD = "d".repeat(64)
-        private val digestE = "e".repeat(64)
         private val digestF = "f".repeat(64)
         private val subject = DeviceSubjectRef(
             packageName = "dev.ed3c.fixture",
@@ -400,7 +399,7 @@ class DeviceAutomationRuntimeTest {
                 lastDispatchEvidence = dispatch
                 PostconditionEvidence(
                     identity = identity,
-                    observedAtEpochMs = 1_500,
+                    observedAtEpochMs = 1_400,
                     evidenceDigestSha256 = digestF,
                     source = VerificationEvidenceSource.SANITIZED_UI,
                     privacyClass = VerificationPrivacyClass.SANITIZED_DIGEST,
