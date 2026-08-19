@@ -122,6 +122,40 @@ class AccessibilityObservationInstrumentedTest {
     }
 
     @Test
+    fun clickable_ancestor_is_never_used_as_a_fallback_for_a_child_target() {
+        val session = session()
+        session.connect()
+        val snapshot = published(
+            frame(
+                snapshotVersion = session.generation,
+                eventSequence = session.eventSequence,
+                nodes = listOf(
+                    publicNode("clickable-parent", "button", "Continue"),
+                    RawAccessibilityNode(
+                        localId = "child-label",
+                        parentLocalId = "clickable-parent",
+                        role = "text",
+                        accessibleName = "Continue",
+                        visible = true,
+                        enabled = true,
+                        editable = false,
+                        sensitivity = AccessibilitySensitivity.PUBLIC_METADATA,
+                    ),
+                ),
+            ),
+        )
+        val child = snapshot.elements.single { it.role == "text" }
+        val result = resolver(session).resolve(
+            snapshot,
+            request(
+                snapshot,
+                DeviceTargetRef.UiTarget(child.fingerprint, snapshot.subject.snapshotVersion),
+            ).copy(expectedRole = "button"),
+        )
+        assertTrue(result is ExactAccessibilityTargetResolution.NotFound)
+    }
+
+    @Test
     fun subject_task_generation_and_time_mismatches_fail_closed() {
         val session = session()
         session.connect()
@@ -140,6 +174,14 @@ class AccessibilityObservationInstrumentedTest {
                 is ExactAccessibilityTargetResolution.Stale,
         )
         assertTrue(
+            resolver.resolve(snapshot, request(snapshot, target).copy(windowId = "window-other"))
+                is ExactAccessibilityTargetResolution.Stale,
+        )
+        assertTrue(
+            resolver.resolve(snapshot, request(snapshot, target).copy(displayId = "display-other"))
+                is ExactAccessibilityTargetResolution.Stale,
+        )
+        assertTrue(
             resolver.resolve(snapshot, request(snapshot, target).copy(taskId = "task-other"))
                 is ExactAccessibilityTargetResolution.Stale,
         )
@@ -154,9 +196,114 @@ class AccessibilityObservationInstrumentedTest {
     }
 
     @Test
+    fun hidden_disabled_and_redacted_candidates_fail_closed() {
+        val session = session()
+        session.connect()
+        val snapshot = published(
+            frame(
+                snapshotVersion = session.generation,
+                eventSequence = session.eventSequence,
+                nodes = listOf(
+                    publicNode("hidden", "button", "Hidden").copy(visible = false),
+                    publicNode("disabled", "button", "Disabled").copy(enabled = false),
+                    RawAccessibilityNode(
+                        localId = "private-message",
+                        role = "button",
+                        accessibleName = "private raw value",
+                        visible = true,
+                        enabled = true,
+                        editable = false,
+                        sensitivity = AccessibilitySensitivity.PRIVATE_MESSAGE,
+                    ),
+                ),
+            ),
+        )
+        val resolver = resolver(session)
+        val hidden = snapshot.elements.single { it.accessibleName == "Hidden" }
+        val disabled = snapshot.elements.single { it.accessibleName == "Disabled" }
+        val redacted = snapshot.elements.single { it.privacyClass == DeviceUiPrivacyClass.SENSITIVE_REDACTED }
+
+        assertTrue(
+            resolver.resolve(
+                snapshot,
+                request(snapshot, DeviceTargetRef.UiTarget(hidden.fingerprint, snapshot.subject.snapshotVersion)),
+            ) is ExactAccessibilityTargetResolution.NotFound,
+        )
+        assertTrue(
+            resolver.resolve(
+                snapshot,
+                request(snapshot, DeviceTargetRef.UiTarget(disabled.fingerprint, snapshot.subject.snapshotVersion)),
+            ) is ExactAccessibilityTargetResolution.NotFound,
+        )
+        assertTrue(
+            resolver.resolve(
+                snapshot,
+                request(snapshot, DeviceTargetRef.UiTarget(redacted.fingerprint, snapshot.subject.snapshotVersion))
+                    .copy(expectedAccessibleName = "private raw value"),
+            ) is ExactAccessibilityTargetResolution.NotFound,
+        )
+        assertFalse(snapshot.elements.any { it.accessibleName == "private raw value" })
+    }
+
+    @Test
+    fun named_window_and_content_change_fixtures_invalidate_old_authority() {
+        val scenarios = listOf(
+            "multi-window" to AccessibilityInvalidationReason.WINDOW_CHANGED,
+            "overlay" to AccessibilityInvalidationReason.WINDOW_CHANGED,
+            "dialog" to AccessibilityInvalidationReason.WINDOW_CHANGED,
+            "ime" to AccessibilityInvalidationReason.WINDOW_CHANGED,
+            "rotation" to AccessibilityInvalidationReason.WINDOW_CHANGED,
+            "split-screen" to AccessibilityInvalidationReason.WINDOW_CHANGED,
+            "scroll" to AccessibilityInvalidationReason.CONTENT_CHANGED,
+            "dynamic-content" to AccessibilityInvalidationReason.CONTENT_CHANGED,
+        )
+
+        for ((scenario, reason) in scenarios) {
+            val session = session("fixture-$scenario")
+            session.connect()
+            val snapshot = published(
+                frame(
+                    taskId = "task-$scenario",
+                    snapshotVersion = session.generation,
+                    eventSequence = session.eventSequence,
+                    nodes = listOf(publicNode("target-$scenario", "button", "Continue")),
+                ),
+            )
+            val binding = session.issueToken(snapshot, snapshot.elements.single().fingerprint, 1_100, 2_000)
+            assertTrue("precondition for $scenario", session.validateToken(binding.token, snapshot, 1_200))
+
+            session.invalidate(reason)
+
+            assertFalse("stale authority survived $scenario", session.validateToken(binding.token, snapshot, 1_200))
+            assertEquals("tokens retained after $scenario", 0, session.activeTokenCount())
+        }
+    }
+
+    @Test
+    fun service_disconnect_revokes_token_and_returns_to_absent_capture_state() {
+        val session = session("disconnect-token")
+        session.connect()
+        val snapshot = published(
+            frame(
+                snapshotVersion = session.generation,
+                eventSequence = session.eventSequence,
+                nodes = listOf(publicNode("button-1", "button", "Continue")),
+            ),
+        )
+        val binding = session.issueToken(snapshot, snapshot.elements.single().fingerprint, 1_100, 2_000)
+        assertTrue(session.validateToken(binding.token, snapshot, 1_200))
+
+        session.disconnect()
+
+        assertFalse(session.validateToken(binding.token, snapshot, 1_200))
+        assertEquals(0, session.activeTokenCount())
+        assertEquals(null, session.captureLease())
+    }
+
+    @Test
     fun every_authority_relevant_invalidation_revokes_the_process_local_token() {
         for (reason in AccessibilityInvalidationReason.entries) {
-            val session = session()
+            val session = session("instrumented-${reason.name.lowercase()}")
             session.connect()
             val snapshot = published(
                 frame(
@@ -172,8 +319,8 @@ class AccessibilityObservationInstrumentedTest {
         }
     }
 
-    private fun session() = AccessibilityObservationSession(
-        AccessibilityOpaqueTokenSource { "instrumented-opaque-token" },
+    private fun session(token: String = "instrumented-opaque-token") = AccessibilityObservationSession(
+        AccessibilityOpaqueTokenSource { token },
     )
 
     private fun resolver(session: AccessibilityObservationSession) = ExactAccessibilityTargetResolver(
@@ -195,16 +342,21 @@ class AccessibilityObservationInstrumentedTest {
     )
 
     private fun frame(
+        packageName: String = "dev.ed3c.autowebview",
+        windowId: String = "window-1",
+        displayId: String = "display-0",
+        taskId: String = "task-1",
         snapshotVersion: Long = 1,
+        capturedAtEpochMs: Long = 1_000,
         eventSequence: Long = 1,
         nodes: List<RawAccessibilityNode>,
     ) = AccessibilityObservationFrame(
-        packageName = "dev.ed3c.autowebview",
-        windowId = "window-1",
-        displayId = "display-0",
-        taskId = "task-1",
+        packageName = packageName,
+        windowId = windowId,
+        displayId = displayId,
+        taskId = taskId,
         snapshotVersion = snapshotVersion,
-        capturedAtEpochMs = 1_000,
+        capturedAtEpochMs = capturedAtEpochMs,
         eventSequence = eventSequence,
         privacyPolicyVersion = "privacy-v1",
         nodes = nodes,
