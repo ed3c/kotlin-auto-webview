@@ -8,11 +8,14 @@ readonly SYSTEM_IMAGE="system-images;android-35;google_apis;x86_64"
 readonly RECEIPT_DIR="build/receipts"
 readonly RECEIPT_PATH="${RECEIPT_DIR}/android-observation-emulator.json"
 readonly EMULATOR_LOG="${RUNNER_TEMP:-/tmp}/kaw-observation-emulator.log"
+readonly CONNECT_TIMEOUT_SECONDS=120
 readonly BOOT_TIMEOUT_SECONDS=300
+readonly TEST_TIMEOUT_SECONDS=600
 readonly -a TEST_COMMAND=(scripts/ci/run-gradle-with-annotations.sh :composeApp:connectedDebugAndroidTest)
 
 mkdir -p "$RECEIPT_DIR"
 STATE="FAIL"
+CONNECT_STATE="NOT_EXERCISED"
 BOOT_STATE="NOT_EXERCISED"
 TEST_STATE="NOT_EXERCISED"
 EMULATOR_PID=""
@@ -23,7 +26,7 @@ write_receipt() {
   head="$(git rev-parse HEAD)"
   tree="$(git rev-parse 'HEAD^{tree}')"
   HEAD_VALUE="$head" TREE_VALUE="$tree" EXIT_VALUE="$exit_code" STATE_VALUE="$STATE" \
-  BOOT_VALUE="$BOOT_STATE" TEST_VALUE="$TEST_STATE" RECEIPT_VALUE="$RECEIPT_PATH" \
+  CONNECT_VALUE="$CONNECT_STATE" BOOT_VALUE="$BOOT_STATE" TEST_VALUE="$TEST_STATE" RECEIPT_VALUE="$RECEIPT_PATH" \
   SOURCE_HEAD_VALUE="$SOURCE_HEAD" SOURCE_TREE_VALUE="$SOURCE_TREE" python3 - <<'PY'
 import json
 import os
@@ -47,6 +50,7 @@ payload = {
         "image": "google_apis/x86_64",
         "avd": "kaw-observation-api35",
     },
+    "emulator_connection": os.environ["CONNECT_VALUE"],
     "emulator_boot": os.environ["BOOT_VALUE"],
     "instrumented_fixture_tests": os.environ["TEST_VALUE"],
     "accessibility_service_liveness": "NOT_EXERCISED",
@@ -59,10 +63,21 @@ Path(os.environ["RECEIPT_VALUE"]).write_text(json.dumps(payload, indent=2, sort_
 PY
 }
 
+show_emulator_tail() {
+  if [[ -f "$EMULATOR_LOG" ]]; then
+    echo "--- bounded emulator log tail ---" >&2
+    tail -n 160 "$EMULATOR_LOG" >&2 || true
+    echo "--- end emulator log tail ---" >&2
+  fi
+}
+
 cleanup() {
   local exit_code=$?
+  if [[ "$exit_code" -ne 0 ]]; then
+    show_emulator_tail
+  fi
   if [[ -n "$EMULATOR_PID" ]]; then
-    adb emu kill >/dev/null 2>&1 || true
+    timeout 10s adb emu kill >/dev/null 2>&1 || true
     kill "$EMULATOR_PID" >/dev/null 2>&1 || true
     wait "$EMULATOR_PID" >/dev/null 2>&1 || true
   fi
@@ -120,23 +135,54 @@ emulator -avd "$AVD_NAME" \
   -gpu swiftshader_indirect "${ACCEL_ARGS[@]}" >"$EMULATOR_LOG" 2>&1 &
 EMULATOR_PID=$!
 
-adb wait-for-device
-deadline=$((SECONDS + BOOT_TIMEOUT_SECONDS))
-while [[ "$SECONDS" -lt "$deadline" ]]; do
-  if [[ "$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == "1" ]]; then
-    BOOT_STATE="PASS"
+# Never block in `adb wait-for-device`: if the emulator exits or never registers,
+# fail inside the evidence script so the EXIT trap can preserve a FAIL receipt.
+adb start-server >/dev/null
+connect_deadline=$((SECONDS + CONNECT_TIMEOUT_SECONDS))
+while [[ "$SECONDS" -lt "$connect_deadline" ]]; do
+  if ! kill -0 "$EMULATOR_PID" >/dev/null 2>&1; then
+    echo "Android emulator terminated before registering with adb" >&2
+    exit 23
+  fi
+  if timeout 5s adb devices | awk 'NR > 1 && $2 == "device" { found=1 } END { exit(found ? 0 : 1) }'; then
+    CONNECT_STATE="PASS"
     break
   fi
+  sleep 2
+done
+if [[ "$CONNECT_STATE" != "PASS" ]]; then
+  echo "Android emulator did not register with adb within ${CONNECT_TIMEOUT_SECONDS}s" >&2
+  exit 24
+fi
+
+boot_deadline=$((SECONDS + BOOT_TIMEOUT_SECONDS))
+while [[ "$SECONDS" -lt "$boot_deadline" ]]; do
   if ! kill -0 "$EMULATOR_PID" >/dev/null 2>&1; then
-    echo "Android emulator terminated before boot" >&2
-    exit 23
+    echo "Android emulator terminated before boot completed" >&2
+    exit 25
+  fi
+  boot_value="$(timeout 5s adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)"
+  if [[ "$boot_value" == "1" ]]; then
+    BOOT_STATE="PASS"
+    break
   fi
   sleep 2
 done
 if [[ "$BOOT_STATE" != "PASS" ]]; then
   echo "Android emulator did not boot within ${BOOT_TIMEOUT_SECONDS}s" >&2
-  exit 24
+  exit 26
 fi
 
-"${TEST_COMMAND[@]}"
+set +e
+timeout --signal=TERM "${TEST_TIMEOUT_SECONDS}s" "${TEST_COMMAND[@]}"
+test_exit=$?
+set -e
+if [[ "$test_exit" -ne 0 ]]; then
+  if [[ "$test_exit" -eq 124 ]]; then
+    echo "Android instrumented fixture timed out after ${TEST_TIMEOUT_SECONDS}s" >&2
+  else
+    echo "Android instrumented fixture failed with exit ${test_exit}" >&2
+  fi
+  exit "$test_exit"
+fi
 TEST_STATE="PASS"
