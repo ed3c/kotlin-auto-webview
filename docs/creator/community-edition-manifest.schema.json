@@ -1,0 +1,643 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ed3c/kotlin-auto-webview/docs/creator/community-edition-manifest.schema.json",
+  "title": "Community Skill Edition Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "editionId",
+    "version",
+    "mode",
+    "sourceBinding",
+    "playbackLane",
+    "sourceMediaReuse",
+    "contributors",
+    "cardSelections",
+    "skillPatches",
+    "procedureVariants",
+    "conflicts",
+    "moderation",
+    "rightsReceipt",
+    "sourceRevocation",
+    "publicationState"
+  ],
+  "properties": {
+    "schema": {
+      "const": "community-skill-edition/v1"
+    },
+    "editionId": {
+      "$ref": "#/$defs/stableId"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "supersedesEditionVersion": {
+      "type": ["integer", "null"],
+      "minimum": 1
+    },
+    "mode": {
+      "enum": [
+        "REFERENCE_EDITION",
+        "OFFICIAL_CLIP_REFERENCE",
+        "LICENSED_RENDER_EDITION"
+      ]
+    },
+    "sourceBinding": {
+      "$ref": "#/$defs/sourceBinding"
+    },
+    "playbackLane": {
+      "enum": [
+        "YOUTUBE_FOREGROUND_DOCK",
+        "OPEN_IN_YOUTUBE_APP",
+        "LICENSED_NATIVE_PIP"
+      ]
+    },
+    "sourceMediaReuse": {
+      "$ref": "#/$defs/sourceMediaReuse"
+    },
+    "officialClipReferences": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/officialClipReference"
+      },
+      "default": []
+    },
+    "contributors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/contributorIdentity"
+      }
+    },
+    "cardSelections": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/cardSelection"
+      }
+    },
+    "skillPatches": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/skillPatch"
+      }
+    },
+    "procedureVariants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/procedureVariant"
+      }
+    },
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/conflictRecord"
+      }
+    },
+    "moderation": {
+      "$ref": "#/$defs/moderationSummary"
+    },
+    "rightsReceipt": {
+      "$ref": "#/$defs/rightsReceipt"
+    },
+    "sourceRevocation": {
+      "$ref": "#/$defs/sourceRevocation"
+    },
+    "publicationState": {
+      "enum": [
+        "PRIVATE_DRAFT",
+        "PRIVATE_PREVIEW",
+        "PUBLICATION_BLOCKED",
+        "PUBLIC_READY",
+        "PUBLISHED",
+        "PARTIALLY_TAKEN_DOWN",
+        "TAKEN_DOWN"
+      ]
+    },
+    "ugcControls": {
+      "$ref": "#/$defs/ugcControls"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "REFERENCE_EDITION"
+          }
+        },
+        "required": ["mode"]
+      },
+      "then": {
+        "properties": {
+          "playbackLane": {
+            "enum": [
+              "YOUTUBE_FOREGROUND_DOCK",
+              "OPEN_IN_YOUTUBE_APP"
+            ]
+          },
+          "sourceMediaReuse": {
+            "properties": {
+              "frameCaptureAllowed": { "const": false },
+              "sourceSegmentRetentionAllowed": { "const": false },
+              "renderedDerivativeAllowed": { "const": false },
+              "nativePipAllowed": { "const": false }
+            }
+          },
+          "rightsReceipt": {
+            "properties": {
+              "state": {
+                "enum": [
+                  "LOCATOR_ONLY",
+                  "RIGHTS_UNKNOWN",
+                  "PLATFORM_REFERENCE_ONLY"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "OFFICIAL_CLIP_REFERENCE"
+          }
+        },
+        "required": ["mode"]
+      },
+      "then": {
+        "required": ["officialClipReferences"],
+        "properties": {
+          "officialClipReferences": {
+            "minItems": 1
+          },
+          "playbackLane": {
+            "enum": ["OPEN_IN_YOUTUBE_APP", "YOUTUBE_FOREGROUND_DOCK"]
+          },
+          "sourceMediaReuse": {
+            "properties": {
+              "frameCaptureAllowed": { "const": false },
+              "sourceSegmentRetentionAllowed": { "const": false },
+              "renderedDerivativeAllowed": { "const": false },
+              "nativePipAllowed": { "const": false }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "mode": {
+            "const": "LICENSED_RENDER_EDITION"
+          }
+        },
+        "required": ["mode"]
+      },
+      "then": {
+        "properties": {
+          "playbackLane": {
+            "enum": ["LICENSED_NATIVE_PIP"]
+          },
+          "rightsReceipt": {
+            "properties": {
+              "state": {
+                "const": "EXACT_LICENSE_BOUND"
+              },
+              "licenseId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rightsOwner": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["licenseId", "rightsOwner"]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "publicationState": {
+            "enum": ["PUBLIC_READY", "PUBLISHED"]
+          }
+        },
+        "required": ["publicationState"]
+      },
+      "then": {
+        "required": ["ugcControls"],
+        "properties": {
+          "ugcControls": {
+            "properties": {
+              "filteringEnabled": { "const": true },
+              "reportingEnabled": { "const": true },
+              "blockingEnabled": { "const": true },
+              "publishedContactAvailable": { "const": true },
+              "copyrightTakedownEnabled": { "const": true },
+              "sourceCreatorOptOutEnabled": { "const": true }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "stableId": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9._:-]{2,127}$"
+    },
+    "sourceBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceBindingId",
+        "platform",
+        "sourceId",
+        "sourceUrl",
+        "observedAt",
+        "accessState",
+        "availabilityState",
+        "embedState",
+        "revisionFingerprint"
+      ],
+      "properties": {
+        "sourceBindingId": { "$ref": "#/$defs/stableId" },
+        "platform": { "const": "YOUTUBE" },
+        "sourceId": { "type": "string", "minLength": 1 },
+        "sourceUrl": { "type": "string", "format": "uri" },
+        "channelId": { "type": ["string", "null"] },
+        "observedAt": { "type": "string", "format": "date-time" },
+        "accessState": {
+          "enum": [
+            "PUBLIC_VISIBLE",
+            "USER_OWNED",
+            "USER_LICENSED",
+            "PARTNER_LICENSED",
+            "RESTRICTED",
+            "UNKNOWN",
+            "REVOKED"
+          ]
+        },
+        "availabilityState": {
+          "enum": [
+            "AVAILABLE",
+            "PRIVATE",
+            "DELETED",
+            "AGE_RESTRICTED",
+            "REGION_RESTRICTED",
+            "LIVE_ONLY",
+            "UNKNOWN"
+          ]
+        },
+        "embedState": {
+          "enum": [
+            "READY",
+            "EMBED_DENIED",
+            "CLIENT_IDENTITY_MISSING",
+            "LOGIN_AGE_REGION_REQUIRED",
+            "SOURCE_UNAVAILABLE",
+            "NOT_EXERCISED"
+          ]
+        },
+        "revisionFingerprint": { "type": "string", "minLength": 1 }
+      }
+    },
+    "sourceMediaReuse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "frameCaptureAllowed",
+        "sourceSegmentRetentionAllowed",
+        "renderedDerivativeAllowed",
+        "nativePipAllowed"
+      ],
+      "properties": {
+        "frameCaptureAllowed": { "type": "boolean" },
+        "sourceSegmentRetentionAllowed": { "type": "boolean" },
+        "renderedDerivativeAllowed": { "type": "boolean" },
+        "nativePipAllowed": { "type": "boolean" }
+      }
+    },
+    "officialClipReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["clipReferenceId", "clipUrl", "sourceId", "availabilityState"],
+      "properties": {
+        "clipReferenceId": { "$ref": "#/$defs/stableId" },
+        "clipUrl": { "type": "string", "format": "uri" },
+        "sourceId": { "type": "string", "minLength": 1 },
+        "availabilityState": {
+          "enum": ["AVAILABLE", "UNAVAILABLE", "UNKNOWN", "NOT_EXERCISED"]
+        },
+        "relatedCardIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/stableId" }
+        }
+      }
+    },
+    "contributorIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contributorId",
+        "accountState",
+        "profileVerificationState",
+        "contributionRightsState"
+      ],
+      "properties": {
+        "contributorId": { "$ref": "#/$defs/stableId" },
+        "displayName": { "type": "string", "minLength": 1 },
+        "accountState": {
+          "enum": ["AUTHENTICATED", "SUSPENDED", "DELETED"]
+        },
+        "profileVerificationState": {
+          "enum": ["UNVERIFIED", "VERIFIED", "REVOKED"]
+        },
+        "contributionRightsState": {
+          "enum": [
+            "PRIVATE_DRAFT_ONLY",
+            "EXPLICIT_GRANT_BOUND",
+            "UNKNOWN",
+            "REVOKED"
+          ]
+        }
+      }
+    },
+    "cardSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cardSelectionId",
+        "cardId",
+        "contributorId",
+        "sourceBindingId",
+        "tStartMs",
+        "tEndMs",
+        "evidenceClass",
+        "playAction"
+      ],
+      "properties": {
+        "cardSelectionId": { "$ref": "#/$defs/stableId" },
+        "cardId": { "$ref": "#/$defs/stableId" },
+        "contributorId": { "$ref": "#/$defs/stableId" },
+        "sourceBindingId": { "$ref": "#/$defs/stableId" },
+        "tStartMs": { "type": "integer", "minimum": 0 },
+        "tEndMs": { "type": "integer", "minimum": 1 },
+        "evidenceClass": {
+          "enum": [
+            "SOURCE_OBSERVATION",
+            "CREATOR_CASE",
+            "CROSS_CASE_PATTERN",
+            "PLATFORM_OFFICIAL",
+            "HYPOTHESIS",
+            "USER_OUTCOME"
+          ]
+        },
+        "playAction": {
+          "enum": [
+            "USER_INITIATED_SEEK",
+            "OPEN_OFFICIAL_CLIP",
+            "OPEN_IN_YOUTUBE_APP",
+            "NO_PLAYBACK"
+          ]
+        },
+        "independentCardTextHash": { "type": "string", "minLength": 1 }
+      }
+    },
+    "skillPatch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "patchId",
+        "contributorId",
+        "baseSkillId",
+        "baseSkillVersion",
+        "selectedCardIds",
+        "evidenceRefs",
+        "contributionRightsState",
+        "moderationState",
+        "qualificationState"
+      ],
+      "properties": {
+        "patchId": { "$ref": "#/$defs/stableId" },
+        "contributorId": { "$ref": "#/$defs/stableId" },
+        "baseSkillId": { "$ref": "#/$defs/stableId" },
+        "baseSkillVersion": { "type": "integer", "minimum": 1 },
+        "selectedCardIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/stableId" }
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/stableId" }
+        },
+        "procedureDeltaDigest": { "type": "string", "minLength": 1 },
+        "contributionRightsState": {
+          "enum": [
+            "PRIVATE_DRAFT_ONLY",
+            "EXPLICIT_GRANT_BOUND",
+            "UNKNOWN",
+            "REVOKED"
+          ]
+        },
+        "moderationState": {
+          "enum": [
+            "PENDING",
+            "ALLOWED",
+            "DENIED",
+            "REMOVED",
+            "APPEAL_PENDING"
+          ]
+        },
+        "qualificationState": {
+          "enum": [
+            "NOT_EXERCISED",
+            "PENDING",
+            "QUALIFIED_VARIANT",
+            "NOT_QUALIFIED",
+            "REVOKED"
+          ]
+        }
+      }
+    },
+    "procedureVariant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "variantId",
+        "patchIds",
+        "applicability",
+        "evidenceRefs",
+        "qualificationState"
+      ],
+      "properties": {
+        "variantId": { "$ref": "#/$defs/stableId" },
+        "patchIds": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/stableId" }
+        },
+        "applicability": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "negativeTriggers": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/stableId" }
+        },
+        "qualificationState": {
+          "enum": [
+            "NOT_EXERCISED",
+            "PENDING",
+            "QUALIFIED",
+            "NOT_QUALIFIED",
+            "REVOKED"
+          ]
+        }
+      }
+    },
+    "conflictRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "conflictId",
+        "variantIds",
+        "statement",
+        "resolutionState"
+      ],
+      "properties": {
+        "conflictId": { "$ref": "#/$defs/stableId" },
+        "variantIds": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "$ref": "#/$defs/stableId" }
+        },
+        "statement": { "type": "string", "minLength": 1 },
+        "resolutionState": {
+          "enum": [
+            "UNRESOLVED",
+            "APPLICABILITY_SPLIT",
+            "EVIDENCE_REQUIRED",
+            "SUPERSEDED"
+          ]
+        }
+      }
+    },
+    "moderationSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "decisionIds"],
+      "properties": {
+        "state": {
+          "enum": [
+            "PRIVATE_DRAFT_ONLY",
+            "PENDING",
+            "ALLOWED",
+            "PARTIALLY_ALLOWED",
+            "DENIED",
+            "REMOVED"
+          ]
+        },
+        "decisionIds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/stableId" }
+        }
+      }
+    },
+    "rightsReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rightsReceiptId", "state", "sourceBindingId"],
+      "properties": {
+        "rightsReceiptId": { "$ref": "#/$defs/stableId" },
+        "state": {
+          "enum": [
+            "LOCATOR_ONLY",
+            "PLATFORM_REFERENCE_ONLY",
+            "RIGHTS_UNKNOWN",
+            "EXACT_LICENSE_BOUND",
+            "REVOKED"
+          ]
+        },
+        "sourceBindingId": { "$ref": "#/$defs/stableId" },
+        "licenseId": { "type": ["string", "null"] },
+        "rightsOwner": { "type": ["string", "null"] },
+        "expiresAt": { "type": ["string", "null"], "format": "date-time" },
+        "attributionRequired": { "type": "boolean", "default": false }
+      }
+    },
+    "sourceRevocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policyId",
+        "freshnessCheckRequired",
+        "onDeleted",
+        "onPrivate",
+        "onEmbedDisabled",
+        "onRightsRevoked"
+      ],
+      "properties": {
+        "policyId": { "$ref": "#/$defs/stableId" },
+        "freshnessCheckRequired": { "type": "boolean" },
+        "onDeleted": {
+          "enum": ["SOURCE_UNAVAILABLE", "TAKEDOWN"]
+        },
+        "onPrivate": {
+          "enum": ["SOURCE_UNAVAILABLE", "PRIVATE_ONLY", "TAKEDOWN"]
+        },
+        "onEmbedDisabled": {
+          "enum": ["OPEN_IN_YOUTUBE_APP", "SOURCE_UNAVAILABLE", "TAKEDOWN"]
+        },
+        "onRightsRevoked": {
+          "enum": ["DEGRADE_TO_LOCATORS", "PARTIAL_TAKEDOWN", "FULL_TAKEDOWN"]
+        }
+      }
+    },
+    "ugcControls": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "filteringEnabled",
+        "reportingEnabled",
+        "blockingEnabled",
+        "publishedContactAvailable",
+        "copyrightTakedownEnabled",
+        "sourceCreatorOptOutEnabled"
+      ],
+      "properties": {
+        "filteringEnabled": { "type": "boolean" },
+        "reportingEnabled": { "type": "boolean" },
+        "blockingEnabled": { "type": "boolean" },
+        "publishedContactAvailable": { "type": "boolean" },
+        "copyrightTakedownEnabled": { "type": "boolean" },
+        "sourceCreatorOptOutEnabled": { "type": "boolean" }
+      }
+    }
+  }
+}
