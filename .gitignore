@@ -17,3 +17,4 @@ iosApp/iosApp.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolve
 secrets.properties
 *.jks
 *.keystore
+/composeApp/src/commonMain/sqldelight/migrations/2.db
