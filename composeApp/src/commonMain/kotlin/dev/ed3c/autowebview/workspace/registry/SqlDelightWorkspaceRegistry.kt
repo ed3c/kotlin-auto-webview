@@ -39,14 +39,14 @@ class SqlDelightWorkspaceRegistry(
         queries.selectWorkspaceSubjectPayload(
             logical_id = key.logicalId,
             kind = key.kind.name,
-        ) { payloadJson -> payloadJson }
+        )
             .awaitAsList()
             .singleOrNull()
             ?.let(::decodeSubjectOrNull)
 
     suspend fun activeSubjects(limit: Int = 100): List<SubjectRef> {
         if (limit <= 0) return emptyList()
-        return queries.selectActiveWorkspaceSubjectPayloads(limit.toLong()) { payloadJson -> payloadJson }
+        return queries.selectActiveWorkspaceSubjectPayloads(limit.toLong())
             .awaitAsList()
             .mapNotNull(::decodeSubjectOrNull)
     }
@@ -80,7 +80,7 @@ class SqlDelightWorkspaceRegistry(
         queries.selectWorkspaceEdgePayloadsFrom(
             from_logical_id = key.logicalId,
             from_kind = key.kind.name,
-        ) { payloadJson -> payloadJson }
+        )
             .awaitAsList()
             .mapNotNull(::decodeEdgeOrNull)
 
@@ -121,9 +121,9 @@ class SqlDelightWorkspaceRegistry(
         require(nowEpochMs >= 0) { "Dispatch time cannot be negative" }
         if (limit <= 0) return emptyList()
         return queries.selectDispatchableWorkspaceOutboxPayloads(
-            next_attempt_at_epoch_ms = nowEpochMs,
-            limit = limit.toLong(),
-        ) { payloadJson -> payloadJson }
+            nowEpochMs,
+            limit.toLong(),
+        )
             .awaitAsList()
             .mapNotNull(::decodeSyncOrNull)
     }
@@ -188,7 +188,7 @@ class SqlDelightWorkspaceRegistry(
 
     suspend fun proposedChanges(limit: Int = 100): List<ChangeProposal> {
         if (limit <= 0) return emptyList()
-        return queries.selectProposedWorkspaceInboxPayloads(limit.toLong()) { payloadJson -> payloadJson }
+        return queries.selectProposedWorkspaceInboxPayloads(limit.toLong())
             .awaitAsList()
             .mapNotNull(::decodeProposalOrNull)
     }
@@ -213,12 +213,12 @@ class SqlDelightWorkspaceRegistry(
     suspend fun inboxCount(): Long = queries.countWorkspaceInbox().awaitAsOne()
 
     private suspend fun outboxEventIdByDedupe(dedupeKey: String): String? =
-        queries.selectWorkspaceOutboxEventIdByDedupe(dedupe_key = dedupeKey) { eventId -> eventId }
+        queries.selectWorkspaceOutboxEventIdByDedupe(dedupe_key = dedupeKey)
             .awaitAsList()
             .singleOrNull()
 
     private suspend fun inboxContains(proposalId: String): Boolean =
-        queries.selectWorkspaceInboxProposalId(proposal_id = proposalId) { id -> id }
+        queries.selectWorkspaceInboxProposalId(proposal_id = proposalId)
             .awaitAsList()
             .singleOrNull() != null
 
@@ -234,7 +234,7 @@ class SqlDelightWorkspaceRegistry(
                 StoredSyncState(parsedState, receipt)
             }
 
-    private fun persistOutboxReceipt(
+    private suspend fun persistOutboxReceipt(
         receipt: SyncReceipt,
         nextAttemptAtEpochMs: Long,
         updatedAtEpochMs: Long,
