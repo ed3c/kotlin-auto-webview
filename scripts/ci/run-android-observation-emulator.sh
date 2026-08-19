@@ -9,7 +9,7 @@ readonly RECEIPT_DIR="build/receipts"
 readonly RECEIPT_PATH="${RECEIPT_DIR}/android-observation-emulator.json"
 readonly EMULATOR_LOG="${RUNNER_TEMP:-/tmp}/kaw-observation-emulator.log"
 readonly BOOT_TIMEOUT_SECONDS=300
-readonly TEST_COMMAND="scripts/ci/run-gradle-with-annotations.sh :composeApp:connectedDebugAndroidTest"
+readonly -a TEST_COMMAND=(scripts/ci/run-gradle-with-annotations.sh :composeApp:connectedDebugAndroidTest)
 
 mkdir -p "$RECEIPT_DIR"
 STATE="FAIL"
@@ -73,10 +73,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if ! git merge-base --is-ancestor "$SOURCE_HEAD" HEAD; then
-  echo "A1 source head is not an ancestor of the evidence candidate" >&2
+# actions/checkout intentionally fetches the exact PR head at depth 1. The commit
+# object still carries the parent SHA, but the parent object is absent until we
+# fetch the frozen source explicitly. Bind the Stack edge first, then fetch only
+# that immutable source object for tree/diff verification.
+head_parent="$(git show -s --format=%P HEAD)"
+if [[ "$head_parent" != "$SOURCE_HEAD" ]]; then
+  echo "Evidence candidate is not a one-commit child of the frozen A1 source head" >&2
   exit 20
 fi
+git fetch --no-tags --depth=1 origin "$SOURCE_HEAD"
 actual_source_tree="$(git show -s --format=%T "$SOURCE_HEAD")"
 if [[ "$actual_source_tree" != "$SOURCE_TREE" ]]; then
   echo "A1 source tree does not match the frozen exact tree" >&2
@@ -92,7 +98,7 @@ while IFS= read -r path; do
       exit 22
       ;;
   esac
-done < <(git diff --name-only "$SOURCE_HEAD"...HEAD)
+done < <(git diff --name-only "$SOURCE_HEAD" HEAD)
 
 yes | sdkmanager --licenses >/dev/null 2>&1 || true
 sdkmanager --install 'platform-tools' 'emulator' "$SYSTEM_IMAGE"
@@ -131,5 +137,5 @@ if [[ "$BOOT_STATE" != "PASS" ]]; then
   exit 24
 fi
 
-$TEST_COMMAND
+"${TEST_COMMAND[@]}"
 TEST_STATE="PASS"
