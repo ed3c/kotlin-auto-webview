@@ -34,6 +34,7 @@ import dev.ed3c.autowebview.device.workflow.WorkflowEdgeKind
 import dev.ed3c.autowebview.device.workflow.WorkflowNode
 import dev.ed3c.autowebview.device.workflow.WorkflowOrigin
 import dev.ed3c.autowebview.device.workflow.WorkflowRevisionAuthorityBinding
+import dev.ed3c.autowebview.dispatcher.LocalDispatcher
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -543,7 +544,7 @@ class DeviceAutomationRuntimeTest {
                 platformAvailable = true,
             )
             var authorityReadCount = 0
-            val authority = DeviceRuntimeAuthoritySource {
+            val authorityDelegate = DeviceRuntimeAuthoritySource {
                 authorityReadCount += 1
                 when {
                     authorityReadCount >= 2 && finalAuthorityMutation != null -> finalAuthorityMutation.invoke(baseAuthority)
@@ -551,6 +552,10 @@ class DeviceAutomationRuntimeTest {
                     else -> baseAuthority
                 }
             }
+            val authority = LocalDispatcherDeviceRuntimeAuthoritySource(
+                dispatcher = LocalDispatcher(),
+                delegate = authorityDelegate,
+            )
             return DeviceAutomationRuntime(
                 compiledProfile = DistributionProfile.ENTERPRISE_SIDELOAD,
                 capabilityCatalog = catalog,
