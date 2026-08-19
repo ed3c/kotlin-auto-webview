@@ -1,0 +1,156 @@
+name: Android device evidence
+
+on:
+  pull_request:
+    branches:
+      - build/android-distribution-profiles
+    paths:
+      - 'composeApp/src/androidInstrumentedTest/**'
+      - 'composeApp/src/androidTestFixtures/**'
+      - 'integrations/opendroid/fixtures/**'
+      - 'scripts/evidence/android/**'
+      - 'tests/evidence/android/**'
+      - 'receipts/android/opendroid/**'
+      - 'docs/evidence/android-opendroid/**'
+      - 'docs/architecture/ADR-0032-android-automation-evidence.md'
+      - '.github/workflows/android-device-evidence.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  KAW_C2_SOURCE_HEAD: b70ea4544b56e4ec34b11a467808814913c27dc7
+  KAW_C2_SOURCE_TREE: f110894117a38ab0ad7c4d5c65299d2ef8c0949b
+
+jobs:
+  static-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Install exact Android compile SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+
+      - name: Run evidence contract planted controls
+        run: python3 scripts/evidence/android/evidence_contract.py
+
+      - name: Bind selected source subjects and lease
+        run: python3 scripts/evidence/android/verify_selected_sources.py
+
+      - name: Build explicit Android profiles and unit controls
+        run: |
+          mkdir -p build/reports/android-distribution
+          scripts/ci/run-gradle-with-annotations.sh \
+            :composeApp:reportAndroidDistributionSourceSets \
+            :composeApp:testPlaySafeDebugUnitTest \
+            :composeApp:testEnterpriseDebugUnitTest \
+            :composeApp:assemblePlaySafeDebug \
+            :composeApp:assembleEnterpriseDebug \
+            :composeApp:assemblePlaySafeRelease \
+            :composeApp:assembleEnterpriseRelease
+
+      - name: Capture exact task and dependency surfaces
+        run: |
+          mkdir -p build/reports/android-distribution
+          ./gradlew :composeApp:tasks --all > build/reports/android-distribution/tasks.txt
+          ./gradlew :composeApp:dependencies --configuration playSafeDebugRuntimeClasspath \
+            > build/reports/android-distribution/playSafe-debug-runtime-classpath.txt
+          ./gradlew :composeApp:dependencies --configuration playSafeReleaseRuntimeClasspath \
+            > build/reports/android-distribution/playSafe-release-runtime-classpath.txt
+          ./gradlew :composeApp:dependencies --configuration enterpriseDebugRuntimeClasspath \
+            > build/reports/android-distribution/enterprise-debug-runtime-classpath.txt
+          ./gradlew :composeApp:dependencies --configuration enterpriseReleaseRuntimeClasspath \
+            > build/reports/android-distribution/enterprise-release-runtime-classpath.txt
+
+      - name: Prove generic release selection remains fail closed
+        shell: bash
+        run: |
+          set -euo pipefail
+          for task in assembleRelease bundleRelease; do
+            log="build/reports/android-distribution/ambiguous-${task}.txt"
+            set +e
+            ./gradlew ":composeApp:${task}" > "$log" 2>&1
+            status=$?
+            set -e
+            if [ "$status" -eq 0 ]; then
+              echo "generic ${task} unexpectedly succeeded" >&2
+              exit 1
+            fi
+            grep -F "Ambiguous Android release task is forbidden" "$log"
+          done
+
+      - name: Verify package/profile oracle
+        run: python3 scripts/ci/check-android-capability-profiles.py verify
+
+      - name: Render and validate L0 public receipt
+        run: |
+          python3 scripts/evidence/android/render_static_receipt.py
+          python3 scripts/evidence/android/validate_receipts.py
+
+      - name: Compile framework-only instrumented evidence APKs
+        run: |
+          scripts/ci/run-gradle-with-annotations.sh \
+            :composeApp:assemblePlaySafeDebugAndroidTest \
+            :composeApp:assembleEnterpriseDebugAndroidTest
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-opendroid-static-contract
+          path: |
+            build/receipts/android-opendroid/static-contract.json
+            build/receipts/android-distribution-profiles.json
+          if-no-files-found: error
+
+  emulator:
+    needs: static-contract
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [24, 28, 33, 36]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Install exact Android compile SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+
+      - name: Run fixed managed-emulator evidence
+        env:
+          KAW_EVIDENCE_API: ${{ matrix.api }}
+        run: bash scripts/evidence/android/run-managed-emulator.sh
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-opendroid-emulator-api${{ matrix.api }}
+          path: build/receipts/android-opendroid/emulator-api${{ matrix.api }}.json
+          if-no-files-found: warn
