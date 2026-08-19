@@ -207,16 +207,16 @@ class DeviceAutomationRuntimeTest {
 
     @Test
     fun stale_authority_context_fails_closed_before_observation() {
-        val mutations = listOf<Pair<(DeviceRuntimeAuthoritySnapshot) -> DeviceRuntimeAuthoritySnapshot, DeviceRuntimeTerminalCode>>(
-            ({ it.copy(currentSubject = it.currentSubject.copy(packageName = "dev.ed3c.other")) }) to DeviceRuntimeTerminalCode.SUBJECT_CHANGED,
-            ({ it.copy(currentSubject = it.currentSubject.copy(windowId = "window-2")) }) to DeviceRuntimeTerminalCode.SUBJECT_CHANGED,
-            ({ it.copy(currentSubject = it.currentSubject.copy(snapshotVersion = 2)) }) to DeviceRuntimeTerminalCode.SUBJECT_CHANGED,
-            ({ it.copy(screenLocked = true) }) to DeviceRuntimeTerminalCode.SCREEN_LOCKED,
-            ({ it.copy(platformAvailable = false) }) to DeviceRuntimeTerminalCode.PLATFORM_UNAVAILABLE,
-            ({ it.copy(compiledProfile = DistributionProfile.PLAY_SAFE) }) to DeviceRuntimeTerminalCode.PROFILE_MISMATCH,
-            ({ it.copy(policyVersion = "policy-v2") }) to DeviceRuntimeTerminalCode.POLICY_CHANGED,
-            ({ it.copy(workflowRevision = 2) }) to DeviceRuntimeTerminalCode.WORKFLOW_CHANGED,
-            ({ it.copy(enabledCapabilityIds = emptySet()) }) to DeviceRuntimeTerminalCode.CAPABILITY_REVOKED,
+        val mutations: List<Pair<(DeviceRuntimeAuthoritySnapshot) -> DeviceRuntimeAuthoritySnapshot, DeviceRuntimeTerminalCode>> = listOf(
+            Pair({ snapshot: DeviceRuntimeAuthoritySnapshot -> snapshot.copy(currentSubject = snapshot.currentSubject.copy(packageName = "dev.ed3c.other")) }, DeviceRuntimeTerminalCode.SUBJECT_CHANGED),
+            Pair({ snapshot: DeviceRuntimeAuthoritySnapshot -> snapshot.copy(currentSubject = snapshot.currentSubject.copy(windowId = "window-2")) }, DeviceRuntimeTerminalCode.SUBJECT_CHANGED),
+            Pair({ snapshot: DeviceRuntimeAuthoritySnapshot -> snapshot.copy(currentSubject = snapshot.currentSubject.copy(snapshotVersion = 2)) }, DeviceRuntimeTerminalCode.SUBJECT_CHANGED),
+            Pair({ snapshot: DeviceRuntimeAuthoritySnapshot -> snapshot.copy(screenLocked = true) }, DeviceRuntimeTerminalCode.SCREEN_LOCKED),
+            Pair({ snapshot: DeviceRuntimeAuthoritySnapshot -> snapshot.copy(platformAvailable = false) }, DeviceRuntimeTerminalCode.PLATFORM_UNAVAILABLE),
+            Pair({ snapshot: DeviceRuntimeAuthoritySnapshot -> snapshot.copy(compiledProfile = DistributionProfile.PLAY_SAFE) }, DeviceRuntimeTerminalCode.PROFILE_MISMATCH),
+            Pair({ snapshot: DeviceRuntimeAuthoritySnapshot -> snapshot.copy(policyVersion = "policy-v2") }, DeviceRuntimeTerminalCode.POLICY_CHANGED),
+            Pair({ snapshot: DeviceRuntimeAuthoritySnapshot -> snapshot.copy(workflowRevision = 2) }, DeviceRuntimeTerminalCode.WORKFLOW_CHANGED),
+            Pair({ snapshot: DeviceRuntimeAuthoritySnapshot -> snapshot.copy(enabledCapabilityIds = emptySet()) }, DeviceRuntimeTerminalCode.CAPABILITY_REVOKED),
         )
         mutations.forEach { (mutation, code) ->
             val fixture = Fixture(authorityMutation = mutation)
