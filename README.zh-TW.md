@@ -2,344 +2,317 @@
 
 繁體中文 · [English](README.md)
 
-這是一個可上架導向的 Kotlin Multiplatform 瀏覽器外殼，目標平台包含 Android、iOS、Web/Wasm 與 Desktop。它把 WebView 從被動容器轉為**有邊界、可驗證、可由人類隨時接管的 Agent Surface**：觀察並清洗頁面 Context、保存在地 L1 記憶、把相關證據投影回頁面、以 MCP 暴露受控 Resource／Proposal，所有會改變狀態的權限都必須通過決定性 Policy 與 Human-in-the-loop。
+Kotlin Auto WebView 是一個跨 Android、iOS、Web/Wasm 與 Desktop 的 Kotlin Multiplatform **有邊界 Agent Browser／Capability Workspace**。既有可執行基線負責觀察與清洗頁面 Context、保存本地記憶、投影證據、接收 Typed MCP Proposal，所有改變狀態的權限都必須經過決定性 Policy、人類搶回控制權與精確證據。
 
-> **目前基線：** Draft PR #1 已完成可執行架構 MVP。Head `a449fac24b8ee602b3c36ae60e972fe25f35c516` 已通過 Common tests、Desktop compile、Wasm production distribution、Android debug assembly 與 iOS Simulator ARM64 framework linking。商店交付、永久記憶、Authenticated OpenClaw L2、原生動作執行與可上架的端側 Semantic Engine 仍是獨立工作。
+本專案目前也在設計 **Creator Capability Browser**：
 
-## 整合真實狀態
+```text
+通過 Admission 的來源
+→ v7.2 時間／結構卡片
+→ 證據與矛盾圖
+→ 程序 DAG
+→ 獨立資格審查的 SKILL.md
+→ Creator Workspace／Community Skill Edition
+→ 真實使用者 Outcome 回寫
+```
 
-| 能力 | 實作 | 證據狀態 | Owner／下一關卡 |
+Creator 主線**尚未實作**。目前完成的是系統提示詞、平台／媒體／權利風險契約與 Community Edition 架構；其餘工作已拆成具有路徑租約、State Machine、負向控制與證據上限的 GitHub issues。
+
+## 精確目前狀態
+
+Snapshot：2026-08-19，Creator 文件 convergence issue [#98](https://github.com/ed3c/kotlin-auto-webview/issues/98)。
+
+| Plane | 精確 subject | 狀態 | 能證明什麼 |
 |---|---|---|---|
-| Android、iOS、Web/Wasm、Desktop 入口 | 已實作 | 基線 Head `PASS` | PR #1 |
-| WebView Observer、DOM、Selection、Fingerprint、Geometry | 已實作 | Common／Platform build `PASS` | `web/` |
-| Sensitive field 排除與 Kotlin Redaction | 已實作 | Common tests `PASS` | `privacy/` |
-| L1 Semantic Cache | In-memory 決定性基線 | Common tests `PASS` | `cache/`；永久化 #8 |
-| 永久化 L1 Cache 與稽核證據 | SQLDelight Schema、Migration 與 Append-only 稽核 | Common／Desktop tests `PASS` | `persistence/`；#8 |
-| OpenClaw L2 Stream | 具 Epoch 綁定的 Typed Admission 與 Ktor WebSocket Transport | Common tests `PASS`；實機私有節點 `NOT_EXERCISED` | Epic #4；實機 #51、#52 |
-| Cache-to-DOM Projection | Bubble／Context Rail MVP | Common tests `PASS` | `projection/` |
-| Capability Policy 與人類搶回控制權 | 已實作 | Common tests `PASS` | `capability/`、`dispatcher/` |
-| 受控 Browser Action Executor | Freshness 綁定並受 HITL 管制 | Common tests `PASS` | `executor/`；#11 |
-| MCP | 跨平台 JSON-RPC Discovery／Resource／Proposal Gateway | Common tests `PASS` | `mcp/` |
-| MCP HTTP Transport | 跨平台 Streamable HTTP Bridge；Desktop Loopback 與 HTTPS Listener | Common／Desktop tests `PASS` | `mcp/http/`；ADR-0011、0013、0021 |
-| MCP 呼叫端認證 | Bearer 生命週期、OAuth／DPoP、mTLS、Workload Identity | Desktop tests `PASS`；實際 Issuer／JWKS `NOT_EXERCISED` | ADR-0019、ADR-0022 |
-| MCP Replay 抑制 | 語意動作識別、記憶體與永久化 Journal | `PASS`；多節點協調 `IMPLEMENTED_NOT_EXERCISED` | ADR-0018、ADR-0024 |
-| 行動端 Inbound MCP Listener | 刻意不提供 | `DENIED_BY_ARCHITECTURE` | ADR-0013 |
-| Local Semantic Router | 決定性 Lexical Router 與可重現語料 | Common tests `PASS` | `semantics/`；#12 |
-| On-device Embedding／SLM Engine | 尚未選定 | `NOT_IMPLEMENTED` | #13 |
-| Android Play 交付 | 只有 Debug APK | Store Evidence `NOT_EXERCISED` | #2 |
-| iOS App Store／TestFlight | 只有 Simulator Framework | Store Evidence `NOT_EXERCISED` | #3 |
-| Web 部署 | 已產生 Production Wasm Artifact | Deployment `NOT_EXERCISED` | #5 |
-| Git Town Static Policy | `.git-town.toml` 對應 v24.0.0 | 設定存在 | Issue #6 |
-| Git Town Executable Admission／Live Sync | 缺 Host Binary、Checksum 與 Canary | `ABSENT`／`NOT_EXERCISED` | `docs/git/GIT_TOWN_ADMISSION.md` |
-| 自主雙軌控制面 | Repo Binding 與 Safety Profile | 文件已實作；本地 Lane `NOT_EXERCISED` | `docs/automation/` |
-| 自動 Merge | 沒有 Repo-owned 預先授權 | `EXTERNAL_AUTHORITY_REQUIRED` | 保留 Exact PR Open |
+| 既有 KMP Agent-browser 基線 | PR #1 head `a449fac24b8ee602b3c36ae60e972fe25f35c516` | repo 既有記錄為 common/Desktop/Wasm/Android/iOS simulator `PASS` | 舊有 bounded browser，不是 Creator runtime |
+| v7.2 程序編譯 Prompt | main `290a82f0394a42e0c20949a36ab575229b95051d` | `MATERIALIZED_DOCUMENT` | Prompt／契約 |
+| 平台、媒體、權利風險 | #80／Draft PR #81 `8e2181e11144ae5bb349c1a0aa9b790485d60c4d` | `DRAFT_PUBLISHED` | 架構風險契約 |
+| Community Skill Edition | #82／Draft PR #83 `d8b105ba1bb7be88caf9ae52eaa5bc31bf4667c9` | `DRAFT_PUBLISHED` | 架構、Schema、Example |
+| Creator 實作 atoms | #84–#97 | `NOT_IMPLEMENTED` | Owner 與驗收契約 |
+| 跨媒體 adapters | #102–#110 | `NOT_IMPLEMENTED` | Source-specific 計畫 |
+| 共享文件 convergence | #98／`docs/creator-capability-convergence` | `IN_PROGRESS_DOCUMENTATION` | 目前索引工作；精確 moving head 以 GitHub metadata 為準 |
+| Docs CI、Prompt、handoff、政策／DoD review | #99–#101、#111–#117 | `PLANNED` | 未來文件／證據工作 |
+| Local Git Town、worktree、本地驗證 | 無 receipt | `NOT_EXERCISED`／`BLOCKED_POLICY` | 不可主張本地 runtime |
+| 法律、平台、Store、實機、Provider | 外部權限 | `EXTERNAL_AUTHORITY_REQUIRED`／`NOT_EXERCISED` | 無核准／Production 主張 |
 
-`PASS`、`FAIL`、`ABSENT`、`NOT_IMPLEMENTED`、`NOT_EXERCISED`、`SKIPPED_BY_POLICY` 與 `EXTERNAL_AUTHORITY_REQUIRED` 不可互換。
+以下證據狀態不可互換：
 
-## 自主雙軌控制面
+```text
+PASS
+FAIL
+ABSENT
+NOT_IMPLEMENTED
+NOT_EXERCISED
+SKIPPED_BY_POLICY
+DENIED_BY_ARCHITECTURE
+EXTERNAL_AUTHORITY_REQUIRED
+```
 
-本 Repo 透過薄型 Binding 套用使用者提供的 **Repository Autonomous Dual-Lane Integration + Shadow Architecture + Git Town System Prompt v2.0**。可攜式法則仍由共享 Skill 擁有；Repo 只保存精確 Identity、State Ownership、Eval、Task Packet 與 Safety Postcondition。
+Issue、branch、Draft PR、Schema 或 Prompt 的存在都不等於實作。
+
+## 產品邊界
+
+```text
+WebView / WKWebView / KCEF / 官方媒體 Surface
+= 觀察與播放 substrate
+
+Kotlin runtime
+= identity、policy、state、lifecycle、privacy、人類 authority
+
+v7.2
+= source-bound cards、stable IDs、typed links、evidence graph
+
+Procedural Compiler
+= card graph → state/decision DAG → candidate Procedural IR
+
+Independent Qualifier
+= executable／discriminative／falsifiable／observable／transferable verdict
+
+Community Edition
+= versioned SkillPatch variants、conflicts、moderation、outcomes
+```
+
+### Edition modes
+
+| Mode | 媒體行為 | 狀態 |
+|---|---|---|
+| `REFERENCE_EDITION` | 官方播放器或官方 App；只存 locator/timestamp/card | 第一個 MVP，#95 |
+| `OFFICIAL_CLIP_REFERENCE` | 只保存可用的官方 Clip URL | reference lane |
+| `LICENSED_RENDER_EDITION` | 只有精確 rights packet 才可截圖、片段、衍生影片、原生 PiP | rights-gated #96 |
+
+```text
+公開可見 != 可重用媒體
+embed ready != 內容授權
+Media Integrity != Premium entitlement != 著作權許可
+社群人氣 != 證據真實
+產生 Skill != Qualified Skill
+```
+
+## 既有 bounded-browser 資料流
 
 ```mermaid
 flowchart LR
-    TASK[Task / Issue / PDF / Architecture Source] --> B[Builder]
-    TASK --> S[Shadow Architect]
-    B -->|Material Delta| S
-    S -->|L0 Observe / L1 Warn| B
-    S -->|L2 Reconcile| R[Architecture + Evidence Reconciliation]
-    R --> B
-    S -->|L3 Block Named Transition| X[Stable Blocked State]
-    X -->|Continue Independent Safe Work| B
-    B --> V[Exact-subject Eval + Negative Control]
-    V --> D[Commit / Push / PR Gate]
-    D --> REC[Evidence-bound Receipt]
+    WV[WebView / WKWebView / KCEF / Web] --> OBS[Observer]
+    OBS --> PRIV[Privacy filter + redaction]
+    PRIV --> RT[AgentBrowserRuntime]
+    RT --> L1[(Local memory / audit)]
+    RT --> PROJ[Evidence projection]
+    MCP[MCP request] --> CAP[Typed capability policy]
+    CAP --> DISP[Human-preemptible dispatcher]
+    DISP -->|admitted + confirmed| EXEC[Bounded executor]
+    EXEC --> WV
 ```
 
-### 目前 Automation Admission
-
-| Operation Class | State | Boundary |
-|---|---|---|
-| Repository／Forge Inspect | `READ_ONLY_ADMITTED` | 同一個 Public Repo |
-| Feature Branch Write | `BRANCH_WRITE_ADMITTED` | 宣告的 PR Branch；Fast-forward only |
-| Issue／PR Publication | `REMOTE_PR_ADMITTED` | Exact Head/Base、Disclosure Scan、既有權限 |
-| Local Linked Worktree／Dirty-state Proof | `NOT_EXERCISED` | 目前 Connector 不暴露 Local Checkout State |
-| Live Git Town Sync | `BLOCKED_POLICY` | 缺 Exact Host Binary、Wrapper、Lease、Receipt、Canary |
-| Merge | `EXTERNAL_AUTHORITY_REQUIRED` | Repo 沒有預先授權 Trusted Automation；Auto-merge 關閉 |
-| Store／Release／Production／Settings／Secrets／License Change | Denied | 超出 Agent Authority |
-
-被 Block 的 Transition 不會觸發問題，也不會停止其他 Path-disjoint Safe Slice。詳見 [`docs/automation/README.md`](docs/automation/README.md) 與 [`docs/automation/REPOSITORY_PROFILE.md`](docs/automation/REPOSITORY_PROFILE.md)。
-
-## Runtime 資料流
+## Creator Capability 資料流
 
 ```mermaid
 flowchart LR
-    U[使用者輸入] -->|pointer down/up| DISP[Local Dispatcher]
-    WV[Android WebView / WKWebView / KCEF / Web] --> OBS[Observer Injection]
-    OBS -->|Raw PageContext JSON| BRIDGE[PageContext Message Handler]
-    BRIDGE --> PRIV[Privacy Guard]
-    PRIV -->|Sanitized PageContext| RT[AgentBrowserRuntime]
-    RT -->|query| L1[(L1 Semantic Cache)]
-    L1 -->|CacheMatch| PROJ[Projection Engine]
-    RT -->|Current Anchors| PROJ
-    PROJ -->|ProjectionHint| UI[Compose Overlay + Context Rail]
-    RT -->|put sanitized record| L1
-    RT --> AUDIT[(Bounded Audit Flow)]
-
-    MCP[MCP JSON-RPC Gateway] -->|Read Sanitized Context| RT
-    MCP -->|Typed AgentAction Proposal| CAP[Capability Registry]
-    CAP -->|Allowed / RequiresConfirmation / Denied| DISP
-    DISP -->|HITL Request| UI
-    UI -->|Confirm / Reject| DISP
-    DISP -. admitted typed action .-> EXEC[Platform Action Executor]
-    EXEC -. Issue #11 Planned .-> WV
-
-    L2[(OpenClaw Private L2)] -. Issue #9 Authenticated Ordered Stream .-> SEM[Semantic Router]
-    SEM -. Pruned CacheMatch .-> PROJ
+    SRC[YouTube / PDF / EPUB / Notion / X / Web / Drive-Docs / local] --> ADM[逐操作 Source Admission]
+    ADM -->|允許 / 最小化| ADAPTER[Source-specific adapter]
+    ADM -->|拒絕 / 未知| BLOCK[穩定 degraded / blocked state]
+    ADAPTER --> EVENTS[清洗後事件 + revision-bound locator]
+    EVENTS --> IDX[v7.2 auto-indexer]
+    IDX --> CARDS[Atomic cards + typed evidence links]
+    CARDS --> EDITOR[Timeline / Graph / Procedure editor]
+    CARDS --> COMP[Procedural compiler]
+    COMP --> IR[Candidate Procedural IR]
+    IR --> QUAL[Independent qualifier]
+    QUAL -->|QUALIFIED| SKILL[Qualified Skill variant]
+    QUAL -->|NOT_QUALIFIED| NQ[缺少證據／矛盾回路]
+    SKILL --> WS[Portable creator workspace]
+    SKILL --> COMM[Community SkillPatch variants]
+    COMM --> REF[Reference Edition]
+    REF --> EXP[Creator experiment]
+    EXP --> OUT[USER_OUTCOME]
+    OUT --> FOLD[保留／強化／縮窄／修訂／反駁]
+    CHANGE[來源／權利／貢獻變更] --> REV[Impact + revocation]
+    REV --> IDX
+    REV --> REF
 ```
 
-### 端到端硬法則
+## Creator State Machines
 
-1. Observation 必須先於 Action。
-2. Raw Page Data 必須在 Cache、Projection、MCP、Audit 前清洗。
-3. Model 或 Remote Node 只能提出 Typed Action，不能自己授權。
-4. 使用者互動永遠優先於 Agent。
-5. 未來執行前必須重新驗證 Page Identity 與 Anchor Freshness。
-6. Same-origin、CSP、iframe 等限制必須明示，不得繞過。
-7. 自主工作不得改變 Repo Visibility、Owner、Access、Default Branch、License／Usage Rights、Remote Topology 或 Private-data Boundary。
-8. Missing Evidence 仍是 Missing；Green Build 不能升級 Local、Physical Device、Store、Legal、Merge 或 Production Lane。
-
-## 目錄 → State Machine → Data Contract
-
-目前只有 `dispatcher/` 擁有序列化 Enum State Machine；其他 Runtime 列是必須遵守的 Lifecycle／Pipeline Contract。
-
-| Path | Domain／Owner | State／Transition Responsibility | Input | Output | Forbidden Coupling | Evidence／Next Slice |
-|---|---|---|---|---|---|---|
-| `domain/` | Shared Contract | `DEFINE -> SERIALIZE -> VALIDATE` | Constructor／Decoder Value | `PageContext`、`AgentAction`、`ProjectionHint`、Cache／Audit DTO | I/O、Platform API、Policy | Serialization Test |
-| `web/` | Browser Observer | `NOT_INJECTED -> OBSERVING -> EMITTING -> RETRY/DEGRADED` | Page Lifecycle、DOM／Selection／Mutation | Raw `PageContext` JSON | Privileged Action、Secret Retention、Authorization | Observer／Privacy Control |
-| `privacy/` | Data Boundary | `RAW -> FILTERED -> REDACTED -> BOUNDED` | Raw Context | Sanitized Context | Ranking、Remote Transport、Permission | Privacy Test |
-| `cache/` | L1 Memory | `QUERY -> HIT/MISS`；`PUT -> STORED`；`REMOVE/CLEAR` | Sanitized Text／Record | Ranked `CacheMatch` | UI、Network Identity、Execution | Cache Test；#8 |
-| `projection/` | Visual Evidence | `MATCH -> ANCHORED/BUBBLE` 或 `UNMATCHED/CONTEXT_RAIL`；Stale Drop | Anchors + Cache Match | `ProjectionHint` | Authorization、DOM Mutation | Projection Test；#11/#12 |
-| `mcp/` | Protocol Gateway | `PARSE -> VALIDATE -> DISCOVER/READ/PROPOSE -> RESULT/ERROR` | JSON-RPC | Sanitized Resource／Typed Proposal | Listener、Peer Trust、WebView／Native Call | MCP Test；#9 |
-| `capability/` | Authorization Policy | Unknown／Disabled／Missing／Over-risk `-> DENIED`；Low `-> ALLOWED`；Medium／High `-> REQUIRES_CONFIRMATION` | Action + Permission | `PolicyDecision` | Temporal Authority、UI | Policy Test；#10 |
-| `dispatcher/` | Human／Agent Authority | `READY`、`OBSERVING_USER`、`PROPOSING`、`WAITING_FOR_CONFIRMATION`、`EXECUTING`、`SUSPENDED` | User／Action Event | `DispatcherSnapshot` | Capability Invention、Platform Implementation | State Test；#11 |
-| `runtime/` | Pipeline Orchestration | `CAPTURE -> SANITIZE -> QUERY -> PROJECT -> STORE -> AUDIT` | Context、Proposal、HITL | Context／Projection／Audit／Dispatcher Flow | Store Packaging、Transport Identity | Common Test；#8/#9 |
-| `ui/` | Rendering／HITL | `RENDER -> OBSERVE_USER -> REQUEST_CONFIRMATION -> CONFIRM/REJECT -> RENDER` | Runtime Flow + User Input | UI Event | Hidden Authorization、Raw Model Execution | UI／Semantics Test |
-| `androidMain/` | Android Adapter | `CREATE -> ATTACH_RENDERER -> FOREGROUND/BACKGROUND -> DESTROY` | Android Lifecycle | Android Result | Android-only Policy Divergence | #2/#10/#11 |
-| `iosMain/` + `iosApp/` | Apple Adapter／Host | `CREATE_CONTROLLER -> ATTACH_WKWEBVIEW -> ACTIVE/BACKGROUND -> RELEASE` | iOS Lifecycle | iOS Result | iOS-only Policy Divergence | #3/#10/#11 |
-| `desktopMain/` | Desktop／KCEF | `INIT_KCEF -> READY -> ACTIVE -> SHUTDOWN` | Desktop Lifecycle | Desktop Result | 把 Chromium 假設套到 Mobile | Desktop Runtime Task |
-| `wasmJsMain/` | Web／Wasm | `BOOT -> MOUNT -> ACTIVE -> UNMOUNT` | Browser Lifecycle | Web Event | 宣稱繞過 Same-origin／CSP | #5 |
-| `docs/automation/` | Autonomous Control Plane | `SM-AUTO-001`、`SM-SHADOW-001`、`SM-SAFE-001`、`SM-PUB-001` | Repo／Task／Evidence Metadata | Admission、Intervention、Safety、Receipt Contract | 複製 Shared Skill 或捏造 Runtime Truth | Issue #6／PR #15 |
-| `docs/git/` | Stack Governance | Task Admission、Branch／Lease／Sync／Publication | Issue、Ref、Exact Tool Evidence | Stack Graph、Worker Outcome、Receipt | Runtime Feature Ownership、Merge Authority | Issue #6／Future Wrapper |
-| `docs/harness/` | Verification Architecture | Invariant -> Observer -> Oracle -> Control -> Evidence | Exact Subject + Environment | Evidence State／Receipt | Cross-subject Evidence Promotion | All Slices |
-
-### Dispatcher State Machine
-
-```mermaid
-stateDiagram-v2
-    [*] --> READY
-    READY --> OBSERVING_USER: UserInteractionStarted
-    OBSERVING_USER --> READY: UserInteractionEnded
-    READY --> PROPOSING: Low-risk ActionProposed
-    READY --> WAITING_FOR_CONFIRMATION: Medium/High-risk ActionProposed
-    OBSERVING_USER --> OBSERVING_USER: Proposal Deferred
-    WAITING_FOR_CONFIRMATION --> EXECUTING: ActionConfirmed
-    WAITING_FOR_CONFIRMATION --> READY: ActionRejected
-    PROPOSING --> READY: ActionCompleted / ActionFailed
-    EXECUTING --> READY: ActionCompleted / ActionFailed
-    READY --> SUSPENDED: Suspend
-    SUSPENDED --> READY: Resume
-```
-
-### Autonomous State Machine 索引
-
-| ID | Owner | Purpose |
-|---|---|---|
-| `SM-AUTO-001` | Autonomous Orchestrator | 從 Discovery 到 Furthest Safe Delivery |
-| `SM-SHADOW-001` | Shadow Architect | L0-L3 Architecture Delta Intervention |
-| `SM-SAFE-001` | Safety Binder | 不擴權的 Read／Local／Branch／PR／Merge Admission |
-| `SM-PUB-001` | Publication Gate | 分離 Exact-head Commit／Push／PR／Merge |
-| `SM-DISP-001` | `dispatcher/` | User Input Preemption 與 Action Lifecycle |
-
-詳細契約請看 `docs/automation/README.md`。
-
-## Repository Layout
+### Source／Indexing
 
 ```text
-.git-town.toml                 # Static No-push Policy；不等於 Executable Admission
-AGENTS.md                      # Repository-wide Agent Authority
-README.md / README.zh-TW.md    # Architecture、State/Data、Automation、Stack Index
-
-composeApp/
-  src/commonMain/kotlin/dev/ed3c/autowebview/
-    domain/                    # Serializable Contract；No I/O
-    web/                       # Observer Injection + Bridge
-    privacy/                   # Filtering／Redaction Boundary
-    cache/                     # L1 Contract + In-memory Implementation
-    projection/                # Anchor + Rendering Hint
-    mcp/                       # Transport-independent JSON-RPC Gateway
-    capability/                # Capability Policy
-    dispatcher/                # Human／Agent State Machine
-    runtime/                   # Orchestration + Bounded Audit
-    ui/                        # Browser Shell、Overlay、HITL
-  src/commonTest/              # Shared Evidence
-  src/androidMain/             # Android Adapter
-  src/iosMain/                 # iOS／WKWebView Adapter
-  src/desktopMain/             # Desktop／KCEF
-  src/wasmJsMain/              # Web Entry
-
-iosApp/                       # Xcode Host Shell
-
-docs/
-  automation/                 # Autonomous Dual-lane／Shadow／Safety Binding
-  architecture/               # Hard Laws／ADR
-  git/                        # Git Town Profile／Stack／Worker Protocol
-  harness/                    # Eval／Shadow Checkpoint／Safety／Evidence
-  release/                    # Platform Delivery Runbook
-  security/                   # Threat Model
-  TRACEABILITY.md             # REQ／SM／DF／INV／EVAL／WP／STACK／Evidence Index
-
-.github/
-  ISSUE_TEMPLATE/             # Eval-first + Safety-bound Task Packet
-  PULL_REQUEST_TEMPLATE.md    # Branch／Path／State／Safety／Evidence Contract
-  workflows/                  # CI／Pages
+SOURCE_REQUESTED
+→ ACCESS／RIGHTS／DESTINATION CLASSIFIED
+→ SOURCE_READY | LOCATOR_ONLY | BLOCKED
+→ STRUCTURAL_OR_TEMPORAL_EVENTS
+→ AUTO_INDEXING
+→ TIMELINE_CARDS_READY
+→ SEMANTIC_GRAPH_READY
+→ PROCEDURE_CLUSTERS_READY
 ```
 
-## Git Town Stacked PR Governance
-
-本 Repo 使用 Canonical [`git-town-stacked-pr-worker`](https://github.com/ed3c/skills-shared/tree/main/skills/git-town-stacked-pr-worker)，不在 Repo 內複製 Skill。
+### Procedure／Skill
 
 ```text
-Git Town                  Branch Hierarchy + Bounded Local Synchronization
-Consumer Repository       Profile + Task Packet + Path Lease + Eval + CI + Receipt
-GitHub Publication Gate   Exact-HEAD Publication Admission
-Pre-existing Policy       僅在明確預先授權時提供 Merge Authority
-External Authority        Semantic Conflict、Legal、Store／Production／Settings
+CARD_SUBGRAPH_SELECTED
+→ PROCEDURAL_ATOMS
+→ STATE_MACHINE_RECOVERED
+→ COUNTERFACTUALS／CONFOUNDERS
+→ CROSS_CASE_INTERSECTION
+→ PROCEDURAL_IR_CANDIDATE
+→ INDEPENDENT_QUALIFICATION
+→ QUALIFIED | NOT_QUALIFIED
 ```
 
-### Admission 狀態
+### Community Edition
 
-| Lane | State |
-|---|---|
-| Static `.git-town.toml` for v24.0.0 | Present |
-| Exact Source Release + Checksums Manifest | Recorded |
-| Host OS／Architecture Binary Checksum | `ABSENT` |
-| Provenance／SBOM／Legal Approval | `ABSENT`／`NOT_EXERCISED` |
-| Local Worktree／Lease Wrapper | `NOT_IMPLEMENTED`；Current Session `NOT_EXERCISED` |
-| Live Dry-run／No-push Sync | `NOT_EXERCISED` |
-| Conflict Canary | `NOT_EXERCISED` |
-| Exact-head Publication Gate | `NOT_IMPLEMENTED` |
-| Repo-preauthorized Auto Merge | `ABSENT` |
-
-Admission 完成前，Worker 回傳 `BLOCKED_POLICY`；不得安裝 `latest`、替換工具或手動繞過 Publish Gate。
-
-### Planned Branch Graph
-
-```mermaid
-gitGraph
-    commit id: "main"
-    branch feat/kmp-agent-browser-foundation
-    checkout feat/kmp-agent-browser-foundation
-    commit id: "PR-1 executable MVP"
-    branch docs/agent-integration-stack-index
-    checkout docs/agent-integration-stack-index
-    commit id: "issue-6 governance"
-    branch build/runtime-dependency-admission
-    checkout build/runtime-dependency-admission
-    commit id: "issue-7 deps"
-    branch feat/persistent-memory
-    checkout feat/persistent-memory
-    commit id: "issue-8 memory"
-    checkout build/runtime-dependency-admission
-    branch feat/openclaw-stream-contract
-    checkout feat/openclaw-stream-contract
-    commit id: "issue-9 edge"
-    checkout docs/agent-integration-stack-index
-    branch feat/native-capability-contracts
-    checkout feat/native-capability-contracts
-    commit id: "issue-10 toolmaker"
-    branch feat/accessibility-action-executor
-    checkout feat/accessibility-action-executor
-    commit id: "issue-11 executor"
-    checkout docs/agent-integration-stack-index
-    branch feat/local-semantic-router-contract
-    checkout feat/local-semantic-router-contract
-    commit id: "issue-12 semantics"
-    branch feat/local-embedding-engine
-    checkout feat/local-embedding-engine
-    commit id: "issue-13 engine"
+```text
+SOURCE_REGISTERED
+→ RIGHTS_CLASSIFIED
+→ EDITION_MODE_SELECTED
+→ COMMUNITY_CONTRIBUTIONS_OPEN
+→ PATCH_SUBMITTED
+→ RIGHTS／LEAKAGE／MODERATION／QUALIFICATION
+→ PROCEDURE_VARIANTS_ASSEMBLED
+→ REFERENCE_EDITION_READY | LICENSED_RENDER_READY
+→ PRIVATE_PREVIEW
+→ PUBLICATION_AUTHORIZED | PUBLICATION_BLOCKED
 ```
 
-包含 Release 與 Convergence 的完整圖請看 [`docs/git/STACKED_PRS.md`](docs/git/STACKED_PRS.md)。
+### Revocation／Outcome
 
-### 分子化 Stack PR 索引
+```text
+SOURCE／RIGHTS／CONTRIBUTION CHANGE
+→ IMPACT_GRAPH
+→ REINDEX | LOCATOR_ONLY | PARTIAL_TAKEDOWN | FULL_TAKEDOWN
+→ CLEANUP RECEIPTS
 
-| Order | Issue | Planned Branch | Parent | Class | Exclusive Path Lease | Evidence／State |
-|---:|---:|---|---|---|---|---|
-| 0 | #1 | `feat/kmp-agent-browser-foundation` | `main` | foundation | Initial Implementation | Draft PR；Baseline CI `PASS` |
-| 1 | #6 | `docs/agent-integration-stack-index` | Foundation | foundation | Automation／Git／Harness／Root Docs／Templates | Current Docs Stack；Local Git Town `NOT_EXERCISED` |
-| 2 | #7 | `build/runtime-dependency-admission` | Docs Stack | foundation | Gradle／Dependency Evidence／NOTICE | Exact Variant／License；No Feature Code |
-| 3A | #8 | `feat/persistent-memory` | Runtime Deps | child | `persistence/**`、Schema／Test、ADR-0004 | Migration／Restart／Redaction；`NOT_IMPLEMENTED` |
-| 3B | #9 | `feat/openclaw-stream-contract` | Runtime Deps | child | `edge/**`、ADR-0005 | Auth／Order／Replay／Backpressure；`NOT_IMPLEMENTED` |
-| 2B | #10 | `feat/native-capability-contracts` | Docs Stack | sibling | `toolmaker/**`、ADR-0006 | Contract／Policy Only；`NOT_IMPLEMENTED` |
-| 3C | #11 | `feat/accessibility-action-executor` | Capability Contract | child | `executor/**`、ADR-0007 | Freshness／HITL／Preemption；`NOT_IMPLEMENTED` |
-| 2C | #12 | `feat/local-semantic-router-contract` | Docs Stack | sibling | `semantics/**`、ADR-0008 | Deterministic Benchmark；`NOT_IMPLEMENTED` |
-| 3D | #13 | `feat/local-embedding-engine` | Semantic Contract | child | Engine／Platform Adapter + Dependency Admission | Physical-device Budget／License；`NOT_IMPLEMENTED` |
-| 4A | #2 | `release/android-play-evidence` | Action Executor | release | Android Release／Metadata／Runbook | Signed AAB + Device／Pre-launch |
-| 4B | #3 | `release/ios-app-store-evidence` | Action Executor | release | iOS Signing／Metadata／Runbook | Signed Archive + TestFlight／Device |
-| 2D | #5 | `release/web-deployment-evidence` | Docs Stack | sibling | Pages／Web Smoke Evidence | Deployed URL／Browser／CSP |
-| 5 | #14 | `converge/release-readiness-index` | Docs Stack after Dependencies | convergence | Shared README／AGENTS／Traceability／Release Index | Full Exact-head Matrix + External Merge／Release Authority |
-
-Issue #4 是 Persistent／Private L2／Semantic Runtime 的 Parent Epic。Leaf PR 禁止修改 Shared Index；#14 是唯一 Convergence Owner。
-
-### Admission 後的 Worker Sync
-
-```bash
-git town sync --stack --dry-run --non-interactive --no-auto-resolve --no-push
-git town sync --stack --non-interactive --no-auto-resolve --no-push
+USER EXPERIMENT
+→ OUTCOME RECEIPT
+→ PRESERVED | STRENGTHENED | NARROWED | REVISED | REFUTED
 ```
 
-Exit `0` 只證明 Synchronization。Publication、CI、Merge、Store、Promotion、Rollback 都是獨立 Evidence Lane。
+## 目錄 → State Machine → DAG 分工
 
-## Build 與 Verification
+`[P]` 表示規劃路徑，不代表目錄或程式已存在。
+
+| Path | Owner／State Machine | Input | Output／下一 Owner | 禁止耦合 | 狀態 |
+|---|---|---|---|---|---|
+| `domain/`、`web/`、`privacy/`、`cache/`、`projection/`、`mcp/`、`capability/`、`dispatcher/`、`runtime/`、`ui/` | 既有 bounded-browser planes | page context、typed proposal | 清洗證據／受控動作 | raw model authority | 基線已實作 |
+| `docs/security/` | 平台／媒體／權利 Admission | 外部 policy／rights claim | risk decisions → adapters | 自行法律核准 | Draft PR #81 |
+| `docs/creator/` | Creator 架構、DAG、Stack、Prompt | GitHub/code/evidence graph | Agent routing | 實作宣稱 | 文件進行中 |
+| `creator/contract/` `[P]` | `DECODE → VALIDATE → ADMIT/REJECT` | 不可信 DTO | typed contracts | platform I/O／self-qualification | #84 |
+| `creator/source/youtube/` `[P]` | player/embed/seek | video identity | source events → index/UI | download／hidden PiP／Premium claim | #85 |
+| `creator/source/pdf/` `[P]` | page/region/text/figure | authorized PDF | events → index | rights inference／full-copy | #103 |
+| `creator/source/epub/` `[P]` | chapter/CFI/DRM | authorized EPUB | events → index | DRM bypass／source substitute | #104 |
+| `creator/source/notion/` `[P]` | workspace/page/block authority | admitted connector/session | events → index | visibility→ownership | #105 |
+| `creator/source/x/` `[P]` | observation-only post/thread/article | public/authorized X | events → index | website action automation | #106 |
+| `creator/source/web/` `[P]` | origin/navigation/DOM | admitted Web page | events → index | CSP/origin bypass | #107 |
+| `creator/source/google/` `[P]` | Drive/Docs OAuth/org/revision | connector/API | events → index | embedded OAuth/token leakage | #108 |
+| `creator/source/local/` `[P]` | URI/digest/codec/resource | user-selected file | events → index | possession→ownership | #109 |
+| `creator/source/registry/` `[P]` | adapter resolution/convergence | source request | exact adapter result | fake parity/fallback | #110 |
+| `creator/indexing/` `[P]` | segmentation/cards/links/dedup | admitted events | graph → editor/compiler | arbitrary chunks/evidence loss | #86 |
+| `creator/editor/`、`creator/ui/` `[P]` | immutable curation | cards + source events | selected DAG | evidence mutation/player overlay | #87 |
+| `creator/compiler/` `[P]` | cards → IR → candidate Skill | evidence graph | candidate → qualifier | raw source/self-qualification | #88 |
+| `creator/qualification/` `[P]` | G1–G8 adversarial verdict | candidate + evidence | verdict → runtime | shared mutable compiler authority | #89 |
+| `creator/provider/`、`creator/export/` `[P]` | destination admission/budget | minimized payload | provider receipt/workspace | consumer session-token reuse | #90 |
+| `creator/runtime/` `[P]` | core convergence | verified leaf heads | vertical slice | invent leaf fixes | #91 |
+| `creator/community/model|store/` `[P]` | SkillPatch/version/conflict | contributor data | variants | votes→truth | #92 |
+| `creator/community/moderation/` `[P]` | filter/report/block/appeal | public UGC | moderation receipt | model as legal authority | #93 |
+| `creator/freshness/`、`community/revocation/` `[P]` | impact/cleanup | source changes | reindex/takedown | cached-source continuation | #94 |
+| `creator/community/playback/reference/` `[P]` | foreground source dock/card seek | player/cards/variants | reference edition | media copy／OS PiP | #95 |
+| `creator/community/render/` `[P]` | rights-bound render/PiP | licensed assets | derivative receipt | standard YouTube source | #96 |
+| `tests|scripts|receipts/creator/` `[P]` | exact evidence lanes | exact subject | receipts | evidence laundering | #97 |
+
+## Molecular DAG
+
+```text
+#80 risk/policy docs → Draft PR #81
+└─ #82 Community architecture → Draft PR #83
+   └─ #84 creator contracts
+      ├─ #85 YouTube adapter
+      ├─ #86 v7.2 auto-indexer
+      ├─ #87 card editor
+      ├─ #88 procedural compiler
+      ├─ #89 independent qualifier
+      ├─ #90 model/destination router
+      └─ #91 core convergence
+         └─ #92 Community SkillPatch store
+            ├─ #93 UGC moderation
+            ├─ #94 source revocation
+            ├─ #95 reference edition
+            │  └─ #96 licensed render/native PiP [rights-gated]
+            └─ #97 evidence convergence
+
+#98 shared docs convergence
+├─ #99 docs CI
+├─ #100 Local Handoff Queue
+├─ #101 zero-context prompts
+└─ #111–#117 index/snapshot/global review/roadmap/DoD/non-claims/policy drift
+
+#102 multi-source epic
+├─ #103 PDF
+├─ #104 EPUB
+├─ #105 Notion
+├─ #106 X
+├─ #107 Web
+├─ #108 Drive/Docs
+├─ #109 local files/media
+└─ #110 source registry
+```
+
+Git ancestry 只表示「消耗未合併 parent bytes」；跨 leaf 的完成依賴是 process DAG，不可偽造成多 parent Git history。
+
+## Git Town／Stack 狀態
+
+```text
+main@290a82f0394a42e0c20949a36ab575229b95051d
+└─ agent/media-rights-risk-register@8e2181e11144ae5bb349c1a0aa9b790485d60c4d  #80/PR #81
+   └─ agent/community-skill-edition-design@d8b105ba1bb7be88caf9ae52eaa5bc31bf4667c9  #82/PR #83
+      └─ docs/creator-capability-convergence  #98；精確 head 以 GitHub metadata 為準
+```
+
+#84–#110 的 implementation branch 目前都只是 issue 中的規劃；Live Git Town executable/worktree/sync 仍是 `ABSENT`／`NOT_EXERCISED`，merge 是 `EXTERNAL_AUTHORITY_REQUIRED`。
+
+完整索引：[`docs/git/STACKED_PRS.md`](docs/git/STACKED_PRS.md)、[`docs/creator/MOLECULAR_STACK_INDEX.md`](docs/creator/MOLECULAR_STACK_INDEX.md)。
+
+## MVP、後續與外部權限
+
+```text
+MVP_REFERENCE_EDITION
+  #84–#91 + #92/#94/#95 的 private/reference 部分 + 精確 docs/evidence
+
+PUBLIC_COMMUNITY_GATED
+  #93 executable UGC controls + Store/publication review
+
+LICENSED_RENDER_RIGHTS_GATED
+  #96 exact rights packet + licensed media + physical PiP/render evidence
+
+POST_MVP_MULTI_SOURCE
+  #102–#110，各自獨立 admission
+```
+
+MVP 不依賴所有未來 adapter 或 licensed render。Creator 成長、收入與付費需求屬於市場 Outcome，不是技術 Definition of Done。
+
+## Agent 讀取順序
+
+1. [`AGENTS.md`](AGENTS.md)
+2. [`docs/security/CONTENT_PLATFORM_MEDIA_RISK_REGISTER.md`](docs/security/CONTENT_PLATFORM_MEDIA_RISK_REGISTER.md)
+3. [`docs/creator/COMMUNITY_SKILL_EDITION_ARCHITECTURE.md`](docs/creator/COMMUNITY_SKILL_EDITION_ARCHITECTURE.md)
+4. [`docs/creator/PROCEDURAL_SKILL_COMPILER_SYSTEM_PROMPT.md`](docs/creator/PROCEDURAL_SKILL_COMPILER_SYSTEM_PROMPT.md)
+5. [`docs/creator/README.md`](docs/creator/README.md)
+6. [`docs/creator/AGENTS.md`](docs/creator/AGENTS.md)
+7. [`docs/creator/CREATOR_CAPABILITY_DAG.md`](docs/creator/CREATOR_CAPABILITY_DAG.md)
+8. [`docs/creator/MOLECULAR_STACK_INDEX.md`](docs/creator/MOLECULAR_STACK_INDEX.md)
+9. 精確 issue、branch、PR、head/tree 與最近的 README/AGENTS
+
+## 驗證與權限邊界
+
+既有檢查：
 
 ```bash
 ./gradlew :composeApp:allTests
 ./gradlew :composeApp:compileKotlinDesktop
 ./gradlew :composeApp:wasmJsBrowserDistribution
 ./gradlew :composeApp:assembleDebug
-./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64  # macOS
+# macOS:
+./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64
 ```
 
-```bash
-./gradlew :composeApp:run
-./gradlew :composeApp:wasmJsBrowserDevelopmentRun
-```
+Creator-specific 命令在 owning implementation issues 真正提供 entrypoint 前不會被捏造。#100 保持 Local Handoff Queue `ABSENT`；#99 擁有未來 exact-head docs CI。
 
-Module Eval、Shadow Checkpoint、Mutation Control、Safety Postcondition、Evidence State 與 Release Boundary 請看 [`docs/harness/README.md`](docs/harness/README.md)。
-
-## MCP 相容性邊界
-
-`BrowserMcpGateway` 位於 `commonMain`，支援 Stateless Discovery 與 Legacy Initialize，只暴露 Sanitized Resource 與 Typed Action Proposal，不啟動 Network Listener。Platform／Edge Transport 必須加入 Authenticated Pairing、Version Negotiation、Origin Policy、Rate Limit、Cancellation、Replay Protection 與 Lifecycle Shutdown。
-
-官方 Kotlin SDK 只能放在 Published Variant 與目標平台相符的 Edge／Platform Module；Common Core 不假裝不存在的 Variant 可以解析。詳細決策請看 [ADR-0003](docs/architecture/ADR-0003-mcp-platform-boundary.md)。
-
-## 平台硬限制
-
-- Mobile WebView 不支援 Chrome Extension；本專案使用受控 Observer Injection 與 JS Bridge。
-- iOS 使用 WKWebView；Chromium-only Behavior 必須有 Fallback 或明確 Unsupported State。
-- Web/Wasm 受 Same-origin、CSP、`X-Frame-Options` 與 iframe Policy 限制；任意網站可以拒絕嵌入。
-- Desktop KCEF 提供最完整 Chromium Surface，但增加 Package Size、Memory 與 Cold Start 成本。
-
-## Security、Privacy 與 Publication Model
-
-不執行 Raw Model Output。Model／Remote Peer 只能提出 Typed Action；Capability Policy 與 Dispatcher 決定 Deny、Stage 或要求 Explicit Confirmation。Password／Payment Field 在進入 Kotlin 前排除。
-
-自主 Repo 工作也必須保留 Visibility、Owner、Access／Ruleset、Default Branch、License／Usage-right Meaning、Private-data Boundary、User Local State、Protected History 與 Remote Topology。Current Connector 無法證明 Local User State，因此該 Lane 保持 `NOT_EXERCISED`，不能寫成 PASS。
-
-正式版仍需 Identity Pinning、Attestation、Zero-telemetry Review、Persistent Audit、Physical Device、Store Privacy Declaration 與 External Authority。
-
-請閱讀 [`SECURITY.md`](SECURITY.md)、[`docs/security/THREAT_MODEL.md`](docs/security/THREAT_MODEL.md)、[`docs/automation/README.md`](docs/automation/README.md) 與 [`docs/TRACEABILITY.md`](docs/TRACEABILITY.md)。
-
-## 授權
-
-Apache License 2.0。第三方元件維持各自授權，請見 [`NOTICE`](NOTICE)。本次 Autonomous Binding 不改變 License 或 Usage Rights。Git Town 是 Development Tool，必須依 `docs/git/GIT_TOWN_ADMISSION.md` 獨立 Admission。
+法律判斷、授權／條款、Creator／媒體權利、Provider account、實機、App Store／Google Play、merge、release、production deployment 與 destructive rollback 都屬於 Human／組織權限。
