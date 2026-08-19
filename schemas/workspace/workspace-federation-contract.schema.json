@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ed3c/kotlin-auto-webview/schemas/workspace/workspace-federation-contract.schema.json",
+  "title": "Kotlin Auto WebView Workspace Federation Contracts",
+  "type": "object",
+  "description": "Provider-neutral W0 interchange definitions. Runtime admission remains in Kotlin contracts.",
+  "$defs": {
+    "subjectKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["logicalId", "kind"],
+      "properties": {
+        "logicalId": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9._:-]{2,127}$" },
+        "kind": {
+          "enum": ["SOURCE", "CLAIM", "REQUIREMENT", "CAPABILITY", "TECHNOLOGY_DECISION", "SKILL_CANDIDATE", "SKILL", "WORK_ITEM", "IMPLEMENTATION", "EVIDENCE", "EXPERIMENT", "OUTCOME", "PROMPT", "DOCUMENT", "OTHER"]
+        }
+      }
+    },
+    "authorityRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ownerId"],
+      "properties": {
+        "kind": {
+          "enum": ["SOURCE_PROVIDER", "GITHUB", "DOMAIN_REPOSITORY", "METHOD_REPOSITORY", "QUALIFIER", "EXPERIMENT_OWNER", "RUNTIME_OWNER", "ORCHESTRATOR", "USER", "EXTERNAL"]
+        },
+        "ownerId": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "digestRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "value"],
+      "properties": {
+        "algorithm": { "const": "sha256" },
+        "value": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "externalRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "externalId", "freshness"],
+      "properties": {
+        "provider": { "enum": ["GITHUB", "GOOGLE_DRIVE", "GOOGLE_DOCS", "GOOGLE_SHEETS", "WEB", "YOUTUBE", "NOTION", "X", "LOCAL_FILE", "OTHER"] },
+        "externalId": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "revision": { "type": ["string", "null"] },
+        "canonicalUrl": { "type": ["string", "null"], "pattern": "^https://" },
+        "freshness": { "enum": ["CURRENT", "STALE", "REVOKED", "UNKNOWN"] },
+        "observedAtEpochMs": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "subjectRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "canonicalAuthority", "visibility", "dataClass"],
+      "properties": {
+        "key": { "$ref": "#/$defs/subjectKey" },
+        "canonicalAuthority": { "$ref": "#/$defs/authorityRef" },
+        "version": { "type": ["string", "null"] },
+        "digest": { "anyOf": [{ "$ref": "#/$defs/digestRef" }, { "type": "null" }] },
+        "visibility": { "enum": ["PUBLIC", "PRIVATE", "RESTRICTED"] },
+        "dataClass": { "enum": ["PUBLIC", "INTERNAL", "CONFIDENTIAL", "RESTRICTED"] }
+      }
+    },
+    "routeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requestId", "caller", "intent", "requiredCapabilityId", "exactSubjects", "destinationOwner", "evidenceCeiling"],
+      "properties": {
+        "requestId": { "type": "string" },
+        "caller": { "$ref": "#/$defs/authorityRef" },
+        "intent": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "requiredCapabilityId": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "exactSubjects": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/subjectKey" } },
+        "destinationOwner": { "$ref": "#/$defs/authorityRef" },
+        "evidenceCeiling": { "enum": ["SOURCE_ONLY", "TECHNICAL", "LIVE_WORKFLOW", "USER_VALIDATED", "PAID_VALIDATED"] }
+      }
+    },
+    "syncReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["eventId", "canonicalSubject", "target", "state", "attempts"],
+      "properties": {
+        "eventId": { "type": "string" },
+        "canonicalSubject": { "$ref": "#/$defs/subjectKey" },
+        "target": { "$ref": "#/$defs/externalRef" },
+        "state": { "enum": ["PENDING", "WRITE_SENT", "WRITE_ACKNOWLEDGED", "READ_BACK_VERIFIED", "CONFLICT", "RETRYABLE_FAILURE", "FAILED", "CLEANED_UP"] },
+        "attempts": { "type": "integer", "minimum": 0 },
+        "targetRevision": { "type": ["string", "null"] },
+        "writtenDigest": { "anyOf": [{ "$ref": "#/$defs/digestRef" }, { "type": "null" }] },
+        "readBackDigest": { "anyOf": [{ "$ref": "#/$defs/digestRef" }, { "type": "null" }] },
+        "errorCode": { "type": ["string", "null"] }
+      }
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/subjectRef" },
+    { "$ref": "#/$defs/externalRef" },
+    { "$ref": "#/$defs/routeRequest" },
+    { "$ref": "#/$defs/syncReceipt" }
+  ]
+}
