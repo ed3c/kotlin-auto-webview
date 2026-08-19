@@ -73,16 +73,16 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# actions/checkout intentionally fetches the exact PR head at depth 1. The commit
-# object still carries the parent SHA, but the parent object is absent until we
-# fetch the frozen source explicitly. Bind the Stack edge first, then fetch only
-# that immutable source object for tree/diff verification.
-head_parent="$(git show -s --format=%P HEAD)"
-if [[ "$head_parent" != "$SOURCE_HEAD" ]]; then
-  echo "Evidence candidate is not a one-commit child of the frozen A1 source head" >&2
+# The PR head is intentionally checked out at depth 1. Fetch a bounded history
+# rooted at the exact immutable HEAD plus the exact frozen source object, then
+# prove ancestry and the source tree before looking at changed paths.
+head_sha="$(git rev-parse HEAD)"
+git fetch --no-tags --depth=32 origin "$head_sha"
+git fetch --no-tags --depth=1 origin "$SOURCE_HEAD"
+if ! git merge-base --is-ancestor "$SOURCE_HEAD" HEAD; then
+  echo "Frozen A1 source head is not an ancestor of the evidence candidate" >&2
   exit 20
 fi
-git fetch --no-tags --depth=1 origin "$SOURCE_HEAD"
 actual_source_tree="$(git show -s --format=%T "$SOURCE_HEAD")"
 if [[ "$actual_source_tree" != "$SOURCE_TREE" ]]; then
   echo "A1 source tree does not match the frozen exact tree" >&2
