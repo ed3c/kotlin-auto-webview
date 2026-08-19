@@ -129,6 +129,27 @@ class DeviceAutomationRuntime(
         }
         mark(DeviceRuntimeState.WORKFLOW_REVISION_FROZEN, "workflow-revision-frozen")
 
+        // Local Dispatcher/user authority outranks observation itself. Do not capture a
+        // precondition or resolve a target if the current authority snapshot is already stale,
+        // user-owned, locked, unavailable, profile-widened, policy-moved or workflow-moved.
+        val preObservationAuthority = authoritySource.snapshot()
+        val preObservationNow = clock.nowEpochMs()
+        val preObservationInvalidation = revalidateAuthorityContext(
+            request = request,
+            authority = preObservationAuthority,
+            nowEpochMs = preObservationNow,
+        )
+        if (preObservationInvalidation != null) {
+            mark(DeviceRuntimeState.CANCELLED_BEFORE_EFFECT, "pre-observation-${canonicalCode(preObservationInvalidation.name)}")
+            return finalize(
+                request = request,
+                trace = trace,
+                actionResult = DeviceActionResult.CancelledBeforeEffect(proposal.proposalId),
+                terminalCode = preObservationInvalidation,
+                effectState = DeviceEffectState.NONE,
+            )
+        }
+
         val plan = verificationRegistry.plans.filter { candidate ->
             candidate.current &&
                 candidate.key.capabilityId == proposal.capabilityId &&
@@ -501,9 +522,8 @@ class DeviceAutomationRuntime(
         return true
     }
 
-    private fun revalidateFinalAuthority(
+    private fun revalidateAuthorityContext(
         request: DeviceRuntimeExecutionRequest,
-        resolved: DeviceResolvedTarget,
         authority: DeviceRuntimeAuthoritySnapshot,
         nowEpochMs: Long,
     ): DeviceRuntimeTerminalCode? {
@@ -525,6 +545,18 @@ class DeviceAutomationRuntime(
         }
         if (authority.currentSubject != proposal.subject) return DeviceRuntimeTerminalCode.SUBJECT_CHANGED
         if (proposal.capabilityId !in authority.enabledCapabilityIds) return DeviceRuntimeTerminalCode.CAPABILITY_REVOKED
+        if (!request.authorityBinding.isValidFor(request.workflow)) return DeviceRuntimeTerminalCode.WORKFLOW_CHANGED
+        return null
+    }
+
+    private fun revalidateFinalAuthority(
+        request: DeviceRuntimeExecutionRequest,
+        resolved: DeviceResolvedTarget,
+        authority: DeviceRuntimeAuthoritySnapshot,
+        nowEpochMs: Long,
+    ): DeviceRuntimeTerminalCode? {
+        revalidateAuthorityContext(request, authority, nowEpochMs)?.let { return it }
+        val proposal = request.proposal
         if (nowEpochMs < resolved.issuedAtEpochMs || nowEpochMs > resolved.expiresAtEpochMs) {
             return DeviceRuntimeTerminalCode.TARGET_TOKEN_EXPIRED
         }
@@ -535,7 +567,6 @@ class DeviceAutomationRuntime(
         if (preboundDigest != null && preboundDigest != resolved.tokenDigestSha256) {
             return DeviceRuntimeTerminalCode.TARGET_BINDING_MISMATCH
         }
-        if (!request.authorityBinding.isValidFor(request.workflow)) return DeviceRuntimeTerminalCode.WORKFLOW_CHANGED
         return null
     }
 
