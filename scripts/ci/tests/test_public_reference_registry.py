@@ -42,10 +42,39 @@ class PublicReferenceRegistryTest(unittest.TestCase):
         row.update(updates)
         return row
 
+    def private_opaque_ref(self, **updates):
+        row = {
+            "id": "REF-1001",
+            "title": "Private architecture source",
+            "visibility": "PRIVATE_OPAQUE",
+            "freshness": "URL_INDEXED",
+            "role": "PRIVATE_SOURCE_REFERENCE",
+        }
+        row.update(updates)
+        return row
+
     def test_valid_public_url_only_registry_passes(self):
         result = self.run_case([self.base_ref()])
         self.assertTrue(result.ok)
         self.assertEqual("NOT_EXERCISED", result.private_parity)
+
+    def test_private_opaque_placeholder_without_locator_passes_public_only(self):
+        result = self.run_case([self.private_opaque_ref()])
+        self.assertTrue(result.ok)
+        self.assertEqual({"REF-1001"}, result.opaque_private_refs)
+        self.assertEqual("NOT_EXERCISED", result.private_parity)
+
+    def test_private_opaque_placeholder_with_locator_fails(self):
+        result = self.run_case(
+            [self.private_opaque_ref(url="https://docs.google.com/document/d/private/edit")]
+        )
+        self.assertFalse(result.ok)
+
+    def test_private_opaque_placeholder_with_revision_or_digest_fails(self):
+        result = self.run_case([self.private_opaque_ref(revision="secret-revision")])
+        self.assertFalse(result.ok)
+        result = self.run_case([self.private_opaque_ref(digest="a" * 64)])
+        self.assertFalse(result.ok)
 
     def test_duplicate_ref_id_fails(self):
         result = self.run_case([self.base_ref(), self.base_ref(url="https://example.com/other")])
@@ -88,17 +117,25 @@ class PublicReferenceRegistryTest(unittest.TestCase):
         self.assertFalse(result.ok)
 
     def test_opaque_private_ref_requires_snapshot_when_exercised(self):
-        result = self.run_case([self.base_ref(used_by=["REF-1001"])], private_ids=[])
+        result = self.run_case([self.private_opaque_ref()], private_ids=[])
         self.assertFalse(result.ok)
         self.assertEqual("FAIL", result.private_parity)
 
     def test_opaque_private_ref_snapshot_can_pass_without_locator(self):
         result = self.run_case(
-            [self.base_ref(used_by=["REF-1001"])],
+            [self.private_opaque_ref()],
             private_ids=["REF-1001"],
         )
         self.assertTrue(result.ok)
         self.assertEqual("PASS", result.private_parity)
+
+    def test_unresolved_opaque_mention_also_participates_in_parity(self):
+        result = self.run_case(
+            [self.base_ref(used_by=["REF-1999"])],
+            private_ids=["REF-1999"],
+        )
+        self.assertTrue(result.ok)
+        self.assertIn("REF-1999", result.opaque_private_refs)
 
 
 if __name__ == "__main__":
