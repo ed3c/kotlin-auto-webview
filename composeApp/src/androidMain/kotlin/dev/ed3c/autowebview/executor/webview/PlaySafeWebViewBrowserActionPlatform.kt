@@ -122,6 +122,9 @@ class PlaySafeWebViewBrowserActionPlatform(
         ) {
             return rejected("click-navigation-already-satisfied")
         }
+        if (command.kind == BrowserActionKind.CLICK && binding.tag != "a") {
+            return rejected("click-navigation-target-invalid")
+        }
         if (cancellationSignal.isCancellationRequested()) {
             return PlatformBrowserActionResult.CancelledBeforeSideEffect
         }
@@ -150,18 +153,8 @@ class PlaySafeWebViewBrowserActionPlatform(
         }
 
         val actionResponse = try {
-            bridgeRequest(actionRequest(command, binding))
+            bridgeRequest(actionRequest(command, binding, expectedClickNavigationUrl))
         } catch (_: Throwable) {
-            val current = currentUrl()
-            if (
-                command.kind == BrowserActionKind.CLICK &&
-                current != null &&
-                expectedClickNavigationUrl != null &&
-                runCatching { canonicalHttpsUrl(current) == canonicalHttpsUrl(expectedClickNavigationUrl) }
-                    .getOrDefault(false)
-            ) {
-                return PlatformBrowserActionResult.Completed
-            }
             return failed("action-transport-unknown", BrowserSideEffectState.UNKNOWN)
         }
         when (actionResponse.optString("status")) {
@@ -235,27 +228,33 @@ class PlaySafeWebViewBrowserActionPlatform(
         return elementFromJson(pageUrl, nonce, documentDigest, response.getJSONObject("element"))
     }
 
-    private fun actionRequest(command: BrowserActionCommand, binding: TargetBinding): JSONObject =
-        JSONObject()
-            .put("type", "action")
-            .put("token", binding.token)
-            .put("kind", command.kind.name)
-            .put(
-                "expected",
-                JSONObject()
-                    .put("localId", binding.localId)
-                    .put("tag", binding.tag)
-                    .put("role", binding.role ?: JSONObject.NULL)
-                    .put("accessibleName", binding.accessibleName)
-                    .put("inputType", binding.inputType ?: JSONObject.NULL),
-            )
-            .also { request ->
-                when (val payload = command.payload) {
-                    ClickPayload -> Unit
-                    is FillTextPayload -> request.put("value", payload.value)
-                    is SelectOptionPayload -> request.put("value", payload.value)
-                }
+    private fun actionRequest(
+        command: BrowserActionCommand,
+        binding: TargetBinding,
+        expectedClickNavigationUrl: String?,
+    ): JSONObject = JSONObject()
+        .put("type", "action")
+        .put("token", binding.token)
+        .put("kind", command.kind.name)
+        .put(
+            "expected",
+            JSONObject()
+                .put("localId", binding.localId)
+                .put("tag", binding.tag)
+                .put("role", binding.role ?: JSONObject.NULL)
+                .put("accessibleName", binding.accessibleName)
+                .put("inputType", binding.inputType ?: JSONObject.NULL),
+        )
+        .also { request ->
+            when (val payload = command.payload) {
+                ClickPayload -> request.put(
+                    "expectedNavigationUrl",
+                    checkNotNull(expectedClickNavigationUrl) { "Click navigation expectation is required" },
+                )
+                is FillTextPayload -> request.put("value", payload.value)
+                is SelectOptionPayload -> request.put("value", payload.value)
             }
+        }
 
     private suspend fun bridgeRequest(requestWithoutId: JSONObject): JSONObject {
         val pageUrl = currentUrl() ?: error("WebView page is absent")

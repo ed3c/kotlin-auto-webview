@@ -19,7 +19,7 @@ The fixed bridge does not expose native APIs. It can only:
 - enumerate a bounded top-document set of interactive elements using one fixed selector owned by the repository;
 - generate a per-document nonce and opaque in-page target tokens;
 - return sanitized target metadata, SHA-256 field digests and bounded input/change event counters;
-- perform the three closed action kinds already present in `BrowserActionContracts`: click, fill text and select option;
+- perform the closed click/fill/select action kinds already present in `BrowserActionContracts`, subject to the narrower rules below;
 - probe the exact token again for deterministic postcondition evidence.
 
 Cross-origin iframe traversal is absent. Password, file, payment and secret-like fields are marked sensitive and cannot execute. Fill/select values are sent as message data, are never concatenated into code or selectors, and native postcondition verification compares only SHA-256 value digests.
@@ -34,9 +34,13 @@ The adapter is intentionally stricter than fuzzy browser automation: there is no
 
 ### Click
 
-The first vertical slice supports only a Human-authored exact navigation postcondition. `PlaySafeWebViewPolicy` may bind an exact target fingerprint to one exact owned HTTPS destination URL. A click with no declared target-specific navigation expectation rejects before side effect. A changed-but-wrong URL or an unrelated DOM mutation is never proof of the click.
+The first click slice is limited to exact anchor navigation. `PlaySafeWebViewPolicy` binds an exact target fingerprint to one exact owned HTTPS destination URL. A click with no target-specific expectation rejects before side effect, and the native adapter also requires the resolved target tag to be `a`.
 
-State/attribute/visibility click expectations are deliberately deferred until they have their own typed adapter contract. This is narrower than treating arbitrary DOM change as success and keeps the first slice causally attributable.
+The expected URL crosses the bridge only as WebMessage data for comparison. The fixed bridge resolves the current anchor's existing `href` against the current document and requires that exact HTTPS destination to equal the expected URL before invoking `element.click()`. The bridge never calls `location.assign`, `location.replace`, sets `window.location`, constructs a caller-controlled selector, or otherwise executes the expected URL. A changed-but-wrong URL or unrelated DOM mutation is never proof of the click.
+
+A bridge transport exception after an action request is always `UNKNOWN`, even if the WebView is later observed at the expected URL, because the adapter cannot prove that the click was dispatched. Only a received bridge `accepted` dispatch receipt followed by the exact declared destination postcondition may yield `Completed`.
+
+State/attribute/visibility click expectations are deliberately deferred until they have their own typed adapter contract.
 
 ### Fill text
 
@@ -55,7 +59,7 @@ For every action, transport callback or event dispatch without the declared fres
 
 ## Security boundary
 
-Only explicit app-owned HTTPS origins are admitted. Click navigation expectations must also stay inside that owned-origin set and are keyed by exact target fingerprint. The adapter does not disable or alter CSP, mixed-content policy, TLS validation, permission prompts, file chooser, downloads, WebAuthn, payment UI, password manager, OS dialogs or browser security settings. It adds no AccessibilityService, Shizuku, root/shell, notification listener or inbound mobile MCP surface.
+Only explicit app-owned HTTPS origins are admitted. Click navigation expectations must also stay inside that owned-origin set and are keyed by exact target fingerprint. The expected URL is comparison data only; the existing exact anchor href remains the page-side navigation source. The adapter does not disable or alter CSP, mixed-content policy, TLS validation, permission prompts, file chooser, downloads, WebAuthn, payment UI, password manager, OS dialogs or browser security settings. It adds no AccessibilityService, Shizuku, root/shell, notification listener or inbound mobile MCP surface.
 
 ## Evidence ceiling
 

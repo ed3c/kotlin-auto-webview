@@ -369,6 +369,20 @@ internal val PLAY_SAFE_FIXED_BRIDGE_JS: String = """
           }
           const kind = String(request.kind || '');
           if (kind === 'CLICK') {
+            const expectedNavigationUrl = String(request.expectedNavigationUrl || '');
+            if (!expectedNavigationUrl) return { requestId: requestId, status: 'rejected', code: 'click-postcondition-not-declared' };
+            if (element.tagName.toLowerCase() !== 'a') return { requestId: requestId, status: 'rejected', code: 'click-navigation-target-invalid' };
+            let actualDestination;
+            let expectedDestination;
+            try {
+              actualDestination = new URL(element.getAttribute('href') || '', location.href);
+              expectedDestination = new URL(expectedNavigationUrl);
+            } catch (error) {
+              return { requestId: requestId, status: 'rejected', code: 'click-navigation-url-invalid' };
+            }
+            if (actualDestination.protocol !== 'https:' || expectedDestination.protocol !== 'https:' || actualDestination.href !== expectedDestination.href) {
+              return { requestId: requestId, status: 'rejected', code: 'click-navigation-destination-mismatch' };
+            }
             if (typeof element.click !== 'function') return { requestId: requestId, status: 'rejected', code: 'click-unsupported' };
             element.click();
             return { requestId: requestId, status: 'accepted' };

@@ -26,7 +26,7 @@ class PlaySafeWebViewContractsTest {
 
     @Test
     fun click_navigation_expectation_is_exact_target_and_owned_url_only() {
-        val target = observation(tag = "button", role = "button", accessibleName = "Continue")
+        val target = observation(tag = "a", role = "link", accessibleName = "Continue")
         val policy = PlaySafeWebViewPolicy(
             allowedOrigins = setOf("https://app.example.test"),
             clickNavigationExpectations = mapOf(
@@ -46,6 +46,16 @@ class PlaySafeWebViewContractsTest {
                 ),
             )
         }
+    }
+
+    @Test
+    fun fixed_bridge_binds_click_to_the_existing_exact_anchor_href_only() {
+        assertTrue(PLAY_SAFE_FIXED_BRIDGE_JS.contains("element.tagName.toLowerCase() !== 'a'"))
+        assertTrue(PLAY_SAFE_FIXED_BRIDGE_JS.contains("new URL(element.getAttribute('href') || '', location.href)"))
+        assertTrue(PLAY_SAFE_FIXED_BRIDGE_JS.contains("actualDestination.href !== expectedDestination.href"))
+        assertFalse(PLAY_SAFE_FIXED_BRIDGE_JS.contains("location.assign("))
+        assertFalse(PLAY_SAFE_FIXED_BRIDGE_JS.contains("location.replace("))
+        assertFalse(PLAY_SAFE_FIXED_BRIDGE_JS.contains("window.location ="))
     }
 
     @Test
@@ -84,7 +94,7 @@ class PlaySafeWebViewContractsTest {
 
     @Test
     fun click_requires_declared_exact_navigation_not_unrelated_dom_change() {
-        val pre = observation(tag = "button", role = "button", accessibleName = "Continue")
+        val pre = observation(tag = "a", role = "link", accessibleName = "Continue")
         val expectedUrl = "https://app.example.test/complete"
 
         assertEquals(
