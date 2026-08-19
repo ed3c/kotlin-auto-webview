@@ -13,7 +13,7 @@ class DeviceCapabilityCatalog(
         val actionPairs = descriptors.flatMap { descriptor ->
             descriptor.canonicalActionIds.map { actionId -> actionId to descriptor }
         }
-        require(actionPairs.map(Pair<String, DeviceCapabilityDescriptor>::first).toSet().size == actionPairs.size) {
+        require(actionPairs.map { it.first }.toSet().size == actionPairs.size) {
             "Canonical action id must have exactly one capability owner"
         }
 
