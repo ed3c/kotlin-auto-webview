@@ -32,6 +32,22 @@ CREDENTIAL_QUERY_KEYS = {
     "client_secret",
 }
 VERIFIED_FRESHNESS = {"CURRENT", "VERIFIED", "READ_BACK_VERIFIED"}
+PRIVATE_OPAQUE_FORBIDDEN_FIELDS = {
+    "url",
+    "canonical_url",
+    "repository_url",
+    "external_id",
+    "externalId",
+    "file_id",
+    "drive_id",
+    "revision",
+    "revision_id",
+    "commit_sha",
+    "sha",
+    "digest",
+    "content_digest",
+    "read_back_digest",
+}
 
 
 @dataclass
@@ -97,6 +113,14 @@ def _reference_rows(document) -> list[dict]:
     return rows
 
 
+def _nonempty_forbidden_private_fields(row: dict) -> list[str]:
+    return sorted(
+        key
+        for key in PRIVATE_OPAQUE_FORBIDDEN_FIELDS
+        if row.get(key) not in (None, "", "UNKNOWN", [], {})
+    )
+
+
 def validate_registry(root: Path, private_snapshot: Path | None = None) -> RegistryResult:
     result = RegistryResult()
     paths = sorted(root.glob("reference-index.public*.json"))
@@ -108,6 +132,7 @@ def validate_registry(root: Path, private_snapshot: Path | None = None) -> Regis
     seen_urls: dict[str, str] = {}
     all_defined_ids: set[str] = set()
     mentions: set[str] = set()
+    opaque_defined_ids: set[str] = set()
 
     for path in paths:
         result.files += 1
@@ -131,10 +156,21 @@ def validate_registry(root: Path, private_snapshot: Path | None = None) -> Regis
                 seen_ids[ref_id] = path
 
             visibility = row.get("visibility", "PUBLIC")
+            if visibility == "PRIVATE_OPAQUE":
+                opaque_defined_ids.add(ref_id)
+                leaked_fields = _nonempty_forbidden_private_fields(row)
+                if leaked_fields:
+                    result.errors.append(
+                        f"{ref_id}: PRIVATE_OPAQUE row leaked locator/revision fields: "
+                        + ", ".join(leaked_fields)
+                    )
+                continue
             if visibility != "PUBLIC":
                 result.errors.append(
-                    f"{ref_id}: public registry row visibility must be PUBLIC, got {visibility!r}"
+                    f"{ref_id}: public registry row visibility must be PUBLIC or PRIVATE_OPAQUE, "
+                    f"got {visibility!r}"
                 )
+                continue
 
             url = row.get("url")
             if url is not None:
@@ -173,11 +209,12 @@ def validate_registry(root: Path, private_snapshot: Path | None = None) -> Regis
                     f"{ref_id}: {freshness} requires revision/digest/read-back evidence"
                 )
 
-    opaque = {
+    unknown_opaque_mentions = {
         ref
         for ref in mentions
         if ref not in all_defined_ids and int(ref.split("-")[1]) >= 1000
     }
+    opaque = opaque_defined_ids | unknown_opaque_mentions
     result.opaque_private_refs = opaque
 
     if private_snapshot is not None:
