@@ -138,6 +138,20 @@ class DeviceAutomationRuntimeTest {
     }
 
     @Test
+    fun expired_confirmation_stops_before_observation() {
+        val fixture = Fixture()
+        val request = fixture.request()
+        val expired = assertNotNull(request.confirmationReceipt).copy(expiresAtEpochMs = 1_300)
+        val result = fixture.runtime().execute(request.copy(confirmationReceipt = expired))
+
+        assertEquals(DeviceRuntimeTerminalCode.CONFIRMATION_INVALID, result.terminalCode)
+        assertEquals(0, fixture.preconditionCount)
+        assertEquals(0, fixture.targetResolutionCount)
+        assertEquals(0, fixture.dispatchCount)
+        assertNull(result.effectRecord)
+    }
+
+    @Test
     fun workflow_risk_drift_is_rejected_before_precondition_targeting_or_dispatch() {
         val fixture = Fixture()
         val original = fixture.workflow()
@@ -160,40 +174,84 @@ class DeviceAutomationRuntimeTest {
     }
 
     @Test
-    fun user_interaction_preempts_after_target_resolution_but_before_dispatch() {
+    fun user_interaction_preempts_before_observation_or_target_resolution() {
         val fixture = Fixture(userInteractionActive = true)
         val result = fixture.runtime().execute(fixture.request())
 
         assertIs<DeviceActionResult.CancelledBeforeEffect>(result.actionResult)
         assertEquals(DeviceRuntimeTerminalCode.USER_PREEMPTED, result.terminalCode)
         assertEquals(DeviceEffectState.NONE, result.effectState)
-        assertEquals(1, fixture.targetResolutionCount)
+        assertEquals(0, fixture.preconditionCount)
+        assertEquals(0, fixture.targetResolutionCount)
         assertEquals(0, fixture.dispatchCount)
         assertNull(result.effectRecord)
-        assertTrue(result.trace.any { it.state == DeviceRuntimeState.CANCELLED_BEFORE_EFFECT })
+        assertTrue(result.trace.any { it.detailCode == "pre-observation-user-preempted" })
     }
 
     @Test
-    fun subject_policy_workflow_and_capability_changes_fail_closed_before_dispatch() {
-        val mutations = listOf<(DeviceRuntimeAuthoritySnapshot) -> DeviceRuntimeAuthoritySnapshot>(
-            { it.copy(currentSubject = it.currentSubject.copy(windowId = "window-2")) },
-            { it.copy(policyVersion = "policy-v2") },
-            { it.copy(workflowRevision = 2) },
-            { it.copy(enabledCapabilityIds = emptySet()) },
+    fun user_interaction_after_resolution_preempts_at_final_gate_before_dispatch() {
+        val fixture = Fixture(
+            finalAuthorityMutation = { it.copy(userInteractionActive = true) },
         )
-        val expected = listOf(
-            DeviceRuntimeTerminalCode.SUBJECT_CHANGED,
-            DeviceRuntimeTerminalCode.POLICY_CHANGED,
-            DeviceRuntimeTerminalCode.WORKFLOW_CHANGED,
-            DeviceRuntimeTerminalCode.CAPABILITY_REVOKED,
+        val result = fixture.runtime().execute(fixture.request())
+
+        assertIs<DeviceActionResult.CancelledBeforeEffect>(result.actionResult)
+        assertEquals(DeviceRuntimeTerminalCode.USER_PREEMPTED, result.terminalCode)
+        assertEquals(DeviceEffectState.NONE, result.effectState)
+        assertEquals(1, fixture.preconditionCount)
+        assertEquals(1, fixture.targetResolutionCount)
+        assertEquals(0, fixture.dispatchCount)
+        assertNull(result.effectRecord)
+        assertTrue(result.trace.any { it.state == DeviceRuntimeState.FINAL_AUTHORITY_REVALIDATION })
+    }
+
+    @Test
+    fun stale_authority_context_fails_closed_before_observation() {
+        val mutations = listOf<Pair<(DeviceRuntimeAuthoritySnapshot) -> DeviceRuntimeAuthoritySnapshot, DeviceRuntimeTerminalCode>>(
+            ({ it.copy(currentSubject = it.currentSubject.copy(packageName = "dev.ed3c.other")) }) to DeviceRuntimeTerminalCode.SUBJECT_CHANGED,
+            ({ it.copy(currentSubject = it.currentSubject.copy(windowId = "window-2")) }) to DeviceRuntimeTerminalCode.SUBJECT_CHANGED,
+            ({ it.copy(currentSubject = it.currentSubject.copy(snapshotVersion = 2)) }) to DeviceRuntimeTerminalCode.SUBJECT_CHANGED,
+            ({ it.copy(screenLocked = true) }) to DeviceRuntimeTerminalCode.SCREEN_LOCKED,
+            ({ it.copy(platformAvailable = false) }) to DeviceRuntimeTerminalCode.PLATFORM_UNAVAILABLE,
+            ({ it.copy(compiledProfile = DistributionProfile.PLAY_SAFE) }) to DeviceRuntimeTerminalCode.PROFILE_MISMATCH,
+            ({ it.copy(policyVersion = "policy-v2") }) to DeviceRuntimeTerminalCode.POLICY_CHANGED,
+            ({ it.copy(workflowRevision = 2) }) to DeviceRuntimeTerminalCode.WORKFLOW_CHANGED,
+            ({ it.copy(enabledCapabilityIds = emptySet()) }) to DeviceRuntimeTerminalCode.CAPABILITY_REVOKED,
         )
-        mutations.zip(expected).forEach { (mutation, code) ->
+        mutations.forEach { (mutation, code) ->
             val fixture = Fixture(authorityMutation = mutation)
             val result = fixture.runtime().execute(fixture.request())
             assertEquals(code, result.terminalCode)
+            assertEquals(0, fixture.preconditionCount)
+            assertEquals(0, fixture.targetResolutionCount)
             assertEquals(0, fixture.dispatchCount)
             assertNull(result.effectRecord)
         }
+    }
+
+    @Test
+    fun target_token_expiry_after_resolution_stops_before_dispatch() {
+        val fixture = Fixture(targetExpiresAtEpochMs = 1_300)
+        val result = fixture.runtime().execute(fixture.request())
+
+        assertEquals(DeviceRuntimeTerminalCode.TARGET_TOKEN_EXPIRED, result.terminalCode)
+        assertEquals(1, fixture.preconditionCount)
+        assertEquals(1, fixture.targetResolutionCount)
+        assertEquals(0, fixture.dispatchCount)
+        assertNull(result.effectRecord)
+    }
+
+    @Test
+    fun prebound_target_digest_disagreement_stops_before_dispatch() {
+        val fixture = Fixture()
+        val request = fixture.request()
+        val mismatched = request.authorityBinding.copy(targetTokenDigestSha256 = "c".repeat(64))
+        val result = fixture.runtime().execute(request.copy(authorityBinding = mismatched))
+
+        assertEquals(DeviceRuntimeTerminalCode.TARGET_BINDING_MISMATCH, result.terminalCode)
+        assertEquals(1, fixture.targetResolutionCount)
+        assertEquals(0, fixture.dispatchCount)
+        assertNull(result.effectRecord)
     }
 
     @Test
@@ -206,6 +264,22 @@ class DeviceAutomationRuntimeTest {
         assertEquals(0, fixture.preconditionCount)
         assertEquals(0, fixture.targetResolutionCount)
         assertEquals(0, fixture.dispatchCount)
+    }
+
+    @Test
+    fun platform_not_dispatched_after_admission_preserves_none_and_never_advances_workflow() {
+        val fixture = Fixture(
+            dispatchResult = DevicePlatformDispatchResult.NotDispatched("user-preempted"),
+        )
+        val result = fixture.runtime().execute(fixture.request())
+
+        assertIs<DeviceActionResult.CancelledBeforeEffect>(result.actionResult)
+        assertEquals(DeviceRuntimeTerminalCode.DISPATCH_NOT_ADMITTED, result.terminalCode)
+        assertEquals(DeviceEffectState.NONE, result.effectState)
+        assertEquals(1, fixture.dispatchCount)
+        assertEquals(EffectLedgerState.TERMINAL_NONE, result.effectRecord?.state)
+        assertNull(result.workflowReceipt)
+        assertFalse(result.trace.any { it.state == DeviceRuntimeState.VERIFIED_APPLIED })
     }
 
     @Test
@@ -258,6 +332,9 @@ class DeviceAutomationRuntimeTest {
         private val userInteractionActive: Boolean = false,
         private val enabledCapabilities: Set<DeviceCapabilityId>? = null,
         private val authorityMutation: ((DeviceRuntimeAuthoritySnapshot) -> DeviceRuntimeAuthoritySnapshot)? = null,
+        private val finalAuthorityMutation: ((DeviceRuntimeAuthoritySnapshot) -> DeviceRuntimeAuthoritySnapshot)? = null,
+        private val targetExpiresAtEpochMs: Long = 3_000,
+        private val dispatchResult: DevicePlatformDispatchResult? = null,
     ) {
         private val capabilityId = DeviceCapabilityId("accessibility-click")
         private val digestA = "a".repeat(64)
@@ -416,7 +493,7 @@ class DeviceAutomationRuntimeTest {
                         resolvedTargetToken = "target-token-1",
                         tokenDigestSha256 = digestB,
                         issuedAtEpochMs = 1_300,
-                        expiresAtEpochMs = 3_000,
+                        expiresAtEpochMs = targetExpiresAtEpochMs,
                     ),
                 )
             }
@@ -443,9 +520,14 @@ class DeviceAutomationRuntimeTest {
             }
             val dispatcher = DevicePlatformDispatcher { _, _ ->
                 dispatchCount += 1
-                val evidence = DevicePlatformDispatchEvidence("dispatch-1", platformCallbackAccepted = true)
-                lastDispatchEvidence = evidence
-                DevicePlatformDispatchResult.Dispatched(evidence)
+                val configured = dispatchResult
+                if (configured != null) {
+                    configured
+                } else {
+                    val evidence = DevicePlatformDispatchEvidence("dispatch-1", platformCallbackAccepted = true)
+                    lastDispatchEvidence = evidence
+                    DevicePlatformDispatchResult.Dispatched(evidence)
+                }
             }
             val baseAuthority = DeviceRuntimeAuthoritySnapshot(
                 authorityEpoch = "authority-1",
@@ -460,8 +542,14 @@ class DeviceAutomationRuntimeTest {
                 screenLocked = false,
                 platformAvailable = true,
             )
+            var authorityReadCount = 0
             val authority = DeviceRuntimeAuthoritySource {
-                authorityMutation?.invoke(baseAuthority) ?: baseAuthority
+                authorityReadCount += 1
+                when {
+                    authorityReadCount >= 2 && finalAuthorityMutation != null -> finalAuthorityMutation.invoke(baseAuthority)
+                    authorityMutation != null -> authorityMutation.invoke(baseAuthority)
+                    else -> baseAuthority
+                }
             }
             return DeviceAutomationRuntime(
                 compiledProfile = DistributionProfile.ENTERPRISE_SIDELOAD,
