@@ -25,6 +25,30 @@ class PlaySafeWebViewContractsTest {
     }
 
     @Test
+    fun click_navigation_expectation_is_exact_target_and_owned_url_only() {
+        val target = observation(tag = "button", role = "button", accessibleName = "Continue")
+        val policy = PlaySafeWebViewPolicy(
+            allowedOrigins = setOf("https://app.example.test"),
+            clickNavigationExpectations = mapOf(
+                target.fingerprint to "https://app.example.test/complete",
+            ),
+        )
+
+        assertEquals(
+            "https://app.example.test/complete",
+            policy.expectedClickNavigation(target.fingerprint),
+        )
+        assertFailsWith<IllegalArgumentException> {
+            PlaySafeWebViewPolicy(
+                allowedOrigins = setOf("https://app.example.test"),
+                clickNavigationExpectations = mapOf(
+                    target.fingerprint to "https://evil.example.test/complete",
+                ),
+            )
+        }
+    }
+
+    @Test
     fun fingerprint_binds_document_generation_position_and_sanitized_identity() {
         val base = playSafeFingerprint(
             pageUrl = "https://app.example.test/page",
@@ -59,19 +83,20 @@ class PlaySafeWebViewContractsTest {
     }
 
     @Test
-    fun click_requires_a_fresh_observable_postcondition() {
-        val preDigest = "a".repeat(64)
-        val post = observation(documentDigest = "b".repeat(64))
+    fun click_requires_declared_exact_navigation_not_unrelated_dom_change() {
+        val pre = observation(tag = "button", role = "button", accessibleName = "Continue")
+        val expectedUrl = "https://app.example.test/complete"
 
         assertEquals(
             PlaySafePostconditionVerdict.VERIFIED_APPLIED,
             PlaySafeWebPostconditionVerifier.verify(
                 kind = BrowserActionKind.CLICK,
                 payload = ClickPayload,
-                expectedFingerprint = post.fingerprint,
-                preDocumentDigestSha256 = preDigest,
-                post = post,
-                pageUrlChanged = false,
+                expectedFingerprint = pre.fingerprint,
+                pre = pre,
+                post = null,
+                currentPageUrl = expectedUrl,
+                expectedClickNavigationUrl = expectedUrl,
             ),
         )
         assertEquals(
@@ -79,73 +104,131 @@ class PlaySafeWebViewContractsTest {
             PlaySafeWebPostconditionVerifier.verify(
                 kind = BrowserActionKind.CLICK,
                 payload = ClickPayload,
-                expectedFingerprint = post.fingerprint,
-                preDocumentDigestSha256 = post.documentDigestSha256,
-                post = post,
-                pageUrlChanged = false,
+                expectedFingerprint = pre.fingerprint,
+                pre = pre,
+                post = pre.copy(documentDigestSha256 = "b".repeat(64)),
+                currentPageUrl = pre.pageUrl,
+                expectedClickNavigationUrl = expectedUrl,
+            ),
+        )
+        assertEquals(
+            PlaySafePostconditionVerdict.INCONCLUSIVE,
+            PlaySafeWebPostconditionVerifier.verify(
+                kind = BrowserActionKind.CLICK,
+                payload = ClickPayload,
+                expectedFingerprint = pre.fingerprint,
+                pre = pre,
+                post = null,
+                currentPageUrl = "https://app.example.test/wrong",
+                expectedClickNavigationUrl = expectedUrl,
             ),
         )
     }
 
     @Test
-    fun fill_and_select_verify_value_digest_not_callback_success() {
-        val fillValue = "hello"
-        val filled = observation(valueDigest = sha256(fillValue))
+    fun fill_requires_value_digest_and_input_change_event_observation() {
+        val value = "hello"
+        val pre = observation(valueDigest = sha256("before"), inputEvents = 3, changeEvents = 7)
+        val post = pre.copy(
+            valueDigestSha256 = sha256(value),
+            inputEventCount = 4,
+            changeEventCount = 8,
+        )
+
         assertEquals(
             PlaySafePostconditionVerdict.VERIFIED_APPLIED,
             PlaySafeWebPostconditionVerifier.verify(
                 kind = BrowserActionKind.FILL_TEXT,
-                payload = FillTextPayload(fillValue),
-                expectedFingerprint = filled.fingerprint,
-                preDocumentDigestSha256 = "a".repeat(64),
-                post = filled,
-                pageUrlChanged = false,
-            ),
-        )
-
-        val selected = observation(tag = "select", valueDigest = sha256("choice-b"))
-        assertEquals(
-            PlaySafePostconditionVerdict.VERIFIED_APPLIED,
-            PlaySafeWebPostconditionVerifier.verify(
-                kind = BrowserActionKind.SELECT_OPTION,
-                payload = SelectOptionPayload("choice-b"),
-                expectedFingerprint = selected.fingerprint,
-                preDocumentDigestSha256 = "a".repeat(64),
-                post = selected,
-                pageUrlChanged = false,
+                payload = FillTextPayload(value),
+                expectedFingerprint = pre.fingerprint,
+                pre = pre,
+                post = post,
+                currentPageUrl = pre.pageUrl,
+                expectedClickNavigationUrl = null,
             ),
         )
         assertEquals(
             PlaySafePostconditionVerdict.INCONCLUSIVE,
             PlaySafeWebPostconditionVerifier.verify(
                 kind = BrowserActionKind.FILL_TEXT,
-                payload = FillTextPayload("different"),
-                expectedFingerprint = filled.fingerprint,
-                preDocumentDigestSha256 = "a".repeat(64),
-                post = filled,
-                pageUrlChanged = false,
+                payload = FillTextPayload(value),
+                expectedFingerprint = pre.fingerprint,
+                pre = pre,
+                post = post.copy(inputEventCount = pre.inputEventCount),
+                currentPageUrl = pre.pageUrl,
+                expectedClickNavigationUrl = null,
+            ),
+        )
+    }
+
+    @Test
+    fun select_requires_selected_value_digest_and_change_event() {
+        val value = "choice-b"
+        val pre = observation(
+            tag = "select",
+            role = "select",
+            inputType = null,
+            valueDigest = sha256("choice-a"),
+            inputEvents = 2,
+            changeEvents = 5,
+        )
+        val post = pre.copy(
+            valueDigestSha256 = sha256(value),
+            inputEventCount = 3,
+            changeEventCount = 6,
+        )
+
+        assertEquals(
+            PlaySafePostconditionVerdict.VERIFIED_APPLIED,
+            PlaySafeWebPostconditionVerifier.verify(
+                kind = BrowserActionKind.SELECT_OPTION,
+                payload = SelectOptionPayload(value),
+                expectedFingerprint = pre.fingerprint,
+                pre = pre,
+                post = post,
+                currentPageUrl = pre.pageUrl,
+                expectedClickNavigationUrl = null,
+            ),
+        )
+        assertEquals(
+            PlaySafePostconditionVerdict.INCONCLUSIVE,
+            PlaySafeWebPostconditionVerifier.verify(
+                kind = BrowserActionKind.SELECT_OPTION,
+                payload = SelectOptionPayload(value),
+                expectedFingerprint = pre.fingerprint,
+                pre = pre,
+                post = post.copy(changeEventCount = pre.changeEventCount),
+                currentPageUrl = pre.pageUrl,
+                expectedClickNavigationUrl = null,
             ),
         )
     }
 
     private fun observation(
         tag: String = "input",
+        role: String? = "textbox",
+        accessibleName: String = "Field",
+        inputType: String? = if (tag == "input") "text" else null,
         documentDigest: String = "a".repeat(64),
         valueDigest: String? = null,
+        inputEvents: Int = 0,
+        changeEvents: Int = 0,
     ): PlaySafeWebElementObservation = PlaySafeWebElementObservation(
         pageUrl = "https://app.example.test/page",
         pageNonce = "nonce-01",
         localId = "interactive-0",
         token = "token-01",
         tag = tag,
-        role = if (tag == "select") "select" else "textbox",
-        accessibleName = "Field",
-        inputType = if (tag == "input") "text" else null,
+        role = role,
+        accessibleName = accessibleName,
+        inputType = inputType,
         visible = true,
         enabled = true,
-        editable = true,
+        editable = tag in setOf("input", "textarea", "select"),
         sensitivity = "NONE",
         documentDigestSha256 = documentDigest,
         valueDigestSha256 = valueDigest,
+        inputEventCount = inputEvents,
+        changeEventCount = changeEvents,
     )
 }

@@ -13,6 +13,7 @@ import dev.ed3c.autowebview.executor.BrowserActionCancellationSignal
 import dev.ed3c.autowebview.executor.BrowserActionCommand
 import dev.ed3c.autowebview.executor.BrowserActionKind
 import dev.ed3c.autowebview.executor.BrowserActionPlatform
+import dev.ed3c.autowebview.executor.BrowserSideEffectState
 import dev.ed3c.autowebview.executor.BrowserTargetQuery
 import dev.ed3c.autowebview.executor.BrowserTargetSensitivity
 import dev.ed3c.autowebview.executor.ClickPayload
@@ -20,7 +21,6 @@ import dev.ed3c.autowebview.executor.FillTextPayload
 import dev.ed3c.autowebview.executor.PlatformBrowserActionResult
 import dev.ed3c.autowebview.executor.ResolvedBrowserTarget
 import dev.ed3c.autowebview.executor.SelectOptionPayload
-import dev.ed3c.autowebview.executor.BrowserSideEffectState
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.coroutines.resume
@@ -29,7 +29,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
-import org.json.JSONArray
 import org.json.JSONObject
 
 data class PlaySafeWebViewPageObservation(
@@ -38,13 +37,6 @@ data class PlaySafeWebViewPageObservation(
     val interactiveElements: List<InteractiveElement>,
 )
 
-/**
- * BrowserActionPlatform for an app-owned Play-safe WebView.
- *
- * All executable JavaScript is the fixed repository-owned bridge below. Action payloads, target
- * identity and expected fields cross into the page only as WebMessage data. No model/network text
- * is concatenated into JavaScript, a selector, URL, coordinate or native call.
- */
 class PlaySafeWebViewBrowserActionPlatform(
     private val webView: WebView,
     private val policy: PlaySafeWebViewPolicy,
@@ -81,13 +73,15 @@ class PlaySafeWebViewBrowserActionPlatform(
         val capture = runCatching { captureBridge(currentUrl) }.getOrNull() ?: return emptyList()
         if (capture.pageUrl != query.pageUrl) return emptyList()
 
+        val issuedAt = nowEpochMs()
         bindings.clear()
         return capture.elements.filter { element ->
             element.fingerprint == query.fingerprint &&
                 (query.expectedRole == null || query.expectedRole.equals(element.role, ignoreCase = true)) &&
                 (query.expectedAccessibleName == null || query.expectedAccessibleName.trim() == element.accessibleName.trim())
         }.map { element ->
-            bindings[element.token] = TargetBinding.from(element)
+            val binding = TargetBinding.from(element, issuedAt)
+            bindings[element.token] = binding
             ResolvedBrowserTarget(
                 executionToken = element.token,
                 pageUrl = element.pageUrl,
@@ -114,7 +108,20 @@ class PlaySafeWebViewBrowserActionPlatform(
         if (binding.pageUrl != command.pageUrl || binding.fingerprint != command.targetFingerprint) {
             return rejected("target-binding-mismatch")
         }
+        if (binding.expired(nowEpochMs())) return rejected("target-token-expired")
         if (currentUrl() != command.pageUrl) return rejected("page-url-changed")
+
+        val expectedClickNavigationUrl = when (command.kind) {
+            BrowserActionKind.CLICK -> policy.expectedClickNavigation(command.targetFingerprint)
+                ?: return rejected("click-postcondition-not-declared")
+            else -> null
+        }
+        if (
+            expectedClickNavigationUrl != null &&
+            canonicalHttpsUrl(expectedClickNavigationUrl) == canonicalHttpsUrl(command.pageUrl)
+        ) {
+            return rejected("click-navigation-already-satisfied")
+        }
         if (cancellationSignal.isCancellationRequested()) {
             return PlatformBrowserActionResult.CancelledBeforeSideEffect
         }
@@ -129,6 +136,15 @@ class PlaySafeWebViewBrowserActionPlatform(
         if (command.kind in setOf(BrowserActionKind.FILL_TEXT, BrowserActionKind.SELECT_OPTION) && !pre.editable) {
             return rejected("target-not-editable")
         }
+        val requestedValueDigest = when (val payload = command.payload) {
+            is FillTextPayload -> sha256(payload.value)
+            is SelectOptionPayload -> sha256(payload.value)
+            ClickPayload -> null
+        }
+        if (requestedValueDigest != null && pre.valueDigestSha256 == requestedValueDigest) {
+            return rejected("postcondition-already-satisfied")
+        }
+        if (binding.expired(nowEpochMs())) return rejected("target-token-expired")
         if (cancellationSignal.isCancellationRequested()) {
             return PlatformBrowserActionResult.CancelledBeforeSideEffect
         }
@@ -136,12 +152,17 @@ class PlaySafeWebViewBrowserActionPlatform(
         val actionResponse = try {
             bridgeRequest(actionRequest(command, binding))
         } catch (_: Throwable) {
-            val navigated = command.kind == BrowserActionKind.CLICK && currentUrl() != command.pageUrl
-            return if (navigated) {
-                PlatformBrowserActionResult.Completed
-            } else {
-                failed("action-transport-unknown", BrowserSideEffectState.UNKNOWN)
+            val current = currentUrl()
+            if (
+                command.kind == BrowserActionKind.CLICK &&
+                current != null &&
+                expectedClickNavigationUrl != null &&
+                runCatching { canonicalHttpsUrl(current) == canonicalHttpsUrl(expectedClickNavigationUrl) }
+                    .getOrDefault(false)
+            ) {
+                return PlatformBrowserActionResult.Completed
             }
+            return failed("action-transport-unknown", BrowserSideEffectState.UNKNOWN)
         }
         when (actionResponse.optString("status")) {
             "rejected" -> return rejected(canonicalCode(actionResponse.optString("code", "bridge-rejected")))
@@ -154,19 +175,20 @@ class PlaySafeWebViewBrowserActionPlatform(
         }
 
         repeat(POSTCONDITION_ATTEMPTS) {
-            val current = currentUrl()
-            val pageChanged = current != command.pageUrl
-            if (command.kind == BrowserActionKind.CLICK && pageChanged) {
-                return PlatformBrowserActionResult.Completed
+            val current = currentUrl() ?: return failed("page-unavailable-after-dispatch", BrowserSideEffectState.UNKNOWN)
+            val post = if (command.kind == BrowserActionKind.CLICK || current != command.pageUrl) {
+                null
+            } else {
+                runCatching { probe(binding) }.getOrNull()
             }
-            val post = runCatching { probe(binding) }.getOrNull()
             val verdict = PlaySafeWebPostconditionVerifier.verify(
                 kind = command.kind,
                 payload = command.payload,
                 expectedFingerprint = command.targetFingerprint,
-                preDocumentDigestSha256 = pre.documentDigestSha256,
+                pre = pre,
                 post = post,
-                pageUrlChanged = pageChanged,
+                currentPageUrl = current,
+                expectedClickNavigationUrl = expectedClickNavigationUrl,
             )
             if (verdict == PlaySafePostconditionVerdict.VERIFIED_APPLIED) {
                 return PlatformBrowserActionResult.Completed
@@ -247,7 +269,7 @@ class PlaySafeWebViewBrowserActionPlatform(
         runOnMain {
             try {
                 if (webView.url != pageUrl) error("WebView page changed before bridge setup")
-                webView.evaluateJavascript(FIXED_BOOTSTRAP_JS) {
+                webView.evaluateJavascript(PLAY_SAFE_FIXED_BRIDGE_JS) {
                     try {
                         if (webView.url != pageUrl) error("WebView page changed while installing bridge")
                         val ports = webView.createWebMessageChannel()
@@ -271,10 +293,9 @@ class PlaySafeWebViewBrowserActionPlatform(
                             },
                             mainHandler,
                         )
-                        val origin = Uri.parse(normalizeHttpsOrigin(pageUrl))
                         webView.postWebMessage(
                             WebMessage(PORT_BIND_MESSAGE, arrayOf(ports[1])),
-                            origin,
+                            Uri.parse(normalizeHttpsOrigin(pageUrl)),
                         )
                     } catch (error: Throwable) {
                         result.completeExceptionally(error)
@@ -324,6 +345,8 @@ class PlaySafeWebViewBrowserActionPlatform(
             sensitivity = sensitivity,
             documentDigestSha256 = documentDigest,
             valueDigestSha256 = valueDigest,
+            inputEventCount = boundedEventCount(json.getInt("inputEventCount"), "input event count"),
+            changeEventCount = boundedEventCount(json.getInt("changeEventCount"), "change event count"),
         )
     }
 
@@ -378,6 +401,11 @@ class PlaySafeWebViewBrowserActionPlatform(
         return value
     }
 
+    private fun boundedEventCount(value: Int, field: String): Int {
+        require(value in 0..MAX_EVENT_COUNT) { "$field is outside the bounded counter contract" }
+        return value
+    }
+
     private fun digest(value: String, field: String): String {
         require(value.matches(Regex("[0-9a-f]{64}"))) { "$field is not a SHA-256 digest" }
         return value
@@ -409,7 +437,12 @@ class PlaySafeWebViewBrowserActionPlatform(
         val role: String?,
         val accessibleName: String,
         val inputType: String?,
+        val issuedAtEpochMs: Long,
+        val expiresAtEpochMs: Long,
     ) {
+        fun expired(nowEpochMs: Long): Boolean =
+            nowEpochMs < issuedAtEpochMs || nowEpochMs > expiresAtEpochMs
+
         fun matches(observation: PlaySafeWebElementObservation): Boolean =
             observation.token == token &&
                 observation.pageUrl == pageUrl &&
@@ -422,7 +455,7 @@ class PlaySafeWebViewBrowserActionPlatform(
                 observation.inputType == inputType
 
         companion object {
-            fun from(observation: PlaySafeWebElementObservation) = TargetBinding(
+            fun from(observation: PlaySafeWebElementObservation, issuedAtEpochMs: Long) = TargetBinding(
                 token = observation.token,
                 pageUrl = observation.pageUrl,
                 pageNonce = observation.pageNonce,
@@ -432,226 +465,19 @@ class PlaySafeWebViewBrowserActionPlatform(
                 role = observation.role,
                 accessibleName = observation.accessibleName,
                 inputType = observation.inputType,
+                issuedAtEpochMs = issuedAtEpochMs,
+                expiresAtEpochMs = issuedAtEpochMs + TARGET_TOKEN_TTL_MS,
             )
         }
     }
 
     private companion object {
         const val MAX_ELEMENTS = 2_048
+        const val MAX_EVENT_COUNT = 1_000_000
         const val BRIDGE_TIMEOUT_MS = 1_500L
+        const val TARGET_TOKEN_TTL_MS = 2_000L
         const val POSTCONDITION_ATTEMPTS = 10
         const val POSTCONDITION_POLL_MS = 50L
         const val PORT_BIND_MESSAGE = "KAW_PORT_V1"
-
-        val FIXED_BOOTSTRAP_JS: String = """
-            (function () {
-              'use strict';
-              if (window.__kawBridgeInstalledV1 === true) return;
-              Object.defineProperty(window, '__kawBridgeInstalledV1', { value: true, writable: false });
-              const MAX_ELEMENTS = 2048;
-              const MAX_DOM_CHARS = 262144;
-              const tokens = new Map();
-              function randomToken() {
-                const bytes = new Uint8Array(16);
-                crypto.getRandomValues(bytes);
-                return Array.from(bytes).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
-              }
-              const pageNonce = randomToken();
-              async function sha256(value) {
-                const data = new TextEncoder().encode(value);
-                const digest = await crypto.subtle.digest('SHA-256', data);
-                return Array.from(new Uint8Array(digest)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
-              }
-              function candidates() {
-                const fixedSelector = 'button,input,textarea,select,a,[role],[tabindex],[contenteditable="true"]';
-                return Array.from(document.querySelectorAll(fixedSelector)).slice(0, MAX_ELEMENTS);
-              }
-              function visible(element) {
-                const rect = element.getBoundingClientRect();
-                const style = window.getComputedStyle(element);
-                return rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none';
-              }
-              function role(element) {
-                const explicit = (element.getAttribute('role') || '').trim();
-                if (explicit) return explicit.slice(0, 64);
-                const tag = element.tagName.toLowerCase();
-                if (tag === 'button') return 'button';
-                if (tag === 'a') return 'link';
-                if (tag === 'select') return 'select';
-                if (tag === 'textarea') return 'textbox';
-                if (tag === 'input') return 'textbox';
-                return null;
-              }
-              function sensitivity(element) {
-                const type = (element.getAttribute('type') || '').toLowerCase();
-                const autocomplete = (element.getAttribute('autocomplete') || '').toLowerCase();
-                const metadata = [
-                  element.getAttribute('name') || '',
-                  element.getAttribute('id') || '',
-                  autocomplete,
-                  type
-                ].join(' ').toLowerCase();
-                if (type === 'password') return 'PASSWORD';
-                if (type === 'file') return 'SECRET';
-                if (autocomplete.indexOf('cc-') >= 0 || /payment|credit|debit|card|cvv|cvc/.test(metadata)) return 'PAYMENT';
-                if (/secret|token|api-key|private-key|otp|one-time|verification-code/.test(metadata)) return 'SECRET';
-                return 'NONE';
-              }
-              function accessibleName(element, sensitive) {
-                if (sensitive !== 'NONE') return '';
-                const raw = (
-                  element.getAttribute('aria-label') ||
-                  element.getAttribute('name') ||
-                  element.getAttribute('placeholder') ||
-                  element.innerText ||
-                  ''
-                );
-                return String(raw).replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 256);
-              }
-              async function documentDigest() {
-                const html = String(document.documentElement ? document.documentElement.outerHTML : '').slice(0, MAX_DOM_CHARS);
-                return sha256(html);
-              }
-              async function record(element, index, token) {
-                const tag = element.tagName.toLowerCase();
-                const sensitive = sensitivity(element);
-                const editable = tag === 'input' || tag === 'textarea' || tag === 'select';
-                let valueDigest = null;
-                if (editable && sensitive === 'NONE') valueDigest = await sha256(String(element.value || ''));
-                return {
-                  token: token,
-                  localId: 'interactive-' + String(index),
-                  tag: tag.slice(0, 32),
-                  role: role(element),
-                  accessibleName: accessibleName(element, sensitive),
-                  inputType: tag === 'input' ? String(element.getAttribute('type') || 'text').toLowerCase().slice(0, 64) : null,
-                  visible: visible(element),
-                  enabled: !element.disabled,
-                  editable: editable,
-                  sensitivity: sensitive,
-                  valueDigestSha256: valueDigest
-                };
-              }
-              async function capture() {
-                tokens.clear();
-                const list = candidates();
-                const output = [];
-                for (let index = 0; index < list.length; index += 1) {
-                  const token = randomToken();
-                  tokens.set(token, list[index]);
-                  output.push(await record(list[index], index, token));
-                }
-                return output;
-              }
-              async function probe(token) {
-                const element = tokens.get(token);
-                if (!element || !element.isConnected) return null;
-                const list = candidates();
-                const index = list.indexOf(element);
-                if (index < 0) return null;
-                return record(element, index, token);
-              }
-              function sameNullable(actual, expected) {
-                return (actual === null ? null : String(actual)) === (expected === null ? null : String(expected));
-              }
-              async function handle(request) {
-                const requestId = String(request.requestId || '');
-                if (request.type === 'capture') {
-                  if (String(request.expectedPageUrl || '') !== location.href) {
-                    return { requestId: requestId, status: 'rejected', code: 'page-url-mismatch' };
-                  }
-                  return {
-                    requestId: requestId,
-                    status: 'ok',
-                    pageUrl: location.href,
-                    pageNonce: pageNonce,
-                    documentDigestSha256: await documentDigest(),
-                    elements: await capture()
-                  };
-                }
-                if (request.type === 'probe') {
-                  const item = await probe(String(request.token || ''));
-                  if (!item) return { requestId: requestId, status: 'rejected', code: 'target-stale' };
-                  return {
-                    requestId: requestId,
-                    status: 'ok',
-                    pageUrl: location.href,
-                    pageNonce: pageNonce,
-                    documentDigestSha256: await documentDigest(),
-                    element: item
-                  };
-                }
-                if (request.type === 'action') {
-                  const token = String(request.token || '');
-                  const element = tokens.get(token);
-                  if (!element || !element.isConnected) return { requestId: requestId, status: 'rejected', code: 'target-stale' };
-                  const list = candidates();
-                  const index = list.indexOf(element);
-                  if (index < 0) return { requestId: requestId, status: 'rejected', code: 'target-stale' };
-                  const current = await record(element, index, token);
-                  const expected = request.expected || {};
-                  if (
-                    current.localId !== expected.localId ||
-                    current.tag !== expected.tag ||
-                    !sameNullable(current.role, expected.role) ||
-                    current.accessibleName !== expected.accessibleName ||
-                    !sameNullable(current.inputType, expected.inputType)
-                  ) return { requestId: requestId, status: 'rejected', code: 'target-revalidation-failed' };
-                  if (!current.visible || !current.enabled || current.sensitivity !== 'NONE') {
-                    return { requestId: requestId, status: 'rejected', code: 'target-not-executable' };
-                  }
-                  const kind = String(request.kind || '');
-                  if (kind === 'CLICK') {
-                    if (typeof element.click !== 'function') return { requestId: requestId, status: 'rejected', code: 'click-unsupported' };
-                    element.click();
-                    return { requestId: requestId, status: 'accepted' };
-                  }
-                  if (kind === 'FILL_TEXT') {
-                    const value = request.value;
-                    if (typeof value !== 'string' || value.length > 2048) return { requestId: requestId, status: 'rejected', code: 'fill-value-invalid' };
-                    const tag = element.tagName.toLowerCase();
-                    if (tag !== 'input' && tag !== 'textarea') return { requestId: requestId, status: 'rejected', code: 'fill-target-invalid' };
-                    const prototype = tag === 'input' ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
-                    const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
-                    if (!descriptor || typeof descriptor.set !== 'function') return { requestId: requestId, status: 'rejected', code: 'fill-setter-unavailable' };
-                    descriptor.set.call(element, value);
-                    element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                    element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-                    return { requestId: requestId, status: 'accepted' };
-                  }
-                  if (kind === 'SELECT_OPTION') {
-                    const value = request.value;
-                    if (typeof value !== 'string' || value.length > 512 || element.tagName.toLowerCase() !== 'select') {
-                      return { requestId: requestId, status: 'rejected', code: 'select-target-invalid' };
-                    }
-                    const option = Array.from(element.options).filter(function (item) { return item.value === value; });
-                    if (option.length !== 1) return { requestId: requestId, status: 'rejected', code: 'select-option-not-exact' };
-                    element.value = value;
-                    element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
-                    element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
-                    return { requestId: requestId, status: 'accepted' };
-                  }
-                  return { requestId: requestId, status: 'rejected', code: 'action-kind-unsupported' };
-                }
-                return { requestId: requestId, status: 'rejected', code: 'request-type-unsupported' };
-              }
-              window.addEventListener('message', function (event) {
-                if (event.data !== 'KAW_PORT_V1' || !event.ports || event.ports.length !== 1) return;
-                const port = event.ports[0];
-                port.onmessage = function (message) {
-                  let request;
-                  try { request = JSON.parse(String(message.data || '')); }
-                  catch (error) { port.postMessage(JSON.stringify({ status: 'error', code: 'invalid-json' })); return; }
-                  Promise.resolve(handle(request)).then(function (response) {
-                    port.postMessage(JSON.stringify(response));
-                  }).catch(function () {
-                    port.postMessage(JSON.stringify({ requestId: String(request.requestId || ''), status: 'error', code: 'bridge-exception' }));
-                  });
-                };
-                port.start();
-                port.postMessage(JSON.stringify({ type: 'ready' }));
-              }, false);
-            })();
-        """.trimIndent()
     }
 }
