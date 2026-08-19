@@ -1,15 +1,19 @@
 package dev.ed3c.autowebview.evidence.android
 
 import android.Manifest
+import android.app.Activity
+import android.app.Instrumentation
 import android.content.ComponentName
 import android.content.pm.PackageManager
+import android.os.Bundle
 import android.provider.Settings
-import android.test.InstrumentationTestCase
+import android.util.Log
 import android.view.View
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import dev.ed3c.autowebview.device.policy.DistributionProfile
 import dev.ed3c.autowebview.device.profile.AndroidCompiledDistributionProfile
+import dev.ed3c.autowebview.domain.InteractiveElement
 import dev.ed3c.autowebview.executor.BrowserActionCancellationSignal
 import dev.ed3c.autowebview.executor.BrowserActionCommand
 import dev.ed3c.autowebview.executor.BrowserActionKind
@@ -26,10 +30,78 @@ import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.runBlocking
 
-@Suppress("DEPRECATION")
-class AndroidAutomationEvidenceInstrumentedTest : InstrumentationTestCase() {
-    fun testPackageBoundaryAndAccessibilityStateRemainSeparated() {
-        val context = instrumentation.targetContext
+/**
+ * Framework-only Stage-7 runner.
+ *
+ * `android.test.*` is intentionally not used: current compile SDKs do not expose the old
+ * InstrumentationTestCase API to this KMP AndroidTest compilation. This runner speaks the stable
+ * instrumentation status protocol directly so Gradle/ddmlib can observe named test start/pass/fail
+ * events without adding a test dependency or widening composeApp/build.gradle.kts.
+ */
+class AndroidAutomationEvidenceInstrumentation : Instrumentation() {
+    override fun onCreate(arguments: Bundle?) {
+        super.onCreate(arguments)
+        start()
+    }
+
+    override fun onStart() {
+        val cases = listOf(
+            EvidenceCase(
+                name = "testPackageBoundaryAndAccessibilityStateRemainSeparated",
+                block = ::testPackageBoundaryAndAccessibilityStateRemainSeparated,
+            ),
+            EvidenceCase(
+                name = "testCompiledProfileIdentityIsClosedAndShizukuIsNotInvented",
+                block = ::testCompiledProfileIdentityIsClosedAndShizukuIsNotInvented,
+            ),
+            EvidenceCase(
+                name = "testPlaySafeWebViewExactActionsAndNegativeControls",
+                block = ::testPlaySafeWebViewExactActionsAndNegativeControls,
+            ),
+        )
+
+        var failures = 0
+        cases.forEachIndexed { index, case ->
+            sendStatus(
+                STATUS_START,
+                statusBundle(case.name, index + 1, cases.size, "${case.name}: START\n"),
+            )
+            try {
+                case.block()
+                sendStatus(
+                    STATUS_OK,
+                    statusBundle(case.name, index + 1, cases.size, "."),
+                )
+            } catch (error: Throwable) {
+                failures += 1
+                val status = statusBundle(
+                    case.name,
+                    index + 1,
+                    cases.size,
+                    "${case.name}: FAIL\n",
+                )
+                status.putString(KEY_STACK, Log.getStackTraceString(error))
+                sendStatus(STATUS_FAILURE, status)
+            }
+        }
+
+        finish(
+            if (failures == 0) Activity.RESULT_OK else Activity.RESULT_CANCELED,
+            Bundle().apply {
+                putString(
+                    KEY_STREAM,
+                    if (failures == 0) {
+                        "OK (${cases.size} bounded evidence cases)\n"
+                    } else {
+                        "FAILURES!!! cases=${cases.size} failures=$failures\n"
+                    },
+                )
+            },
+        )
+    }
+
+    private fun testPackageBoundaryAndAccessibilityStateRemainSeparated() {
+        val context = targetContext
         val packageName = context.packageName
         val profile = AndroidCompiledDistributionProfile.current
         val packageInfo = context.packageManager.getPackageInfo(
@@ -42,42 +114,58 @@ class AndroidAutomationEvidenceInstrumentedTest : InstrumentationTestCase() {
 
         when (profile) {
             DistributionProfile.PLAY_SAFE -> {
-                assertEquals(PLAY_SAFE_PACKAGE, packageName)
-                assertTrue(accessibilityServices.isEmpty())
+                assertEqualsValue(PLAY_SAFE_PACKAGE, packageName, "Play-safe application identity drift")
+                assertCondition(accessibilityServices.isEmpty(), "Play-safe packaged AccessibilityService")
             }
 
             DistributionProfile.ENTERPRISE_SIDELOAD -> {
-                assertEquals(ENTERPRISE_PACKAGE, packageName)
-                assertEquals(1, accessibilityServices.size)
+                assertEqualsValue(ENTERPRISE_PACKAGE, packageName, "Enterprise application identity drift")
+                assertEqualsValue(1, accessibilityServices.size, "Enterprise AccessibilityService count")
                 val service = accessibilityServices.single()
-                assertEquals(ENTERPRISE_SERVICE, service.name)
-                assertTrue(service.exported)
-                assertEquals(Manifest.permission.BIND_ACCESSIBILITY_SERVICE, service.permission)
+                assertEqualsValue(ENTERPRISE_SERVICE, service.name, "Enterprise service identity drift")
+                assertCondition(service.exported, "Enterprise AccessibilityService must remain exported to system binding")
+                assertEqualsValue(
+                    Manifest.permission.BIND_ACCESSIBILITY_SERVICE,
+                    service.permission,
+                    "Enterprise AccessibilityService permission drift",
+                )
 
-                // Reading the user-owned setting is evidence only. This test never writes it.
+                // Reading the user-owned setting is evidence only. This runner never writes it.
                 val enabled = Settings.Secure.getString(
                     context.contentResolver,
                     Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
                 ).orEmpty()
                 val component = ComponentName(packageName, ENTERPRISE_SERVICE).flattenToString()
-                assertFalse(enabled.split(':').any { it.equals(component, ignoreCase = true) })
+                assertCondition(
+                    enabled.split(':').none { it.equals(component, ignoreCase = true) },
+                    "Automated Stage-7 runner must not enable AccessibilityService",
+                )
             }
 
-            DistributionProfile.ACCESSIBILITY_TOOL -> fail("ACCESSIBILITY_TOOL must not be distributable")
+            DistributionProfile.ACCESSIBILITY_TOOL ->
+                throw AssertionError("ACCESSIBILITY_TOOL must not be distributable")
         }
     }
 
-    fun testCompiledProfileIdentityIsClosedAndShizukuIsNotInvented() {
+    private fun testCompiledProfileIdentityIsClosedAndShizukuIsNotInvented() {
         when (AndroidCompiledDistributionProfile.current) {
-            DistributionProfile.PLAY_SAFE -> assertEquals(PLAY_SAFE_PACKAGE, AndroidCompiledDistributionProfile.applicationId)
-            DistributionProfile.ENTERPRISE_SIDELOAD -> assertEquals(
+            DistributionProfile.PLAY_SAFE -> assertEqualsValue(
+                PLAY_SAFE_PACKAGE,
+                AndroidCompiledDistributionProfile.applicationId,
+                "Play-safe compiled profile identity drift",
+            )
+
+            DistributionProfile.ENTERPRISE_SIDELOAD -> assertEqualsValue(
                 ENTERPRISE_PACKAGE,
                 AndroidCompiledDistributionProfile.applicationId,
+                "Enterprise compiled profile identity drift",
             )
-            DistributionProfile.ACCESSIBILITY_TOOL -> fail("ACCESSIBILITY_TOOL variant exists unexpectedly")
+
+            DistributionProfile.ACCESSIBILITY_TOOL ->
+                throw AssertionError("ACCESSIBILITY_TOOL variant exists unexpectedly")
         }
 
-        val context = instrumentation.targetContext
+        val context = targetContext
         val packageInfo = context.packageManager.getPackageInfo(
             context.packageName,
             PackageManager.GET_SERVICES or PackageManager.GET_PROVIDERS or PackageManager.GET_RECEIVERS,
@@ -87,13 +175,19 @@ class AndroidAutomationEvidenceInstrumentedTest : InstrumentationTestCase() {
             packageInfo.providers.orEmpty().forEach { add(it.name.orEmpty()) }
             packageInfo.receivers.orEmpty().forEach { add(it.name.orEmpty()) }
         }
-        assertFalse(componentNames.any { it.contains("shizuku", ignoreCase = true) })
+        assertCondition(
+            componentNames.none { it.contains("shizuku", ignoreCase = true) },
+            "Shizuku component was invented by evidence harness",
+        )
     }
 
-    fun testPlaySafeWebViewExactActionsAndNegativeControls() {
+    private fun testPlaySafeWebViewExactActionsAndNegativeControls() {
         if (AndroidCompiledDistributionProfile.current != DistributionProfile.PLAY_SAFE) {
-            // Enterprise variant deliberately has no Play-safe execution authority.
-            assertEquals(DistributionProfile.ENTERPRISE_SIDELOAD, AndroidCompiledDistributionProfile.current)
+            assertEqualsValue(
+                DistributionProfile.ENTERPRISE_SIDELOAD,
+                AndroidCompiledDistributionProfile.current,
+                "Enterprise evidence variant profile drift",
+            )
             return
         }
 
@@ -112,11 +206,20 @@ class AndroidAutomationEvidenceInstrumentedTest : InstrumentationTestCase() {
             val password = first.interactiveElements.single { it.inputType == "password" }
             val disabled = first.singleElement("Disabled")
 
-            assertEquals(2, duplicates.size)
-            assertFalse(duplicates[0].fingerprint == duplicates[1].fingerprint)
-            assertEquals("", password.accessibleName)
-            assertFalse(first.interactiveElements.any { it.accessibleName == "Shadow Secret" })
-            assertFalse(first.interactiveElements.any { it.accessibleName == "Iframe Secret" })
+            assertEqualsValue(2, duplicates.size, "Duplicate-label fixture cardinality drift")
+            assertCondition(
+                duplicates[0].fingerprint != duplicates[1].fingerprint,
+                "Duplicate labels collapsed to one exact fingerprint",
+            )
+            assertEqualsValue("", password.accessibleName, "Sensitive accessible name leaked")
+            assertCondition(
+                first.interactiveElements.none { it.accessibleName == "Shadow Secret" },
+                "Shadow-root descendant was silently traversed",
+            )
+            assertCondition(
+                first.interactiveElements.none { it.accessibleName == "Iframe Secret" },
+                "Iframe descendant was silently traversed",
+            )
 
             val policy = PlaySafeWebViewPolicy(
                 allowedOrigins = setOf(OWNED_ORIGIN),
@@ -138,7 +241,7 @@ class AndroidAutomationEvidenceInstrumentedTest : InstrumentationTestCase() {
                     BrowserActionCancellationSignal { false },
                 )
             }
-            assertEquals(PlatformBrowserActionResult.Completed, fill)
+            assertEqualsValue(PlatformBrowserActionResult.Completed, fill, "Fill postcondition not verified")
 
             val selectTarget = runBlocking { platform.resolve(first.query(choice)) }.single()
             val select = runBlocking {
@@ -154,7 +257,7 @@ class AndroidAutomationEvidenceInstrumentedTest : InstrumentationTestCase() {
                     BrowserActionCancellationSignal { false },
                 )
             }
-            assertEquals(PlatformBrowserActionResult.Completed, select)
+            assertEqualsValue(PlatformBrowserActionResult.Completed, select, "Select postcondition not verified")
 
             val passwordTarget = runBlocking { platform.resolve(first.query(password)) }.single()
             val sensitive = runBlocking {
@@ -165,12 +268,12 @@ class AndroidAutomationEvidenceInstrumentedTest : InstrumentationTestCase() {
                         targetExecutionToken = passwordTarget.executionToken,
                         targetFingerprint = password.fingerprint,
                         kind = BrowserActionKind.FILL_TEXT,
-                        payload = FillTextPayload("not-a-real-secret"),
+                        payload = FillTextPayload("synthetic-sensitive-fixture"),
                     ),
                     BrowserActionCancellationSignal { false },
                 )
             }
-            assertTrue(sensitive is PlatformBrowserActionResult.Rejected)
+            assertCondition(sensitive is PlatformBrowserActionResult.Rejected, "Sensitive target did not fail closed")
 
             val disabledTarget = runBlocking { platform.resolve(first.query(disabled)) }.single()
             val disabledResult = runBlocking {
@@ -186,7 +289,7 @@ class AndroidAutomationEvidenceInstrumentedTest : InstrumentationTestCase() {
                     BrowserActionCancellationSignal { false },
                 )
             }
-            assertTrue(disabledResult is PlatformBrowserActionResult.Rejected)
+            assertCondition(disabledResult is PlatformBrowserActionResult.Rejected, "Disabled target did not fail closed")
 
             val cancelTarget = runBlocking { platform.resolve(first.query(name)) }.single()
             val cancelled = runBlocking {
@@ -202,7 +305,11 @@ class AndroidAutomationEvidenceInstrumentedTest : InstrumentationTestCase() {
                     BrowserActionCancellationSignal { true },
                 )
             }
-            assertEquals(PlatformBrowserActionResult.CancelledBeforeSideEffect, cancelled)
+            assertEqualsValue(
+                PlatformBrowserActionResult.CancelledBeforeSideEffect,
+                cancelled,
+                "Pre-dispatch cancellation did not preserve NONE",
+            )
 
             var fakeNow = 1_000L
             val expiring = PlaySafeWebViewBrowserActionPlatform(
@@ -225,8 +332,12 @@ class AndroidAutomationEvidenceInstrumentedTest : InstrumentationTestCase() {
                     BrowserActionCancellationSignal { false },
                 )
             }
-            assertTrue(expired is PlatformBrowserActionResult.Rejected)
-            assertEquals("target-token-expired", (expired as PlatformBrowserActionResult.Rejected).code)
+            assertCondition(expired is PlatformBrowserActionResult.Rejected, "Expired target token did not reject")
+            assertEqualsValue(
+                "target-token-expired",
+                (expired as PlatformBrowserActionResult.Rejected).code,
+                "Expired token rejection code drift",
+            )
 
             val wrongDestination = PlaySafeWebViewBrowserActionPlatform(
                 webView = webView,
@@ -249,7 +360,7 @@ class AndroidAutomationEvidenceInstrumentedTest : InstrumentationTestCase() {
                     BrowserActionCancellationSignal { false },
                 )
             }
-            assertTrue(wrong is PlatformBrowserActionResult.Rejected)
+            assertCondition(wrong is PlatformBrowserActionResult.Rejected, "Wrong click destination did not reject")
 
             val clickTarget = runBlocking { platform.resolve(first.query(anchor)) }.single()
             val click = runBlocking {
@@ -265,9 +376,9 @@ class AndroidAutomationEvidenceInstrumentedTest : InstrumentationTestCase() {
                     BrowserActionCancellationSignal { false },
                 )
             }
-            assertEquals(PlatformBrowserActionResult.Completed, click)
+            assertEqualsValue(PlatformBrowserActionResult.Completed, click, "Exact anchor navigation not verified")
         } finally {
-            instrumentation.runOnMainSync { webView.destroy() }
+            runOnMainSync { webView.destroy() }
         }
     }
 
@@ -275,9 +386,9 @@ class AndroidAutomationEvidenceInstrumentedTest : InstrumentationTestCase() {
         val reference = AtomicReference<WebView>()
         val loaded = CountDownLatch(1)
         val failure = AtomicReference<Throwable?>()
-        instrumentation.runOnMainSync {
+        runOnMainSync {
             try {
-                val webView = WebView(instrumentation.targetContext)
+                val webView = WebView(targetContext)
                 webView.settings.javaScriptEnabled = true
                 webView.measure(
                     View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
@@ -302,15 +413,15 @@ class AndroidAutomationEvidenceInstrumentedTest : InstrumentationTestCase() {
                 loaded.countDown()
             }
         }
-        assertTrue("fixture WebView did not load", loaded.await(20, TimeUnit.SECONDS))
-        failure.get()?.let { throw AssertionError("fixture WebView failed", it) }
-        return reference.get() ?: throw AssertionError("fixture WebView absent")
+        assertCondition(loaded.await(20, TimeUnit.SECONDS), "Fixture WebView did not load")
+        failure.get()?.let { throw AssertionError("Fixture WebView failed", it) }
+        return reference.get() ?: throw AssertionError("Fixture WebView absent")
     }
 
-    private fun PlaySafeWebViewPageObservation.singleElement(name: String) =
+    private fun PlaySafeWebViewPageObservation.singleElement(name: String): InteractiveElement =
         interactiveElements.single { it.accessibleName == name }
 
-    private fun PlaySafeWebViewPageObservation.query(element: dev.ed3c.autowebview.domain.InteractiveElement) =
+    private fun PlaySafeWebViewPageObservation.query(element: InteractiveElement) =
         BrowserTargetQuery(
             pageUrl = pageUrl,
             fingerprint = element.fingerprint,
@@ -318,7 +429,42 @@ class AndroidAutomationEvidenceInstrumentedTest : InstrumentationTestCase() {
             expectedAccessibleName = element.accessibleName,
         )
 
+    private fun assertCondition(condition: Boolean, message: String) {
+        if (!condition) throw AssertionError(message)
+    }
+
+    private fun assertEqualsValue(expected: Any?, actual: Any?, message: String) {
+        if (expected != actual) throw AssertionError("$message: expected=$expected actual=$actual")
+    }
+
+    private fun statusBundle(testName: String, current: Int, total: Int, stream: String): Bundle =
+        Bundle().apply {
+            putString(KEY_ID, "AndroidAutomationEvidenceInstrumentation")
+            putInt(KEY_NUM_TESTS, total)
+            putString(KEY_CLASS, RUNNER_CLASS)
+            putString(KEY_TEST, testName)
+            putInt(KEY_CURRENT, current)
+            putString(KEY_STREAM, stream)
+        }
+
+    private data class EvidenceCase(
+        val name: String,
+        val block: () -> Unit,
+    )
+
     private companion object {
+        const val STATUS_START = 1
+        const val STATUS_OK = 0
+        const val STATUS_FAILURE = -2
+        const val KEY_ID = "id"
+        const val KEY_NUM_TESTS = "numtests"
+        const val KEY_CLASS = "class"
+        const val KEY_TEST = "test"
+        const val KEY_CURRENT = "current"
+        const val KEY_STREAM = "stream"
+        const val KEY_STACK = "stack"
+        const val RUNNER_CLASS =
+            "dev.ed3c.autowebview.evidence.android.AndroidAutomationEvidenceInstrumentation"
         const val PLAY_SAFE_PACKAGE = "dev.ed3c.autowebview"
         const val ENTERPRISE_PACKAGE = "dev.ed3c.autowebview.enterprise"
         const val ENTERPRISE_SERVICE =
