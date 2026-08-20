@@ -1,7 +1,6 @@
 package dev.ed3c.autowebview.workspace.viewmodel
 
 import dev.ed3c.autowebview.workspace.contract.FreshnessState
-import dev.ed3c.autowebview.workspace.contract.RouteDecisionState
 import dev.ed3c.autowebview.workspace.contract.SubjectDataClass
 import dev.ed3c.autowebview.workspace.contract.SubjectKind
 import dev.ed3c.autowebview.workspace.contract.SubjectVisibility
@@ -187,6 +186,7 @@ class CapabilityWorkspaceController(
 }
 
 fun CapabilityWorkspaceUiState.toPublicState(): CapabilityWorkspaceUiState = copy(
+    snapshotId = null,
     subjects = subjects.map { subject ->
         val privateSubject = subject.visibility != SubjectVisibility.PUBLIC ||
             subject.dataClass != SubjectDataClass.PUBLIC
@@ -205,7 +205,10 @@ fun CapabilityWorkspaceUiState.toPublicState(): CapabilityWorkspaceUiState = cop
         } ?: true
         if (!privateSubject) projection else projection.copy(externalLocator = null)
     },
-    routes = routes.map { route -> route.copy(enabled = false) },
+    routes = routes.map { route -> route.copy(
+        destinationLabel = "ROUTE_DESTINATION",
+        enabled = false,
+    ) },
     globalBlockerCodes = globalBlockerCodes + "PUBLIC_EXPORT_READ_ONLY",
 )
 
