@@ -125,7 +125,7 @@ class GitHubRestMetadataSource(
         } catch (_: IllegalArgumentException) {
             GitHubReadResult.Unavailable(GitHubReadFailureReason.RESPONSE_MISMATCH)
         } catch (_: Exception) {
-            GitHubReadResult.Unavailable(GitHubReadFailureReason.NETWORK_FAILURE)
+            GitHubReadResult.Unavailable(GitHubReadFailureReason.RESPONSE_MISMATCH)
         }
     }
 
@@ -147,7 +147,11 @@ class GitHubRestMetadataSource(
                 ),
             )
             val decoded = decoder.decodeCheckRuns(body, repositoryId, expectedHeadSha = sha)
-            if (expectedTotal == null) expectedTotal = decoded.totalCount
+            require(decoded.totalCount >= 0) { "GitHub check-run total cannot be negative" }
+            val total = expectedTotal ?: decoded.totalCount.also { expectedTotal = it }
+            if (decoded.totalCount != total) {
+                throw GitHubReadAbort(GitHubReadFailureReason.RESPONSE_MISMATCH)
+            }
             for (run in decoded.checkRuns) {
                 val existing = runs[run.checkRunId]
                 if (existing != null && existing != run) {
@@ -155,7 +159,10 @@ class GitHubRestMetadataSource(
                 }
                 runs[run.checkRunId] = run
             }
-            if (runs.size >= (expectedTotal ?: 0)) return runs.values.toList()
+            if (runs.size > total) {
+                throw GitHubReadAbort(GitHubReadFailureReason.RESPONSE_MISMATCH)
+            }
+            if (runs.size == total) return runs.values.toList()
             if (decoded.checkRuns.isEmpty()) break
         }
 
