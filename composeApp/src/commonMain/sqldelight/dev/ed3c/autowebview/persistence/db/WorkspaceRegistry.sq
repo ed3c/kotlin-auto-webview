@@ -56,21 +56,31 @@ CREATE INDEX workspace_inbox_state_idx
 ON workspace_inbox_change(state, received_at_epoch_ms, proposal_id);
 
 upsertWorkspaceSubject:
-INSERT OR REPLACE INTO workspace_subject_projection(
+INSERT INTO workspace_subject_projection(
   logical_id,
   kind,
   payload_json,
   updated_at_epoch_ms,
   tombstoned
-) VALUES (?, ?, ?, ?, 0);
+) VALUES (?, ?, ?, ?, 0)
+ON CONFLICT(logical_id, kind) DO UPDATE SET
+  payload_json = excluded.payload_json,
+  updated_at_epoch_ms = excluded.updated_at_epoch_ms,
+  tombstoned = 0
+WHERE excluded.updated_at_epoch_ms > workspace_subject_projection.updated_at_epoch_ms
+   OR (
+     excluded.updated_at_epoch_ms = workspace_subject_projection.updated_at_epoch_ms
+     AND excluded.payload_json = workspace_subject_projection.payload_json
+     AND workspace_subject_projection.tombstoned = 0
+   );
 
-selectWorkspaceSubjectPayload:
-SELECT payload_json
+selectWorkspaceSubjectRow:
+SELECT logical_id, kind, payload_json, updated_at_epoch_ms, tombstoned
 FROM workspace_subject_projection
 WHERE logical_id = ? AND kind = ?;
 
-selectActiveWorkspaceSubjectPayloads:
-SELECT payload_json
+selectActiveWorkspaceSubjectRows:
+SELECT logical_id, kind, payload_json, updated_at_epoch_ms, tombstoned
 FROM workspace_subject_projection
 WHERE tombstoned = 0
 ORDER BY updated_at_epoch_ms DESC, logical_id ASC
@@ -78,8 +88,11 @@ LIMIT ?;
 
 tombstoneWorkspaceSubject:
 UPDATE workspace_subject_projection
-SET tombstoned = 1, updated_at_epoch_ms = ?
-WHERE logical_id = ? AND kind = ?;
+SET tombstoned = 1,
+    updated_at_epoch_ms = :updated_at_epoch_ms
+WHERE logical_id = :logical_id
+  AND kind = :kind
+  AND updated_at_epoch_ms < :updated_at_epoch_ms;
 
 countActiveWorkspaceSubjects:
 SELECT COUNT(*)
@@ -87,7 +100,7 @@ FROM workspace_subject_projection
 WHERE tombstoned = 0;
 
 upsertWorkspaceEdge:
-INSERT OR REPLACE INTO workspace_edge_projection(
+INSERT INTO workspace_edge_projection(
   edge_id,
   from_logical_id,
   from_kind,
@@ -96,10 +109,46 @@ INSERT OR REPLACE INTO workspace_edge_projection(
   to_kind,
   payload_json,
   updated_at_epoch_ms
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(edge_id) DO UPDATE SET
+  payload_json = excluded.payload_json,
+  updated_at_epoch_ms = excluded.updated_at_epoch_ms
+WHERE excluded.from_logical_id = workspace_edge_projection.from_logical_id
+  AND excluded.from_kind = workspace_edge_projection.from_kind
+  AND excluded.relation = workspace_edge_projection.relation
+  AND excluded.to_logical_id = workspace_edge_projection.to_logical_id
+  AND excluded.to_kind = workspace_edge_projection.to_kind
+  AND (
+    excluded.updated_at_epoch_ms > workspace_edge_projection.updated_at_epoch_ms
+    OR (
+      excluded.updated_at_epoch_ms = workspace_edge_projection.updated_at_epoch_ms
+      AND excluded.payload_json = workspace_edge_projection.payload_json
+    )
+  );
 
-selectWorkspaceEdgePayloadsFrom:
-SELECT payload_json
+selectWorkspaceEdgeRow:
+SELECT
+  edge_id,
+  from_logical_id,
+  from_kind,
+  relation,
+  to_logical_id,
+  to_kind,
+  payload_json,
+  updated_at_epoch_ms
+FROM workspace_edge_projection
+WHERE edge_id = ?;
+
+selectWorkspaceEdgeRowsFrom:
+SELECT
+  edge_id,
+  from_logical_id,
+  from_kind,
+  relation,
+  to_logical_id,
+  to_kind,
+  payload_json,
+  updated_at_epoch_ms
 FROM workspace_edge_projection
 WHERE from_logical_id = ? AND from_kind = ?
 ORDER BY relation ASC, edge_id ASC;
@@ -125,12 +174,24 @@ FROM workspace_outbox_event
 WHERE dedupe_key = ?;
 
 selectWorkspaceOutboxStateAndPayload:
-SELECT state, payload_json
+SELECT
+  event_id,
+  canonical_logical_id,
+  canonical_kind,
+  state,
+  attempt_count,
+  payload_json
 FROM workspace_outbox_event
 WHERE event_id = ?;
 
 selectDispatchableWorkspaceOutboxPayloads:
-SELECT payload_json
+SELECT
+  event_id,
+  canonical_logical_id,
+  canonical_kind,
+  state,
+  attempt_count,
+  payload_json
 FROM workspace_outbox_event
 WHERE state IN ('PENDING', 'RETRYABLE_FAILURE')
   AND next_attempt_at_epoch_ms <= ?
@@ -168,8 +229,25 @@ SELECT proposal_id
 FROM workspace_inbox_change
 WHERE proposal_id = ?;
 
+selectWorkspaceInboxStateAndPayload:
+SELECT
+  proposal_id,
+  canonical_logical_id,
+  canonical_kind,
+  source_projection_id,
+  state,
+  payload_json
+FROM workspace_inbox_change
+WHERE proposal_id = ?;
+
 selectProposedWorkspaceInboxPayloads:
-SELECT payload_json
+SELECT
+  proposal_id,
+  canonical_logical_id,
+  canonical_kind,
+  source_projection_id,
+  state,
+  payload_json
 FROM workspace_inbox_change
 WHERE state = 'PROPOSED'
 ORDER BY received_at_epoch_ms ASC, proposal_id ASC
