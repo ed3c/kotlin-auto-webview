@@ -1,0 +1,29 @@
+name: Workspace Evidence
+
+on:
+  pull_request:
+    paths:
+      - 'tests/evidence/workspace/**'
+      - 'scripts/evidence/workspace/**'
+      - 'receipts/workspace/**'
+      - 'schemas/workspace/evidence*.json'
+      - '.github/workflows/workspace-evidence.yml'
+      - 'docs/evidence/workspace/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Parse evidence JSON and schema
+        run: |
+          python3 -m json.tool receipts/workspace/federation-evidence.json >/dev/null
+          python3 -m json.tool schemas/workspace/evidence-federation.schema.json >/dev/null
+      - name: Verify exact evidence denominator
+        run: python3 scripts/evidence/workspace/verify_federation_evidence.py receipts/workspace/federation-evidence.json
+      - name: Run evidence laundering mutations
+        run: python3 -m unittest discover -s tests/evidence/workspace -p 'test_*.py' -v
