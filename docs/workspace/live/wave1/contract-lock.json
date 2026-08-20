@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "program": "FEDERATED_CAPABILITY_WORKSPACE_LIVE_WAVE1",
+  "owner_issue": 176,
+  "parent": {
+    "issue": 172,
+    "pull_request": 175,
+    "head_sha": "b9049a2c1d781218b264ee82a817f69ed1580f92",
+    "tree_sha": "37693d1aa5d6c95ffd7ea68714fc2dd934930abe",
+    "state": "LIVE_EVIDENCE_PREIMPLEMENTATION_READY"
+  },
+  "repository_subjects": [
+    {"subject_id":"KAW-W2","repository":"ed3c/kotlin-auto-webview","commit_sha":"3294fb2b4d86fef91f3f2c63e28718c490147808","tree_sha":"923ed99356690020eb01f79255392d138083dc1a","issue":122,"pull_request":158},
+    {"subject_id":"KAW-W3","repository":"ed3c/kotlin-auto-webview","commit_sha":"95754e2a7ea6a09da030da3803313fe49641b677","tree_sha":"f9502cb346c6ac2f4a24449681bed5c86dcc836d","issue":123,"pull_request":160},
+    {"subject_id":"KAW-W4","repository":"ed3c/kotlin-auto-webview","commit_sha":"56eb824866e7e74d63a4297748c647cff738db51","tree_sha":"0a32759d10c4a08a1815026f9504145d2fbc7cad","issue":124,"pull_request":161},
+    {"subject_id":"KAW-W6","repository":"ed3c/kotlin-auto-webview","commit_sha":"c19d4e561cb09cb1c6c96c2b0f8df0c88b7d987b","tree_sha":"6278886726e5cbff5ea5a6f0c01d6581811b9077","issue":126,"pull_request":163},
+    {"subject_id":"BETTOR-MAIN","repository":"ed3c/bettor-arena","commit_sha":"65b7188ba57b0769419850db462bd92b5c834e00","tree_sha":"41f0ecdef0232114d9f339fbfd984e37e56f3dc5","issue":197},
+    {"subject_id":"TVL-MAIN","repository":"ed3c/truth-verify-loop","commit_sha":"f6e1b81d14d9ae7bfb0fe5f513f6f8d7322f5202","tree_sha":"f62e9596bef4e6ad745c11fb44dea2e56c9205f3","issue":47}
+  ],
+  "source_files": [
+    {
+      "surface_id":"GH-REST","repository":"ed3c/kotlin-auto-webview","commit_sha":"3294fb2b4d86fef91f3f2c63e28718c490147808","path":"composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/github/GitHubRestMetadataSource.kt","blob_sha":"9b677be0c8bd1da0f1488acb83488677eae11a81","raw_url":"https://raw.githubusercontent.com/ed3c/kotlin-auto-webview/3294fb2b4d86fef91f3f2c63e28718c490147808/composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/github/GitHubRestMetadataSource.kt","required_symbols":["GitHubTokenProvider","GitHubApiEndpoint","GitHubRestMetadataSource","GitHubMetadataSource"]
+    },
+    {
+      "surface_id":"GH-CONTRACTS","repository":"ed3c/kotlin-auto-webview","commit_sha":"3294fb2b4d86fef91f3f2c63e28718c490147808","path":"composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/github/GitHubWorkGraphContracts.kt","blob_sha":"60f0bc1474fe24fb4e35b814cd8a6e83214dbb7b","raw_url":"https://raw.githubusercontent.com/ed3c/kotlin-auto-webview/3294fb2b4d86fef91f3f2c63e28718c490147808/composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/github/GitHubWorkGraphContracts.kt","required_symbols":["GitHubWorkGraphRequest","GitHubWorkGraphSnapshot","GitHubReadResult","GitHubMetadataSource"]
+    },
+    {
+      "surface_id":"GH-ADAPTER","repository":"ed3c/kotlin-auto-webview","commit_sha":"3294fb2b4d86fef91f3f2c63e28718c490147808","path":"composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/github/GitHubWorkGraphAdapter.kt","blob_sha":"15d512a6bd331b5ab05e4332dbd4b24db7f5f7df","raw_url":"https://raw.githubusercontent.com/ed3c/kotlin-auto-webview/3294fb2b4d86fef91f3f2c63e28718c490147808/composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/github/GitHubWorkGraphAdapter.kt","required_symbols":["GitHubWorkGraphAdapter","GitHubWorkGraphMapper"]
+    },
+    {
+      "surface_id":"GOOGLE-CONTRACTS","repository":"ed3c/kotlin-auto-webview","commit_sha":"95754e2a7ea6a09da030da3803313fe49641b677","path":"composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/google/GoogleProjectionContracts.kt","blob_sha":"02485d957d4b3432ba4e3310d3949c9ae6a71b7f","raw_url":"https://raw.githubusercontent.com/ed3c/kotlin-auto-webview/95754e2a7ea6a09da030da3803313fe49641b677/composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/google/GoogleProjectionContracts.kt","required_symbols":["GoogleProjectionBinding","GoogleProjectionTransport","GoogleProjectionWriteCommand","GoogleProjectionPublicReceipt"]
+    },
+    {
+      "surface_id":"GOOGLE-SAGA","repository":"ed3c/kotlin-auto-webview","commit_sha":"95754e2a7ea6a09da030da3803313fe49641b677","path":"composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/google/GoogleProjectionSaga.kt","blob_sha":"37e91707786273af29b29208e2e42db9f1f13dac","raw_url":"https://raw.githubusercontent.com/ed3c/kotlin-auto-webview/95754e2a7ea6a09da030da3803313fe49641b677/composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/google/GoogleProjectionSaga.kt","required_symbols":["GoogleProjectionSaga"]
+    },
+    {
+      "surface_id":"FEDERATION-ROUTER","repository":"ed3c/kotlin-auto-webview","commit_sha":"56eb824866e7e74d63a4297748c647cff738db51","path":"composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/routing/FederationRouter.kt","blob_sha":"d25f92d140fa1b7012345a921d52efa7af1d10e7","raw_url":"https://raw.githubusercontent.com/ed3c/kotlin-auto-webview/56eb824866e7e74d63a4297748c647cff738db51/composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/routing/FederationRouter.kt","required_symbols":["FederationRouteEnvelope","RouteProposalPacket","RouteProposalSink","FederationRouter","\"verify.claim\"","\"orchestrate.work\""]
+    },
+    {
+      "surface_id":"W6-VERIFIER","repository":"ed3c/kotlin-auto-webview","commit_sha":"c19d4e561cb09cb1c6c96c2b0f8df0c88b7d987b","path":"scripts/evidence/workspace/verify_federation_evidence.py","blob_sha":"cb7106be3a0681cd3931521bdfa165e80aaf1ede","raw_url":"https://raw.githubusercontent.com/ed3c/kotlin-auto-webview/c19d4e561cb09cb1c6c96c2b0f8df0c88b7d987b/scripts/evidence/workspace/verify_federation_evidence.py","required_symbols":["REQUIRED_LANES","LIVE_GITHUB_CONNECTOR","LIVE_GOOGLE_ACCOUNT","LIVE_BETTOR_HANDOFF","LIVE_DOMAIN_AUTHORITY"]
+    },
+    {
+      "surface_id":"BETTOR-GATEWAY-MANIFEST","repository":"ed3c/bettor-arena","commit_sha":"65b7188ba57b0769419850db462bd92b5c834e00","path":"loop_wiki/loopx-worker-gateway/contracts/manifest.json","blob_sha":"ed851c870b519184bf6b2ea258f291515d783271","raw_url":"https://raw.githubusercontent.com/ed3c/bettor-arena/65b7188ba57b0769419850db462bd92b5c834e00/loop_wiki/loopx-worker-gateway/contracts/manifest.json","required_symbols":["\"fixture_only\": true","\"live_matrix_state\": \"NOT_EXERCISED\"","\"loopx.worker-gateway/v1\""]
+    },
+    {
+      "surface_id":"BETTOR-WORKER-RECEIPT","repository":"ed3c/bettor-arena","commit_sha":"65b7188ba57b0769419850db462bd92b5c834e00","path":"loop_wiki/loopx-worker-gateway/contracts/worker-receipt.schema.json","blob_sha":"c9aded898d0108e550e8614b716251f3afef2cd5","raw_url":"https://raw.githubusercontent.com/ed3c/bettor-arena/65b7188ba57b0769419850db462bd92b5c834e00/loop_wiki/loopx-worker-gateway/contracts/worker-receipt.schema.json","required_symbols":["\"adapter\"","\"descriptor_digest\"","\"host_id\""]
+    },
+    {
+      "surface_id":"TVL-SEMANTIC-RECEIPT","repository":"ed3c/truth-verify-loop","commit_sha":"f6e1b81d14d9ae7bfb0fe5f513f6f8d7322f5202","path":"schemas/semantic-verifier-receipt.v1.schema.json","blob_sha":"2c9085b66d080abcede3861812d15bdc92986d04","raw_url":"https://raw.githubusercontent.com/ed3c/truth-verify-loop/f6e1b81d14d9ae7bfb0fe5f513f6f8d7322f5202/schemas/semantic-verifier-receipt.v1.schema.json","required_symbols":["tvl.semantic-verifier-receipt.v1","\"status\"","\"output_sha256\"","\"attempt_kind\""]
+    }
+  ],
+  "lanes": [
+    {
+      "atom":"L2-GH","issue":165,"lane":"L2","state":"CODE_PRESENT_LIVE_CANARY_ABSENT","git_parent":{"repository":"ed3c/kotlin-auto-webview","pull_request":158,"head_sha":"3294fb2b4d86fef91f3f2c63e28718c490147808"},
+      "existing":["Ktor read-only public api.github.com transport","optional external token provider","bounded pagination and status mapping","W2 WorkGraph mapper and W1 local projection"],
+      "missing":["live public exact-subject canary","credential-capability binding for authenticated/private canary","sanitized L2 receipt and disclosure scan","cleanup/rate-limit/cancellation receipt"],
+      "external_capabilities":["GITHUB_PUBLIC_NETWORK","GITHUB_CREDENTIAL_SCOPE_FOR_PRIVATE_CANARY"],
+      "first_safe_write":["tests/evidence/workspace/github/**","scripts/evidence/workspace/github/**","receipts/workspace/live/github/**",".github/workflows/workspace-live-github.yml","docs/evidence/workspace/live-github/**"],
+      "start_receipt":{"code_ready":true,"public_canary_ready":true,"external_ready":false,"live_evidence_ready":false,"reason_codes":["PUBLIC_TRANSPORT_ALREADY_PRESENT","PRIVATE_SCOPE_EXTERNAL","LIVE_RECEIPT_ABSENT"]},
+      "maximum_claim":"IMPLEMENTATION_PREP_ONLY"
+    },
+    {
+      "atom":"L3-GOOGLE","issue":166,"lane":"L3","state":"PORT_PRESENT_LIVE_TRANSPORT_ABSENT","git_parent":{"repository":"ed3c/kotlin-auto-webview","pull_request":160,"head_sha":"95754e2a7ea6a09da030da3803313fe49641b677"},
+      "existing":["provider-neutral GoogleProjectionTransport","revision-bound saga","conditional write/read-back contracts","public receipt redaction"],
+      "missing":["Drive/Docs/Sheets live transport","system-browser or native OAuth binding","scope/account/file admission","live read-back canary and sanitized L3 receipt"],
+      "external_capabilities":["GOOGLE_ACCOUNT","OAUTH_SCOPES","TEST_FILE","ORGANIZATION_DLP_WHEN_APPLICABLE"],
+      "first_safe_write":["composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/google/live/**","composeApp/src/commonTest/**workspace/google/live**","tests/evidence/workspace/google/**","scripts/evidence/workspace/google/**","docs/evidence/workspace/live-google/**"],
+      "start_receipt":{"code_ready":true,"public_canary_ready":false,"external_ready":false,"live_evidence_ready":false,"reason_codes":["PORT_AND_SAGA_PRESENT","LIVE_TRANSPORT_ABSENT","ACCOUNT_AND_FILE_EXTERNAL"]},
+      "maximum_claim":"IMPLEMENTATION_PREP_ONLY"
+    },
+    {
+      "atom":"L4-BETTOR","issue":167,"lane":"L4","state":"PRODUCER_CONTRACT_PRESENT_CONSUMER_ABSENT","git_parent":{"repository":"ed3c/kotlin-auto-webview","pull_request":161,"head_sha":"56eb824866e7e74d63a4297748c647cff738db51"},
+      "existing":["KAW RouteProposalPacket and RouteProposalSink","orchestrate.work capability binding","Bettor worker-gateway schemas"],
+      "missing":["Bettor capability-workspace consumer module","exact cross-repository schema/digest binding","live gateway/deployment capability","literal receipt-reference validation and L4 receipt"],
+      "external_capabilities":["BETTOR_CONSUMER_IMPLEMENTATION","BETTOR_DEPLOYMENT","WORKER_RUNTIME_AND_BUDGET"],
+      "external_issue":"ed3c/bettor-arena#197",
+      "first_safe_write":["composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/routing/bettor/**","composeApp/src/commonTest/**workspace/routing/bettor**","tests/evidence/workspace/bettor/**","docs/evidence/workspace/live-bettor/**"],
+      "start_receipt":{"code_ready":true,"public_canary_ready":false,"external_ready":false,"live_evidence_ready":false,"reason_codes":["KAW_PRODUCER_PRESENT","BETTOR_CONSUMER_ABSENT","GATEWAY_FIXTURE_ONLY"]},
+      "maximum_claim":"IMPLEMENTATION_PREP_ONLY"
+    },
+    {
+      "atom":"L5-DOMAIN","issue":168,"lane":"L5","state":"ROUTE_BINDING_PRESENT_RECEIPT_ADAPTER_ABSENT","git_parent":{"repository":"ed3c/kotlin-auto-webview","pull_request":161,"head_sha":"56eb824866e7e74d63a4297748c647cff738db51"},
+      "existing":["verify.claim route binding","truth-verify-loop semantic verifier receipt schema","domain-owned closure vocabulary"],
+      "missing":["KAW domain receipt-reference adapter","truth-verify-loop KAW canary receipt producer","exact repository/commit/tree/claim/digest validation","sanitized L5 receipt"],
+      "external_capabilities":["TRUTH_VERIFY_CANARY_IMPLEMENTATION","DOMAIN_SOURCE_ACCESS_WHEN_APPLICABLE"],
+      "external_issue":"ed3c/truth-verify-loop#47",
+      "first_safe_write":["composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/domain/**","composeApp/src/commonTest/**workspace/domain**","tests/evidence/workspace/domain/**","docs/evidence/workspace/live-domain/**"],
+      "start_receipt":{"code_ready":true,"public_canary_ready":false,"external_ready":false,"live_evidence_ready":false,"reason_codes":["ROUTE_BINDING_PRESENT","DOMAIN_RECEIPT_SCHEMA_PRESENT","KAW_AND_DOMAIN_ADAPTERS_ABSENT"]},
+      "maximum_claim":"IMPLEMENTATION_PREP_ONLY"
+    }
+  ],
+  "hard_laws": {
+    "chat_context_defines_interface": false,
+    "mutable_branch_replaces_exact_commit": false,
+    "path_replaces_blob_identity": false,
+    "fixture_is_live": false,
+    "credential_or_token_in_repository": false,
+    "route_ack_is_execution": false,
+    "receipt_reference_is_verdict_content": false,
+    "google_account_access_is_content_right": false,
+    "missing_external_consumer_is_ready": false
+  },
+  "local_handoff": {"state":"ABSENT","reason":"EXTERNAL_CAPABILITIES_AND_CONCRETE_COMMANDS_NOT_BOUND"},
+  "excluded_void_issues": [173,174],
+  "stage_verdict": "LIVE_WAVE1_IMPLEMENTATION_SURFACES_LOCKED_PENDING_CI"
+}
