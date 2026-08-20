@@ -187,55 +187,59 @@ class GoogleProjectionSaga(
         nowEpochMs: Long,
     ): GoogleProjectionDispatchResult {
         val kind = runCatching { pending.target.provider.googleProjectionKind() }.getOrNull()
-            ?: return blockWithoutWrite(pending, "TARGET_PROVIDER_NOT_GOOGLE_PROJECTION", nowEpochMs)
+            ?: return blockWithoutAttempt(pending, "TARGET_PROVIDER_NOT_GOOGLE_PROJECTION", nowEpochMs)
         val binding = bindingFrom(pending, kind)
-            ?: return blockWithoutWrite(pending, "TARGET_BINDING_INVALID", nowEpochMs)
-        val payload = payloadSource.render(pending.canonicalSubject, kind)
-            ?: return retryWithoutWrite(pending, "CANONICAL_PAYLOAD_UNAVAILABLE", nowEpochMs)
-        if (payload.subject.key != pending.canonicalSubject || payload.subject.digest == null) {
-            return blockWithoutWrite(pending, "CANONICAL_PAYLOAD_IDENTITY_MISMATCH", nowEpochMs)
+            ?: return blockWithoutAttempt(pending, "TARGET_BINDING_INVALID", nowEpochMs)
+
+        // W1 makes WRITE_SENT the attempt boundary. Every retry crosses it before provider work so
+        // attempt counting and retry exhaustion remain deterministic across process restarts.
+        val attempt = store.markWriteSent(pending.eventId, nowEpochMs)
+
+        val payload = payloadSource.render(attempt.canonicalSubject, kind)
+            ?: return retryAfterAttempt(attempt, "CANONICAL_PAYLOAD_UNAVAILABLE", nowEpochMs)
+        if (payload.subject.key != attempt.canonicalSubject || payload.subject.digest == null) {
+            return blockAfterAttempt(attempt, "CANONICAL_PAYLOAD_IDENTITY_MISMATCH", nowEpochMs)
         }
         if (payload.destinationAdmission != GoogleDestinationAdmission.ADMITTED) {
-            return blockWithoutWrite(pending, "DESTINATION_NO_LONGER_ADMITTED", nowEpochMs)
+            return blockAfterAttempt(attempt, "DESTINATION_NO_LONGER_ADMITTED", nowEpochMs)
         }
 
         val preRead = when (val result = transport.read(binding)) {
             is GoogleProjectionReadResult.Blocked ->
-                return blockWithoutWrite(pending, result.reasonCode, nowEpochMs)
+                return blockAfterAttempt(attempt, result.reasonCode, nowEpochMs)
             is GoogleProjectionReadResult.RetryableFailure ->
-                return retryWithoutWrite(pending, result.reasonCode, nowEpochMs)
+                return retryAfterAttempt(attempt, result.reasonCode, nowEpochMs)
             is GoogleProjectionReadResult.Found -> result.snapshot
         }
         if (preRead.fileId != binding.fileId) {
-            return blockWithoutWrite(pending, "TARGET_FILE_ID_MISMATCH", nowEpochMs)
+            return blockAfterAttempt(attempt, "TARGET_FILE_ID_MISMATCH", nowEpochMs)
         }
         if (
             preRead.canonicalSubject != null &&
-            preRead.canonicalSubject != pending.canonicalSubject
+            preRead.canonicalSubject != attempt.canonicalSubject
         ) {
-            return blockWithoutWrite(pending, "TARGET_CANONICAL_SUBJECT_MISMATCH", nowEpochMs)
+            return blockAfterAttempt(attempt, "TARGET_CANONICAL_SUBJECT_MISMATCH", nowEpochMs)
         }
 
         if (remoteMatches(preRead, payload)) {
-            return recordAlreadyCurrent(pending, kind, preRead, payload, nowEpochMs)
+            return recordAlreadyCurrent(attempt, kind, preRead, payload, nowEpochMs)
         }
 
         if (
             binding.expectedRevision != null &&
             preRead.revision != binding.expectedRevision
         ) {
-            val proposal = captureRevisionDrift(pending, binding, payload, preRead, nowEpochMs)
-            return blockWithoutWrite(
-                pending = pending,
+            val proposal = captureRevisionDrift(attempt, binding, payload, preRead, nowEpochMs)
+            return blockAfterAttempt(
+                current = attempt,
                 reasonCode = "TARGET_REVISION_CHANGED",
                 nowEpochMs = nowEpochMs,
                 proposal = proposal,
             )
         }
 
-        val sent = store.markWriteSent(pending.eventId, nowEpochMs)
         val command = GoogleProjectionWriteCommand(
-            eventId = sent.eventId,
+            eventId = attempt.eventId,
             binding = binding.copy(expectedRevision = preRead.revision),
             payload = payload,
             ifRevisionMatches = preRead.revision,
@@ -243,20 +247,20 @@ class GoogleProjectionSaga(
         val write = transport.write(command)
         val acknowledged = when (write) {
             is GoogleProjectionWriteResult.Blocked ->
-                return blockAfterWriteAttempt(sent, write.reasonCode, nowEpochMs)
+                return blockAfterAttempt(attempt, write.reasonCode, nowEpochMs)
             is GoogleProjectionWriteResult.RetryableFailure ->
-                return retryAfterAttempt(sent, write.reasonCode, nowEpochMs)
+                return retryAfterAttempt(attempt, write.reasonCode, nowEpochMs)
             is GoogleProjectionWriteResult.RevisionChanged ->
-                return retryAfterAttempt(sent, "TARGET_CHANGED_DURING_WRITE", nowEpochMs)
+                return retryAfterAttempt(attempt, "TARGET_CHANGED_DURING_WRITE", nowEpochMs)
             is GoogleProjectionWriteResult.Acknowledged -> {
                 if (
                     write.fileId != binding.fileId ||
                     write.revision.isBlank() ||
                     write.writtenDigest != payload.renderedDigest
                 ) {
-                    return blockAfterWriteAttempt(sent, "WRITE_ACK_MISMATCH", nowEpochMs)
+                    return blockAfterAttempt(attempt, "WRITE_ACK_MISMATCH", nowEpochMs)
                 }
-                sent.copy(
+                attempt.copy(
                     state = SyncState.WRITE_ACKNOWLEDGED,
                     targetRevision = write.revision,
                     writtenDigest = write.writtenDigest,
@@ -276,14 +280,13 @@ class GoogleProjectionSaga(
     }
 
     private suspend fun recordAlreadyCurrent(
-        pending: SyncReceipt,
+        attempt: SyncReceipt,
         kind: GoogleProjectionKind,
         remote: GoogleProjectionRemoteSnapshot,
         payload: GoogleProjectionPayload,
         nowEpochMs: Long,
     ): GoogleProjectionDispatchResult {
-        val sent = store.markWriteSent(pending.eventId, nowEpochMs)
-        val acknowledged = sent.copy(
+        val acknowledged = attempt.copy(
             state = SyncState.WRITE_ACKNOWLEDGED,
             targetRevision = remote.revision,
             writtenDigest = payload.renderedDigest,
@@ -307,7 +310,9 @@ class GoogleProjectionSaga(
         payload: GoogleProjectionPayload,
         nowEpochMs: Long,
     ): GoogleProjectionDispatchResult {
-        val readBack = when (val result = transport.read(binding.copy(expectedRevision = acknowledged.targetRevision))) {
+        val readBack = when (
+            val result = transport.read(binding.copy(expectedRevision = acknowledged.targetRevision))
+        ) {
             is GoogleProjectionReadResult.Blocked ->
                 return blockAfterAcknowledgement(acknowledged, result.reasonCode, nowEpochMs)
             is GoogleProjectionReadResult.RetryableFailure ->
@@ -365,7 +370,7 @@ class GoogleProjectionSaga(
     }
 
     private suspend fun captureRevisionDrift(
-        pending: SyncReceipt,
+        current: SyncReceipt,
         binding: GoogleProjectionBinding,
         payload: GoogleProjectionPayload,
         remote: GoogleProjectionRemoteSnapshot,
@@ -373,7 +378,7 @@ class GoogleProjectionSaga(
     ): ChangeProposal? {
         if (remote.canonicalSubject != payload.subject.key) return null
         if (remote.renderedDigest == payload.renderedDigest) return null
-        val proposalId = proposalIdFor(pending.eventId) ?: return null
+        val proposalId = proposalIdFor(current.eventId) ?: return null
         val proposal = ChangeProposal(
             proposalId = proposalId,
             canonicalSubject = payload.subject.key,
@@ -383,25 +388,6 @@ class GoogleProjectionSaga(
             state = ChangeProposalState.PROPOSED,
         )
         return if (store.enqueueChangeProposal(proposal, nowEpochMs)) proposal else null
-    }
-
-    private suspend fun retryWithoutWrite(
-        pending: SyncReceipt,
-        reasonCode: String,
-        nowEpochMs: Long,
-    ): GoogleProjectionDispatchResult {
-        val exhausted = pending.attempts >= maxAttempts
-        val receipt = pending.copy(
-            state = if (exhausted) SyncState.FAILED else SyncState.RETRYABLE_FAILURE,
-            errorCode = reasonCode,
-        )
-        val next = retryAt(nowEpochMs, pending.attempts + 1)
-        store.record(receipt, next, nowEpochMs)
-        return GoogleProjectionDispatchResult(
-            state = if (exhausted) GoogleProjectionDispatchState.BLOCKED else GoogleProjectionDispatchState.RETRY,
-            receipt = receipt,
-            reasonCode = reasonCode,
-        )
     }
 
     private suspend fun retryAfterAttempt(
@@ -423,13 +409,30 @@ class GoogleProjectionSaga(
         )
     }
 
-    private suspend fun blockWithoutWrite(
-        pending: SyncReceipt,
+    private suspend fun blockWithoutAttempt(
+        current: SyncReceipt,
+        reasonCode: String,
+        nowEpochMs: Long,
+    ): GoogleProjectionDispatchResult {
+        val receipt = current.copy(
+            state = SyncState.FAILED,
+            errorCode = reasonCode,
+        )
+        store.record(receipt, nowEpochMs, nowEpochMs)
+        return GoogleProjectionDispatchResult(
+            state = GoogleProjectionDispatchState.BLOCKED,
+            receipt = receipt,
+            reasonCode = reasonCode,
+        )
+    }
+
+    private suspend fun blockAfterAttempt(
+        current: SyncReceipt,
         reasonCode: String,
         nowEpochMs: Long,
         proposal: ChangeProposal? = null,
     ): GoogleProjectionDispatchResult {
-        val receipt = pending.copy(
+        val receipt = current.copy(
             state = SyncState.FAILED,
             errorCode = reasonCode,
         )
@@ -442,17 +445,11 @@ class GoogleProjectionSaga(
         )
     }
 
-    private suspend fun blockAfterWriteAttempt(
-        current: SyncReceipt,
-        reasonCode: String,
-        nowEpochMs: Long,
-    ): GoogleProjectionDispatchResult = blockWithoutWrite(current, reasonCode, nowEpochMs)
-
     private suspend fun blockAfterAcknowledgement(
         current: SyncReceipt,
         reasonCode: String,
         nowEpochMs: Long,
-    ): GoogleProjectionDispatchResult = blockWithoutWrite(current, reasonCode, nowEpochMs)
+    ): GoogleProjectionDispatchResult = blockAfterAttempt(current, reasonCode, nowEpochMs)
 
     private fun bindingFrom(
         receipt: SyncReceipt,
