@@ -25,7 +25,8 @@ Add a read-only GitHub WorkGraph plane under `workspace/github` with three parts
    - accepts an already-created `HttpClient` and an ephemeral token provider;
    - admits only `https://api.github.com`;
    - reads repository, issue, pull-request, explicit commit and check-run metadata;
-   - uses bounded check-run pagination;
+   - uses bounded check-run pagination and requires a stable `total_count` across pages;
+   - rejects duplicate-ID payload drift, pagination overrun and incomplete page traversal;
    - converts HTTP, decode, rate-limit and unavailable states into typed failure reasons;
    - never persists credentials or exposes repository mutation methods.
 
@@ -41,6 +42,8 @@ Add a read-only GitHub WorkGraph plane under `workspace/github` with three parts
 3. `GitHubWorkGraphAdapter`
    - reads one exact request snapshot;
    - rejects repository or observation-sequence mismatch before local writes;
+   - requires the snapshot issue numbers, PR numbers, explicit commit SHAs and linked-issue map to equal the request scope;
+   - rejects check runs when checks were disabled or when a check SHA is outside the requested PR-head set;
    - writes subjects before edges through the W1 registry sink;
    - returns partial write counts if a monotonic/local identity gate rejects a later write, so a caller can replay the same idempotent request;
    - owns no scheduler, retry daemon, checkout, merge or repository-setting authority.
@@ -48,11 +51,11 @@ Add a read-only GitHub WorkGraph plane under `workspace/github` with three parts
 ## Stable identities
 
 ```text
-repository  GHREPO:<GitHub REST repository id>
-issue       GHISSUE:<GitHub REST issue id>
+repository   GHREPO:<GitHub REST repository id>
+issue        GHISSUE:<GitHub REST issue id>
 pull request GHPR:<GitHub REST pull-request id>
-commit      GHCOMMIT:<40-character SHA>
-check       GHCHECK:<GitHub REST check-run id>
+commit       GHCOMMIT:<40-character SHA>
+check        GHCHECK:<GitHub REST check-run id>
 ```
 
 URLs remain `ExternalRef` projections. Branch names are display/routing metadata only; exact commit SHA controls technical-evidence freshness.
@@ -86,6 +89,10 @@ The adapter fails closed for:
 - malformed or unknown payloads;
 - conflicting duplicate stable IDs;
 - one issue/PR number resolving to multiple stable IDs;
+- missing or unrequested issue, PR or explicit commit subjects;
+- linked-issue scope drift;
+- check runs outside the exact requested PR-head set;
+- pagination `total_count` drift, overrun or bounded-page exhaustion;
 - observation sequence or requested repository mismatch;
 - W1 subject/edge monotonicity or identity rejection.
 
@@ -106,6 +113,6 @@ W2 does not implement:
 
 ## Verification ceiling
 
-A green W2 slice proves deterministic GitHub payload decoding, stable identity and typed-edge mapping, exact-head check classification, privacy-safe public summaries, fail-closed unavailable/alias/conflict behavior, and restartable writes into the exercised W1 local projection interface.
+A green W2 slice proves deterministic GitHub payload decoding, stable identity and typed-edge mapping, exact request-scope enforcement, exact-head check classification, privacy-safe public summaries, bounded pagination contracts, fail-closed unavailable/alias/conflict behavior, and restartable writes into the exercised W1 local projection interface.
 
 It does not prove live authenticated private-repository access, webhook freshness, checkout/build behavior, merge authority, deployment, or product outcome.
