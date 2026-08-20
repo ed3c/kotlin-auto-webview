@@ -1,0 +1,223 @@
+{
+  "schema_version": 1,
+  "program": "FEDERATED_CAPABILITY_WORKSPACE",
+  "public_registry_only": true,
+  "implementation_subjects": [
+    {
+      "evidence_id": "EV-W0-CONTRACT",
+      "atom": "W0",
+      "issue": 120,
+      "pull_request": 136,
+      "head_sha": "fba4a7f1c7cb8ca014d5a3cfe083fd9beaea4c5c",
+      "check_head_sha": "fba4a7f1c7cb8ca014d5a3cfe083fd9beaea4c5c",
+      "workflow_run_id": 32248605485,
+      "workflow_run_number": 80,
+      "workflow_conclusion": "success",
+      "evidence_type": "CONTRACT_CI",
+      "environment_class": "DETERMINISTIC_CONTRACT",
+      "live_provider": false,
+      "read_back_verified": false,
+      "manual_edit_can_change_canonical": false,
+      "route_request_grants_execution": false,
+      "expected_receipt_authority": "kotlin-auto-webview",
+      "receipt_authority": "kotlin-auto-webview",
+      "public_receipt": {
+        "atom": "W0",
+        "status": "PASS",
+        "environment": "DETERMINISTIC_CONTRACT"
+      }
+    },
+    {
+      "evidence_id": "EV-W1-LOCAL",
+      "atom": "W1",
+      "issue": 121,
+      "pull_request": 139,
+      "head_sha": "286f588226be7b0f9ecb63042e3eaefd5bc77dd7",
+      "check_head_sha": "286f588226be7b0f9ecb63042e3eaefd5bc77dd7",
+      "workflow_run_id": 32332217916,
+      "workflow_run_number": 146,
+      "workflow_conclusion": "success",
+      "evidence_type": "LOCAL_DETERMINISTIC_CI",
+      "environment_class": "DETERMINISTIC_FIXTURE",
+      "live_provider": false,
+      "read_back_verified": false,
+      "manual_edit_can_change_canonical": false,
+      "route_request_grants_execution": false,
+      "expected_receipt_authority": "kotlin-auto-webview",
+      "receipt_authority": "kotlin-auto-webview",
+      "public_receipt": {
+        "atom": "W1",
+        "status": "PASS",
+        "environment": "DETERMINISTIC_FIXTURE"
+      }
+    },
+    {
+      "evidence_id": "EV-W2-GITHUB-MAPPER",
+      "atom": "W2",
+      "issue": 122,
+      "pull_request": 158,
+      "head_sha": "3294fb2b4d86fef91f3f2c63e28718c490147808",
+      "check_head_sha": "3294fb2b4d86fef91f3f2c63e28718c490147808",
+      "workflow_run_id": 32345280914,
+      "workflow_run_number": 159,
+      "workflow_conclusion": "success",
+      "evidence_type": "GITHUB_ADAPTER_FIXTURE_CI",
+      "environment_class": "DETERMINISTIC_FIXTURE",
+      "live_provider": false,
+      "read_back_verified": false,
+      "manual_edit_can_change_canonical": false,
+      "route_request_grants_execution": false,
+      "expected_receipt_authority": "github-workgraph-adapter",
+      "receipt_authority": "github-workgraph-adapter",
+      "public_receipt": {
+        "atom": "W2",
+        "status": "PASS",
+        "environment": "DETERMINISTIC_FIXTURE"
+      }
+    },
+    {
+      "evidence_id": "EV-W3-GOOGLE-SAGA",
+      "atom": "W3",
+      "issue": 123,
+      "pull_request": 160,
+      "head_sha": "95754e2a7ea6a09da030da3803313fe49641b677",
+      "check_head_sha": "95754e2a7ea6a09da030da3803313fe49641b677",
+      "workflow_run_id": 32377060202,
+      "workflow_run_number": 166,
+      "workflow_conclusion": "success",
+      "evidence_type": "GOOGLE_PROJECTION_FIXTURE_CI",
+      "environment_class": "DETERMINISTIC_FIXTURE",
+      "live_provider": false,
+      "read_back_verified": true,
+      "manual_edit_can_change_canonical": false,
+      "route_request_grants_execution": false,
+      "expected_receipt_authority": "google-projection-saga",
+      "receipt_authority": "google-projection-saga",
+      "public_receipt": {
+        "atom": "W3",
+        "status": "PASS",
+        "environment": "DETERMINISTIC_FIXTURE",
+        "read_back": "VERIFIED_FIXTURE"
+      }
+    },
+    {
+      "evidence_id": "EV-W4-ROUTER",
+      "atom": "W4",
+      "issue": 124,
+      "pull_request": 161,
+      "head_sha": "56eb824866e7e74d63a4297748c647cff738db51",
+      "check_head_sha": "56eb824866e7e74d63a4297748c647cff738db51",
+      "workflow_run_id": 32379913900,
+      "workflow_run_number": 167,
+      "workflow_conclusion": "success",
+      "evidence_type": "ROUTER_FIXTURE_CI",
+      "environment_class": "DETERMINISTIC_FIXTURE",
+      "live_provider": false,
+      "read_back_verified": false,
+      "manual_edit_can_change_canonical": false,
+      "route_request_grants_execution": false,
+      "expected_receipt_authority": "federation-router",
+      "receipt_authority": "federation-router",
+      "public_receipt": {
+        "atom": "W4",
+        "status": "PASS",
+        "environment": "DETERMINISTIC_FIXTURE",
+        "execution_authority": false
+      }
+    },
+    {
+      "evidence_id": "EV-W5-UI",
+      "atom": "W5",
+      "issue": 125,
+      "pull_request": 162,
+      "head_sha": "f0e37a4f2b39dd825bfd379d42f96c29ce887f37",
+      "check_head_sha": "f0e37a4f2b39dd825bfd379d42f96c29ce887f37",
+      "workflow_run_id": 32389825474,
+      "workflow_run_number": 169,
+      "workflow_conclusion": "success",
+      "evidence_type": "READ_ONLY_UI_FIXTURE_CI",
+      "environment_class": "DETERMINISTIC_FIXTURE",
+      "live_provider": false,
+      "read_back_verified": false,
+      "manual_edit_can_change_canonical": false,
+      "route_request_grants_execution": false,
+      "expected_receipt_authority": "capability-workspace-ui",
+      "receipt_authority": "capability-workspace-ui",
+      "public_receipt": {
+        "atom": "W5",
+        "status": "PASS",
+        "environment": "DETERMINISTIC_FIXTURE",
+        "private_locators": "REDACTED"
+      }
+    }
+  ],
+  "lanes": [
+    {
+      "lane_id": "L0",
+      "name": "CONTRACT",
+      "required_environment_class": "DETERMINISTIC_CONTRACT",
+      "status": "PASS",
+      "evidence_ids": ["EV-W0-CONTRACT"]
+    },
+    {
+      "lane_id": "L1",
+      "name": "LOCAL_DETERMINISTIC",
+      "required_environment_class": "DETERMINISTIC_FIXTURE",
+      "status": "PASS",
+      "evidence_ids": ["EV-W1-LOCAL", "EV-W2-GITHUB-MAPPER", "EV-W3-GOOGLE-SAGA", "EV-W4-ROUTER", "EV-W5-UI"]
+    },
+    {
+      "lane_id": "L2",
+      "name": "GITHUB_CONNECTOR",
+      "required_environment_class": "LIVE_GITHUB_CONNECTOR",
+      "status": "NOT_EXERCISED",
+      "evidence_ids": []
+    },
+    {
+      "lane_id": "L3",
+      "name": "GOOGLE_PROJECTION_ACCOUNT",
+      "required_environment_class": "LIVE_GOOGLE_ACCOUNT",
+      "status": "NOT_EXERCISED",
+      "evidence_ids": []
+    },
+    {
+      "lane_id": "L4",
+      "name": "BETTOR_ROUTE_HANDOFF",
+      "required_environment_class": "LIVE_BETTOR_HANDOFF",
+      "status": "NOT_EXERCISED",
+      "evidence_ids": []
+    },
+    {
+      "lane_id": "L5",
+      "name": "DOMAIN_AUTHORITY_RECEIPT",
+      "required_environment_class": "LIVE_DOMAIN_AUTHORITY",
+      "status": "NOT_EXERCISED",
+      "evidence_ids": []
+    },
+    {
+      "lane_id": "L6",
+      "name": "PHYSICAL_DEVICE",
+      "required_environment_class": "PHYSICAL_DEVICE",
+      "status": "NOT_EXERCISED",
+      "evidence_ids": []
+    },
+    {
+      "lane_id": "L7",
+      "name": "USER_OUTCOME",
+      "required_environment_class": "USER_OUTCOME",
+      "status": "ABSENT",
+      "evidence_ids": []
+    }
+  ],
+  "hard_laws": {
+    "url_or_title_is_stable_identity": false,
+    "stale_check_can_evidence_current_head": false,
+    "google_write_ack_without_read_back_is_success": false,
+    "google_manual_edit_can_change_canonical": false,
+    "public_receipt_can_contain_private_identifier": false,
+    "route_request_grants_execution": false,
+    "cross_authority_receipt_reuse_allowed": false,
+    "fixture_can_satisfy_live_lane": false,
+    "ci_or_issue_can_satisfy_user_outcome": false
+  }
+}
