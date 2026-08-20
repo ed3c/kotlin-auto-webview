@@ -174,7 +174,6 @@ enum class GoogleProjectionDispatchState {
 
 @Serializable
 data class GoogleProjectionPublicReceipt(
-    val eventId: String,
     val canonicalSubjectKind: String,
     val projectionKind: GoogleProjectionKind,
     val state: GoogleProjectionDispatchState,
@@ -182,7 +181,6 @@ data class GoogleProjectionPublicReceipt(
     val reasonCode: String? = null,
 ) {
     init {
-        require(W3_ID_PATTERN.matches(eventId)) { "Public Google receipt event id is invalid" }
         require(canonicalSubjectKind.isNotBlank()) { "Public Google receipt subject kind cannot be blank" }
         require(attempts >= 0) { "Public Google receipt attempts cannot be negative" }
     }
@@ -196,7 +194,6 @@ data class GoogleProjectionDispatchResult(
     val changeProposal: ChangeProposal? = null,
 ) {
     fun toPublicReceipt(): GoogleProjectionPublicReceipt = GoogleProjectionPublicReceipt(
-        eventId = receipt.eventId,
         canonicalSubjectKind = receipt.canonicalSubject.kind.name,
         projectionKind = receipt.target.provider.googleProjectionKind(),
         state = state,
