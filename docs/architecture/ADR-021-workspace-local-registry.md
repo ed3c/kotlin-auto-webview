@@ -1,6 +1,6 @@
 # ADR-021: Local workspace registry, durable outbox, and inbox
 
-Status: Proposed for W1 implementation (#121)
+Status: Accepted for W1 implementation (#121, Draft PR #139)
 
 ## Context
 
@@ -31,7 +31,7 @@ terminal
 → CLEANED_UP
 ```
 
-Direct `PENDING → READ_BACK_VERIFIED`, terminal reopening, and decreasing attempt counts are rejected.
+Direct `PENDING → READ_BACK_VERIFIED`, terminal reopening, changing sync identity/target, and changing attempt counts outside `markWriteSent` are rejected. The issue-level `BLOCKED` outcome is represented by terminal `FAILED` plus an explicit error code in the W0 contract; it does not grant or imply execution authority.
 
 ## Authority boundary
 
@@ -43,21 +43,30 @@ INBOX CHANGE != CANONICAL CHANGE
 CACHE CORRUPTION != PERMISSION TO INVENT STATE
 ```
 
-Only W0 metadata contracts are stored by this plane. It does not store arbitrary source bytes and exposes no network capability.
+Only W0 metadata contracts are stored by this plane. It does not store arbitrary source bytes and exposes no network capability. Private subjects may exist in the local database, but public serialization remains the W0 redacted projection path; W1 adds no public export shortcut.
 
-## Durability and idempotency
+## Durability, freshness, and idempotency
+
+Subject and edge writes use monotonic local observation timestamps. An older write cannot replace a newer projection, a stale tombstone cannot hide a newer subject, and a tombstoned subject can be rebuilt only by a newer observation. An existing edge ID cannot be rebound to different endpoints or a different relation.
 
 Outbox events use an explicit unique `dedupe_key`. Duplicate enqueue attempts do not create a second event. File-backed desktop integration tests close and reopen the SQLite database before dispatch/decision processing.
 
-Inbox proposals use proposal ID as an idempotency key. A proposal enters only as `PROPOSED`; acceptance/rejection requires a reviewer and only changes the local proposal state.
+Inbox proposals use proposal ID as an idempotency key. A proposal enters only as `PROPOSED`; acceptance/rejection requires a reviewer, cannot alter the requested change, and is terminal in the local inbox.
+
+## Row/payload integrity
+
+Every decoded row is checked against its indexed columns:
+
+- subject key and tombstone marker;
+- edge ID, endpoints, and relation;
+- sync event ID, canonical subject, state, and attempt count;
+- proposal ID, canonical subject, source projection, and state.
+
+Malformed JSON, unknown enum values, or column/payload disagreement fail closed. Raw row counts remain observable so repair tooling can distinguish storage presence from admitted decoded state.
 
 ## Schema migration
 
-W1 introduces AppDatabase schema v3. Migration `2.sqm` starts from the committed version-2 snapshot `2.db`. The snapshot contains only the pre-W1 semantic cache and audit schema and has `PRAGMA user_version = 2`.
-
-## Failure behavior
-
-Malformed serialized subject/edge/outbox/inbox payloads fail closed during decode; they are not promoted into canonical state. Corrupt-row counting remains observable so later repair/tombstone logic can distinguish storage presence from decoded projection availability.
+W1 introduces AppDatabase schema v3. Migration `2.sqm` starts from the pinned version-2 snapshot. Because some remote mutation carriers cannot safely transport expanded SQLite bytes, the repository stores a digest-pinned `2.db.gz`; the Gradle graph deterministically materializes `2.db`, verifies compressed and expanded SHA-256 values, and then runs the existing readable-snapshot and SQLDelight migration gates.
 
 ## Non-goals
 
@@ -74,4 +83,4 @@ W1 does not implement:
 
 ## Verification ceiling
 
-PASS proves local SQLDelight schema/migration, projection persistence, file-backed reopen, idempotent enqueue, state-machine rejection, tombstone behavior, and inbox proposal semantics only. It is not live synchronization evidence.
+PASS proves local SQLDelight schema/migration, projection persistence, stale-write refusal, tombstone/rebuild, stable edge identity, file-backed reopen, idempotent enqueue, retry/conflict persistence, state-machine rejection, row/payload fail-closed behavior, and inbox proposal semantics only. It is not live synchronization evidence.
