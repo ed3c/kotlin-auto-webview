@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ed3c/kotlin-auto-webview/schemas/workspace/google-projection-contract.schema.json",
+  "title": "Federated Workspace Google Projection Contract",
+  "type": "object",
+  "required": [
+    "projection_id",
+    "canonical_subject",
+    "kind",
+    "file_id",
+    "destination_admission"
+  ],
+  "properties": {
+    "projection_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9._:-]{2,127}$"
+    },
+    "canonical_subject": {
+      "$ref": "#/$defs/subject_key"
+    },
+    "kind": {
+      "enum": ["DOC", "SHEET"]
+    },
+    "file_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]{6,256}$"
+    },
+    "expected_revision": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "display_name": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 512,
+      "description": "Human label only. It is never projection identity."
+    },
+    "destination_admission": {
+      "enum": ["ADMITTED", "LOCAL_ONLY", "EXTERNAL_AUTHORITY_REQUIRED"]
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "subject_key": {
+      "type": "object",
+      "required": ["logical_id", "kind"],
+      "properties": {
+        "logical_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._:-]{2,127}$"
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "public_receipt": {
+      "type": "object",
+      "required": ["canonical_subject_kind", "projection_kind", "state", "attempts"],
+      "properties": {
+        "canonical_subject_kind": {"type": "string", "minLength": 1},
+        "projection_kind": {"enum": ["DOC", "SHEET"]},
+        "state": {"enum": ["SYNCED", "RETRY", "CONFLICT", "BLOCKED"]},
+        "attempts": {"type": "integer", "minimum": 0},
+        "reason_code": {"type": ["string", "null"]}
+      },
+      "not": {
+        "anyOf": [
+          {"required": ["file_id"]},
+          {"required": ["revision"]},
+          {"required": ["event_id"]},
+          {"required": ["canonical_url"]}
+        ]
+      },
+      "additionalProperties": false
+    }
+  }
+}
