@@ -124,3 +124,96 @@ jobs:
           gradle-version: '8.11.1'
       - name: Link iOS simulator framework
         run: scripts/ci/run-gradle-with-annotations.sh :composeApp:linkDebugFrameworkIosSimulatorArm64
+
+  opendroid-d0-admission:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact workflow subject
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 1
+      - name: Run D0 admission validator
+        run: |
+          python3 integrations/opendroid/validate_admission.py \
+            --expected-commit 0e9e5898f0e0dcc679d99e5f4518e19310e96775 \
+            --expected-tree 4c9d1d5f644fc69d9a0a5e658b51d1753fd2ac32
+      - name: Run D0 mutation controls
+        run: python3 -m unittest integrations/opendroid/test_validate_admission.py
+      - name: Emit exact-head D0 receipt
+        env:
+          EXPECTED_UPSTREAM_COMMIT: 0e9e5898f0e0dcc679d99e5f4518e19310e96775
+          EXPECTED_UPSTREAM_TREE: 4c9d1d5f644fc69d9a0a5e658b51d1753fd2ac32
+        run: |
+          mkdir -p receipts/opendroid
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
+
+          head = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          tree = subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], text=True).strip()
+          receipt = {
+              "schema": "kotlin-auto-webview/opendroid-d0-admission-receipt/v1",
+              "state": "PASS",
+              "evidence_ceiling": "STATIC_SOURCE_ADMISSION_ONLY",
+              "product": {
+                  "repository": "ed3c/kotlin-auto-webview",
+                  "head_commit": head,
+                  "head_tree": tree,
+              },
+              "upstream": {
+                  "repository": "yashab-cyber/opendroid",
+                  "expected_commit": os.environ["EXPECTED_UPSTREAM_COMMIT"],
+                  "expected_tree": os.environ["EXPECTED_UPSTREAM_TREE"],
+              },
+              "commands": [
+                  {
+                      "argv": [
+                          "python3",
+                          "integrations/opendroid/validate_admission.py",
+                          "--expected-commit",
+                          os.environ["EXPECTED_UPSTREAM_COMMIT"],
+                          "--expected-tree",
+                          os.environ["EXPECTED_UPSTREAM_TREE"],
+                      ],
+                      "exit_status": 0,
+                  },
+                  {
+                      "argv": [
+                          "python3",
+                          "-m",
+                          "unittest",
+                          "integrations/opendroid/test_validate_admission.py",
+                      ],
+                      "exit_status": 0,
+                  },
+              ],
+              "mutation_controls": [
+                  "stale-pin",
+                  "capability-omission",
+                  "forbidden-direct-mcp-admission",
+                  "play-safe-widening",
+                  "provenance-copy-mutation",
+                  "source-blob-disagreement",
+              ],
+              "non_claims": [
+                  "device-execution",
+                  "emulator-pass",
+                  "physical-device-pass",
+                  "store-policy-pass",
+                  "runtime-side-effect-pass",
+              ],
+          }
+          Path("receipts/opendroid/d0-admission.json").write_text(
+              json.dumps(receipt, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+      - name: Upload D0 receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: opendroid-d0-admission-receipt
+          path: receipts/opendroid/d0-admission.json
+          if-no-files-found: error
