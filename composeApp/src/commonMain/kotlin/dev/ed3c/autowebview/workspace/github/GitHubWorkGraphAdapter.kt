@@ -7,6 +7,7 @@ import dev.ed3c.autowebview.workspace.contract.EvidenceClass
 import dev.ed3c.autowebview.workspace.contract.SubjectRef
 import dev.ed3c.autowebview.workspace.contract.TypedEdge
 import dev.ed3c.autowebview.workspace.registry.SqlDelightWorkspaceRegistry
+import kotlinx.serialization.Serializable
 
 class GitHubWorkGraphMapper {
     fun map(snapshot: GitHubWorkGraphSnapshot): GitHubWorkGraphProjection {
@@ -194,9 +195,7 @@ class GitHubWorkGraphMapper {
             )
         }
 
-        val pullRequestByNumber = linkedMapOf<Long, GitHubPullRequestSnapshot>()
         for (pullRequest in pullRequests.sortedBy(GitHubPullRequestSnapshot::number)) {
-            pullRequestByNumber[pullRequest.number] = pullRequest
             val key = GitHubSubjectKeys.pullRequest(pullRequest.pullRequestId)
             val state = when {
                 pullRequest.state == GitHubPullRequestState.MERGED -> GitHubWorkState.PULL_REQUEST_MERGED
@@ -500,6 +499,11 @@ class GitHubWorkGraphAdapter(
                 GitHubProjectionRejectionReason.REPOSITORY_SLUG_MISMATCH,
             )
         }
+        if (!matchesRequestedScope(request, snapshot)) {
+            return GitHubWorkGraphRefreshResult.Rejected(
+                GitHubProjectionRejectionReason.REQUEST_SCOPE_MISMATCH,
+            )
+        }
 
         val projection = try {
             mapper.map(snapshot)
@@ -542,6 +546,36 @@ class GitHubWorkGraphAdapter(
         )
     }
 
+    private fun matchesRequestedScope(
+        request: GitHubWorkGraphRequest,
+        snapshot: GitHubWorkGraphSnapshot,
+    ): Boolean {
+        if (snapshot.issues.mapTo(linkedSetOf(), GitHubIssueSnapshot::number) != request.issueNumbers) {
+            return false
+        }
+        if (
+            snapshot.pullRequests.mapTo(linkedSetOf(), GitHubPullRequestSnapshot::number) !=
+            request.pullRequestNumbers
+        ) {
+            return false
+        }
+        if (
+            snapshot.commits.mapTo(linkedSetOf()) { it.sha.lowercase() } !=
+            request.commitShas.mapTo(linkedSetOf()) { it.lowercase() }
+        ) {
+            return false
+        }
+        if (snapshot.linkedIssueNumbersByPullRequest != request.linkedIssueNumbersByPullRequest) {
+            return false
+        }
+        if (!request.includeChecksForPullRequests) {
+            return snapshot.checkRuns.isEmpty()
+        }
+
+        val requestedHeadShas = snapshot.pullRequests.mapTo(linkedSetOf()) { it.headSha }
+        return snapshot.checkRuns.all { it.headSha in requestedHeadShas }
+    }
+
     private fun sameRepository(left: GitHubRepositorySlug, right: GitHubRepositorySlug): Boolean =
         left.owner.equals(right.owner, ignoreCase = true) &&
             left.name.equals(right.name, ignoreCase = true)
@@ -551,6 +585,7 @@ class GitHubWorkGraphAdapter(
 enum class GitHubProjectionRejectionReason {
     OBSERVATION_SEQUENCE_MISMATCH,
     REPOSITORY_SLUG_MISMATCH,
+    REQUEST_SCOPE_MISMATCH,
     DUPLICATE_IDENTITY_CONFLICT,
     NUMBER_ALIAS_CONFLICT,
     SNAPSHOT_INVALID,
