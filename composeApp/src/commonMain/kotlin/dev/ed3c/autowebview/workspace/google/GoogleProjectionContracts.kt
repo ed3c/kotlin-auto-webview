@@ -14,6 +14,7 @@ import kotlinx.serialization.Serializable
 
 private val W3_ID_PATTERN = Regex("^[A-Za-z][A-Za-z0-9._:-]{2,127}$")
 private val GOOGLE_FILE_ID_PATTERN = Regex("^[A-Za-z0-9_-]{6,256}$")
+private val REASON_CODE_PATTERN = Regex("^[A-Z0-9_:-]{1,128}$")
 
 @Serializable
 enum class GoogleProjectionKind {
@@ -122,19 +123,44 @@ sealed interface GoogleProjectionWriteResult {
         val fileId: String,
         val revision: String,
         val writtenDigest: DigestRef,
-    ) : GoogleProjectionWriteResult
+    ) : GoogleProjectionWriteResult {
+        init {
+            require(GOOGLE_FILE_ID_PATTERN.matches(fileId)) { "Google write file id is invalid" }
+            require(revision.isNotBlank()) { "Google write revision cannot be blank" }
+            require(!revision.contains('\n') && !revision.contains('\r')) {
+                "Google write revision cannot contain newlines"
+            }
+        }
+    }
 
     data class RevisionChanged(
         val actualRevision: String? = null,
-    ) : GoogleProjectionWriteResult
+    ) : GoogleProjectionWriteResult {
+        init {
+            require(actualRevision == null || actualRevision.isNotBlank()) {
+                "Google changed revision cannot be blank"
+            }
+            require(actualRevision == null || !actualRevision.contains('\n') && !actualRevision.contains('\r')) {
+                "Google changed revision cannot contain newlines"
+            }
+        }
+    }
 
     data class RetryableFailure(
         val reasonCode: String,
-    ) : GoogleProjectionWriteResult
+    ) : GoogleProjectionWriteResult {
+        init {
+            requireReasonCode(reasonCode)
+        }
+    }
 
     data class Blocked(
         val reasonCode: String,
-    ) : GoogleProjectionWriteResult
+    ) : GoogleProjectionWriteResult {
+        init {
+            requireReasonCode(reasonCode)
+        }
+    }
 }
 
 sealed interface GoogleProjectionReadResult {
@@ -144,11 +170,19 @@ sealed interface GoogleProjectionReadResult {
 
     data class RetryableFailure(
         val reasonCode: String,
-    ) : GoogleProjectionReadResult
+    ) : GoogleProjectionReadResult {
+        init {
+            requireReasonCode(reasonCode)
+        }
+    }
 
     data class Blocked(
         val reasonCode: String,
-    ) : GoogleProjectionReadResult
+    ) : GoogleProjectionReadResult {
+        init {
+            requireReasonCode(reasonCode)
+        }
+    }
 }
 
 fun interface GoogleProjectionPayloadSource {
@@ -183,6 +217,7 @@ data class GoogleProjectionPublicReceipt(
     init {
         require(canonicalSubjectKind.isNotBlank()) { "Public Google receipt subject kind cannot be blank" }
         require(attempts >= 0) { "Public Google receipt attempts cannot be negative" }
+        if (reasonCode != null) requireReasonCode(reasonCode)
     }
 }
 
@@ -193,6 +228,10 @@ data class GoogleProjectionDispatchResult(
     val reasonCode: String? = null,
     val changeProposal: ChangeProposal? = null,
 ) {
+    init {
+        if (reasonCode != null) requireReasonCode(reasonCode)
+    }
+
     fun toPublicReceipt(): GoogleProjectionPublicReceipt = GoogleProjectionPublicReceipt(
         canonicalSubjectKind = receipt.canonicalSubject.kind.name,
         projectionKind = receipt.target.provider.googleProjectionKind(),
@@ -219,4 +258,8 @@ internal fun GoogleProjectionBinding.isDestinationAdmitted(subject: SubjectRef):
         return true
     }
     return destinationAdmission == GoogleDestinationAdmission.ADMITTED
+}
+
+private fun requireReasonCode(value: String) {
+    require(REASON_CODE_PATTERN.matches(value)) { "Google projection reason code is invalid" }
 }
