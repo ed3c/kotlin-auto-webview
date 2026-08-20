@@ -27,6 +27,21 @@ class GitHubRestPayloadDecoderTest {
     }
 
     @Test
+    fun checkRunQueryPinsLatestFilterAndBoundedPageSize() {
+        assertEquals(
+            linkedMapOf(
+                "filter" to "latest",
+                "per_page" to "100",
+                "page" to "2",
+            ),
+            githubCheckRunQueryParameters(page = 2),
+        )
+        assertFailsWith<IllegalArgumentException> {
+            githubCheckRunQueryParameters(page = 0)
+        }
+    }
+
+    @Test
     fun repositoryIssueAndPullRequestPayloadsMapToStableRestIds() {
         val slug = GitHubRepositorySlug("example", "public-repository")
         val repository = decoder.decodeRepository(
@@ -170,6 +185,58 @@ class GitHubRestPayloadDecoderTest {
 
         assertFailsWith<IllegalArgumentException> {
             decoder.decodeCheckRuns(payload, repositoryId = 100, expectedHeadSha = baseSha)
+        }
+    }
+
+    @Test
+    fun unknownOrInconsistentCheckStatesFailClosed() {
+        fun payload(status: String, conclusion: String?): String {
+            val conclusionJson = conclusion?.let { "\"$it\"" } ?: "null"
+            return """
+                {
+                  "total_count": 1,
+                  "check_runs": [
+                    {
+                      "id": 401,
+                      "name": "fixture",
+                      "head_sha": "$headSha",
+                      "status": "$status",
+                      "conclusion": $conclusionJson,
+                      "started_at": "2026-08-20T00:00:00Z",
+                      "completed_at": null
+                    }
+                  ]
+                }
+            """.trimIndent()
+        }
+
+        assertFailsWith<IllegalArgumentException> {
+            decoder.decodeCheckRuns(
+                payload("waiting_for_model", null),
+                repositoryId = 100,
+                expectedHeadSha = headSha,
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            decoder.decodeCheckRuns(
+                payload("completed", "future_conclusion"),
+                repositoryId = 100,
+                expectedHeadSha = headSha,
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            decoder.decodeCheckRuns(
+                payload("completed", null),
+                repositoryId = 100,
+                expectedHeadSha = headSha,
+            )
+        }
+        assertFailsWith<IllegalArgumentException> {
+            decoder.decodeCheckRuns(
+                payload("in_progress", "success"),
+                repositoryId = 100,
+                expectedHeadSha = headSha,
+            )
         }
     }
 
