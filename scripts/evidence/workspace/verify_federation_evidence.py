@@ -20,6 +20,44 @@ REQUIRED_LANES = {
     "L6": ("PHYSICAL_DEVICE", "PHYSICAL_DEVICE"),
     "L7": ("USER_OUTCOME", "USER_OUTCOME"),
 }
+EXPECTED_SUBJECTS = {
+    "W0": {
+        "issue": 120,
+        "pull_request": 136,
+        "head_sha": "fba4a7f1c7cb8ca014d5a3cfe083fd9beaea4c5c",
+        "workflow_run_id": 32248605485,
+    },
+    "W1": {
+        "issue": 121,
+        "pull_request": 139,
+        "head_sha": "286f588226be7b0f9ecb63042e3eaefd5bc77dd7",
+        "workflow_run_id": 32332217916,
+    },
+    "W2": {
+        "issue": 122,
+        "pull_request": 158,
+        "head_sha": "3294fb2b4d86fef91f3f2c63e28718c490147808",
+        "workflow_run_id": 32345280914,
+    },
+    "W3": {
+        "issue": 123,
+        "pull_request": 160,
+        "head_sha": "95754e2a7ea6a09da030da3803313fe49641b677",
+        "workflow_run_id": 32377060202,
+    },
+    "W4": {
+        "issue": 124,
+        "pull_request": 161,
+        "head_sha": "56eb824866e7e74d63a4297748c647cff738db51",
+        "workflow_run_id": 32379913900,
+    },
+    "W5": {
+        "issue": 125,
+        "pull_request": 162,
+        "head_sha": "f0e37a4f2b39dd825bfd379d42f96c29ce887f37",
+        "workflow_run_id": 32389825474,
+    },
+}
 ALLOWED_STATUSES = {
     "PASS",
     "FAIL",
@@ -120,6 +158,14 @@ def verify_manifest(manifest: dict[str, Any]) -> list[str]:
         else:
             atoms.add(atom)
 
+        pinned = EXPECTED_SUBJECTS.get(atom) if isinstance(atom, str) else None
+        if pinned is None:
+            errors.append(f"{evidence_id}: unrecognized implementation atom {atom!r}")
+        else:
+            for field, expected in pinned.items():
+                if item.get(field) != expected:
+                    errors.append(f"{evidence_id}: exact subject drift at {field}")
+
         head = item.get("head_sha")
         check_head = item.get("check_head_sha")
         if not isinstance(head, str) or not SHA40.fullmatch(head):
@@ -148,9 +194,10 @@ def verify_manifest(manifest: dict[str, Any]) -> list[str]:
         else:
             _walk_public(public_receipt, f"{evidence_id}.public_receipt", errors)
 
-    expected_atoms = {f"W{i}" for i in range(6)}
-    if atoms != expected_atoms:
-        errors.append(f"implementation atom denominator mismatch: expected {sorted(expected_atoms)}, got {sorted(atoms)}")
+    if atoms != set(EXPECTED_SUBJECTS):
+        errors.append(
+            f"implementation atom denominator mismatch: expected {sorted(EXPECTED_SUBJECTS)}, got {sorted(atoms)}"
+        )
 
     lanes = manifest.get("lanes")
     if not isinstance(lanes, list):
