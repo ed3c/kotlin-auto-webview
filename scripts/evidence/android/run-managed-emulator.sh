@@ -14,6 +14,7 @@ readonly AVD_NAME="kaw-evidence-api${API_LEVEL}"
 readonly RECEIPT_DIR="build/receipts/android-opendroid"
 readonly RECEIPT_PATH="${RECEIPT_DIR}/emulator-api${API_LEVEL}.json"
 readonly EMULATOR_LOG="${RECEIPT_DIR}/emulator-api${API_LEVEL}.log"
+readonly IMAGE_CATALOG_LOG="${RECEIPT_DIR}/emulator-api${API_LEVEL}-sdkmanager-list.log"
 readonly CONNECT_TIMEOUT_SECONDS=120
 readonly BOOT_TIMEOUT_SECONDS=300
 readonly TEST_TIMEOUT_SECONDS=900
@@ -223,6 +224,24 @@ if [[ "$SOURCECHECK_EXIT" -ne 0 ]]; then
 fi
 
 yes | sdkmanager --licenses >/dev/null 2>&1 || true
+
+# Determine literal carrier availability before installation. A successful catalog
+# lookup that does not contain the fixed image is ABSENT; catalog/network/tooling
+# failures remain FAIL and are never converted into an alternate-image fallback.
+set +e
+sdkmanager --list >"$IMAGE_CATALOG_LOG" 2>&1
+image_catalog_exit=$?
+set -e
+if [[ "$image_catalog_exit" -ne 0 ]]; then
+  echo "Android SDK catalog lookup failed; carrier availability is unknown" >&2
+  exit 26
+fi
+if ! grep -Fq "$SYSTEM_IMAGE" "$IMAGE_CATALOG_LOG"; then
+  STATE="ABSENT"
+  echo "fixed Android emulator system image is absent: ${SYSTEM_IMAGE}" >&2
+  exit 27
+fi
+
 sdkmanager --install 'platform-tools' 'emulator' "$SYSTEM_IMAGE"
 if [[ ! -x "$EMULATOR_BIN" ]]; then
   echo "Android emulator binary absent after fixed sdkmanager install" >&2
