@@ -5,8 +5,7 @@ import dev.ed3c.autowebview.workspace.contract.SubjectDataClass
 import dev.ed3c.autowebview.workspace.contract.SubjectKind
 import dev.ed3c.autowebview.workspace.contract.SubjectVisibility
 
-@JvmInline
-value class CapabilityWorkspaceAccess private constructor(val privateLocatorsVisible: Boolean) {
+class CapabilityWorkspaceAccess private constructor(val privateLocatorsVisible: Boolean) {
     companion object {
         val PublicSafe = CapabilityWorkspaceAccess(false)
         val AuthorizedLocal = CapabilityWorkspaceAccess(true)
