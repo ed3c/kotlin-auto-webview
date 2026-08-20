@@ -52,9 +52,10 @@ class GitHubRestMetadataSource(
     private val client: HttpClient,
     private val tokenProvider: GitHubTokenProvider = GitHubTokenProvider { null },
     private val endpoint: GitHubApiEndpoint = GitHubApiEndpoint(),
-    private val decoder: GitHubRestPayloadDecoder = GitHubRestPayloadDecoder(),
     private val maxCheckPages: Int = 10,
 ) : GitHubMetadataSource {
+    private val decoder = GitHubRestPayloadDecoder()
+
     init {
         require(maxCheckPages in 1..100) { "GitHub check page limit must be bounded" }
     }
