@@ -343,7 +343,7 @@ class AndroidAutomationEvidenceInstrumentation : Instrumentation() {
                 webView = webView,
                 policy = PlaySafeWebViewPolicy(
                     allowedOrigins = setOf(OWNED_ORIGIN),
-                    clickNavigationExpectations = mapOf(anchor.fingerprint to "$BASE_PAGE_URL#wrong"),
+                    clickNavigationExpectations = mapOf(anchor.fingerprint to "$OWNED_ORIGIN/wrong"),
                 ),
             )
             val wrongTarget = runBlocking { wrongDestination.resolve(first.query(anchor)) }.single()
@@ -471,13 +471,13 @@ class AndroidAutomationEvidenceInstrumentation : Instrumentation() {
             "dev.ed3c.autowebview.device.accessibility.executor.EnterpriseAccessibilityService"
         const val OWNED_ORIGIN = "https://app.example.test"
         const val BASE_PAGE_URL = "https://app.example.test/page"
-        const val CLICK_DESTINATION = "https://app.example.test/page#complete"
+        const val CLICK_DESTINATION = "https://app.example.test/complete"
 
         val FIXTURE_HTML = """
             <!doctype html>
             <html>
               <body>
-                <a aria-label="Complete" href="#complete">Complete</a>
+                <a aria-label="Complete" href="/complete" onclick="history.pushState(null, '', '/complete'); return false;">Complete</a>
                 <input aria-label="Name" type="text" />
                 <select aria-label="Choice">
                   <option value="a">A</option>
