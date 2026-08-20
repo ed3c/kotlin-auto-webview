@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ed3c/kotlin-auto-webview/schemas/workspace/evidence-federation.schema.json",
+  "title": "Federated Capability Workspace Evidence Denominator",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "program", "public_registry_only", "implementation_subjects", "lanes", "hard_laws"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "program": {"const": "FEDERATED_CAPABILITY_WORKSPACE"},
+    "public_registry_only": {"const": true},
+    "implementation_subjects": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {"$ref": "#/$defs/evidenceSubject"}
+    },
+    "lanes": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {"$ref": "#/$defs/lane"}
+    },
+    "hard_laws": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "url_or_title_is_stable_identity",
+        "stale_check_can_evidence_current_head",
+        "google_write_ack_without_read_back_is_success",
+        "google_manual_edit_can_change_canonical",
+        "public_receipt_can_contain_private_identifier",
+        "route_request_grants_execution",
+        "cross_authority_receipt_reuse_allowed",
+        "fixture_can_satisfy_live_lane",
+        "ci_or_issue_can_satisfy_user_outcome"
+      ],
+      "properties": {
+        "url_or_title_is_stable_identity": {"const": false},
+        "stale_check_can_evidence_current_head": {"const": false},
+        "google_write_ack_without_read_back_is_success": {"const": false},
+        "google_manual_edit_can_change_canonical": {"const": false},
+        "public_receipt_can_contain_private_identifier": {"const": false},
+        "route_request_grants_execution": {"const": false},
+        "cross_authority_receipt_reuse_allowed": {"const": false},
+        "fixture_can_satisfy_live_lane": {"const": false},
+        "ci_or_issue_can_satisfy_user_outcome": {"const": false}
+      }
+    }
+  },
+  "$defs": {
+    "sha40": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "status": {"enum": ["PASS", "FAIL", "BLOCKED", "NOT_EXERCISED", "EXTERNAL_AUTHORITY_REQUIRED", "ABSENT"]},
+    "evidenceSubject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id", "atom", "issue", "pull_request", "head_sha", "check_head_sha",
+        "workflow_run_id", "workflow_run_number", "workflow_conclusion", "evidence_type",
+        "environment_class", "live_provider", "read_back_verified",
+        "manual_edit_can_change_canonical", "route_request_grants_execution",
+        "expected_receipt_authority", "receipt_authority", "public_receipt"
+      ],
+      "properties": {
+        "evidence_id": {"type": "string", "minLength": 3, "maxLength": 96},
+        "atom": {"enum": ["W0", "W1", "W2", "W3", "W4", "W5"]},
+        "issue": {"type": "integer", "minimum": 1},
+        "pull_request": {"type": "integer", "minimum": 1},
+        "head_sha": {"$ref": "#/$defs/sha40"},
+        "check_head_sha": {"$ref": "#/$defs/sha40"},
+        "workflow_run_id": {"type": "integer", "minimum": 1},
+        "workflow_run_number": {"type": "integer", "minimum": 1},
+        "workflow_conclusion": {"const": "success"},
+        "evidence_type": {"type": "string", "minLength": 1, "maxLength": 96},
+        "environment_class": {"type": "string", "minLength": 1, "maxLength": 96},
+        "live_provider": {"type": "boolean"},
+        "physical_device": {"type": "boolean"},
+        "read_back_verified": {"type": "boolean"},
+        "manual_edit_can_change_canonical": {"const": false},
+        "route_request_grants_execution": {"const": false},
+        "expected_receipt_authority": {"type": "string", "minLength": 1, "maxLength": 128},
+        "receipt_authority": {"type": "string", "minLength": 1, "maxLength": 128},
+        "public_receipt": {"type": "object"}
+      }
+    },
+    "lane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["lane_id", "name", "required_environment_class", "status", "evidence_ids"],
+      "properties": {
+        "lane_id": {"enum": ["L0", "L1", "L2", "L3", "L4", "L5", "L6", "L7"]},
+        "name": {"type": "string", "minLength": 1, "maxLength": 96},
+        "required_environment_class": {"type": "string", "minLength": 1, "maxLength": 96},
+        "status": {"$ref": "#/$defs/status"},
+        "evidence_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}}
+      }
+    }
+  }
+}
