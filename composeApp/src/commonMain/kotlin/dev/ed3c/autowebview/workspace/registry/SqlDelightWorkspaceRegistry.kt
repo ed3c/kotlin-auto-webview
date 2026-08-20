@@ -27,12 +27,21 @@ class SqlDelightWorkspaceRegistry(
 
     suspend fun putSubject(subject: SubjectRef, updatedAtEpochMs: Long): Boolean {
         require(updatedAtEpochMs >= 0) { "Subject update time cannot be negative" }
-        queries.upsertWorkspaceSubject(
-            logical_id = subject.key.logicalId,
-            kind = subject.key.kind.name,
-            payload_json = json.encodeToString(subject),
-            updated_at_epoch_ms = updatedAtEpochMs,
-        )
+        val payload = json.encodeToString(subject)
+        database.transaction {
+            queries.updateWorkspaceSubjectIfFresh(
+                payload_json = payload,
+                updated_at_epoch_ms = updatedAtEpochMs,
+                logical_id = subject.key.logicalId,
+                kind = subject.key.kind.name,
+            )
+            queries.insertWorkspaceSubjectIfAbsent(
+                logical_id = subject.key.logicalId,
+                kind = subject.key.kind.name,
+                payload_json = payload,
+                updated_at_epoch_ms = updatedAtEpochMs,
+            )
+        }
         val stored = subjectRow(subject.key)
         return stored != null &&
             stored.subject == subject &&
@@ -61,7 +70,7 @@ class SqlDelightWorkspaceRegistry(
         }
             .awaitAsList()
             .mapNotNull(::decodeSubjectRow)
-            .filterNot(StoredSubject::tombstoned)
+            .filter { stored -> !stored.tombstoned }
             .map(StoredSubject::subject)
     }
 
@@ -82,16 +91,29 @@ class SqlDelightWorkspaceRegistry(
 
     suspend fun putEdge(edge: TypedEdge, updatedAtEpochMs: Long): Boolean {
         require(updatedAtEpochMs >= 0) { "Edge update time cannot be negative" }
-        queries.upsertWorkspaceEdge(
-            edge_id = edge.edgeId,
-            from_logical_id = edge.from.logicalId,
-            from_kind = edge.from.kind.name,
-            relation = edge.relation.name,
-            to_logical_id = edge.to.logicalId,
-            to_kind = edge.to.kind.name,
-            payload_json = json.encodeToString(edge),
-            updated_at_epoch_ms = updatedAtEpochMs,
-        )
+        val payload = json.encodeToString(edge)
+        database.transaction {
+            queries.updateWorkspaceEdgeIfFresh(
+                payload_json = payload,
+                updated_at_epoch_ms = updatedAtEpochMs,
+                edge_id = edge.edgeId,
+                from_logical_id = edge.from.logicalId,
+                from_kind = edge.from.kind.name,
+                relation = edge.relation.name,
+                to_logical_id = edge.to.logicalId,
+                to_kind = edge.to.kind.name,
+            )
+            queries.insertWorkspaceEdgeIfAbsent(
+                edge_id = edge.edgeId,
+                from_logical_id = edge.from.logicalId,
+                from_kind = edge.from.kind.name,
+                relation = edge.relation.name,
+                to_logical_id = edge.to.logicalId,
+                to_kind = edge.to.kind.name,
+                payload_json = payload,
+                updated_at_epoch_ms = updatedAtEpochMs,
+            )
+        }
         val stored = edgeRow(edge.edgeId)
         return stored != null &&
             stored.edge == edge &&
