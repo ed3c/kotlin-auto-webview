@@ -156,7 +156,7 @@ object StandardFederationRouteCatalog {
         capabilityId = capabilityId,
         routeClass = routeClass,
         destinationOwner = owner,
-        maximumDataClass = SubjectDataClass.CONFIDENTIAL,
+        maximumDataClass = SubjectDataClass.PUBLIC,
         maximumEvidenceCeiling = EvidenceCeiling.TECHNICAL,
     )
 }
@@ -195,12 +195,16 @@ class InMemoryRouteRequestLedger : RouteRequestLedger {
 @Serializable
 data class RouteProposalPacket(
     val requestId: String,
+    val caller: AuthorityRef,
+    val intent: String,
     val routeClass: FederationRouteClass,
     val destinationOwner: AuthorityRef,
     val evidenceCeiling: EvidenceCeiling,
-    val exactSubjects: Set<SubjectKey>,
+    val exactSubjects: Set<ExactSubjectExpectation>,
 ) {
     init {
+        require(intent.isNotBlank()) { "Route proposal intent cannot be blank" }
+        require(intent.length <= 1_024) { "Route proposal intent is too long" }
         require(exactSubjects.isNotEmpty()) { "Route proposal requires exact subjects" }
     }
 }
@@ -293,10 +297,12 @@ class FederationRouter(
 
         val packet = RouteProposalPacket(
             requestId = request.requestId,
+            caller = request.caller,
+            intent = request.intent,
             routeClass = binding.routeClass,
             destinationOwner = binding.destinationOwner,
             evidenceCeiling = request.evidenceCeiling,
-            exactSubjects = resolved.mapTo(linkedSetOf()) { it.key },
+            exactSubjects = envelope.subjects,
         )
         return when (val response = proposalSink.propose(packet)) {
             is RouteProposalResponse.Denied -> deferred(
@@ -344,6 +350,12 @@ class FederationRouter(
         binding: FederationRouteBinding,
     ): String = buildString {
         append(envelope.request.requiredCapabilityId)
+        append('|')
+        append(envelope.request.caller.kind.name)
+        append(':')
+        append(envelope.request.caller.ownerId)
+        append('|')
+        append(envelope.request.intent)
         append('|')
         append(binding.routeClass.name)
         append('|')
