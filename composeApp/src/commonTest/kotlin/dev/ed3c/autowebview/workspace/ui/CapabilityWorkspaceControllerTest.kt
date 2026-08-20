@@ -51,6 +51,19 @@ class CapabilityWorkspaceControllerTest {
             visibility = SubjectVisibility.PRIVATE,
             dataClass = SubjectDataClass.CONFIDENTIAL,
         )
+        val projection = ProjectionRef(
+            projectionId = "PROJ.private-001",
+            canonicalSubject = private.key,
+            kind = ProjectionKind.GOOGLE_DOC,
+            externalRef = ExternalRef(
+                provider = ExternalProvider.GOOGLE_DOCS,
+                externalId = "private-google-file",
+                revision = "private-google-revision",
+                canonicalUrl = "https://docs.google.com/document/d/private-google-file",
+                freshness = FreshnessState.CURRENT,
+            ),
+            state = ProjectionState.WRITTEN,
+        )
         val snapshot = snapshot(
             subjectRecord = CapabilityWorkspaceSubjectRecord(
                 subject = private,
@@ -66,6 +79,7 @@ class CapabilityWorkspaceControllerTest {
                 evidenceCeiling = EvidenceCeiling.TECHNICAL,
                 freshness = FreshnessState.CURRENT,
             ),
+            projection = CapabilityWorkspaceProjectionRecord(projection),
         )
         val publicController = controller(snapshot, CapabilityWorkspaceAccess.PublicSafe)
         val publicState = publicController.load()
@@ -77,11 +91,14 @@ class CapabilityWorkspaceControllerTest {
         val localState = localController.load()
         assertEquals("subject-owner", localState.subjects.single().authorityLabel)
         assertTrue(localState.subjects.single().externalLocators.single().contains("private-owner"))
+        assertTrue(localState.projections.single().externalLocator!!.contains("private-google-file"))
 
         val exported = localState.toPublicState()
+        assertNull(exported.snapshotId)
         assertEquals("PRIVATE_AUTHORITY", exported.subjects.single().authorityLabel)
-        assertNull(exported.projections.firstOrNull()?.externalLocator)
+        assertNull(exported.projections.single().externalLocator)
         assertTrue(exported.subjects.single().externalLocators.isEmpty())
+        assertEquals("ROUTE_DESTINATION", exported.routes.single().destinationLabel)
         assertTrue(exported.routes.all { !it.enabled })
     }
 
@@ -147,6 +164,20 @@ class CapabilityWorkspaceControllerTest {
     }
 
     @Test
+    fun externalAuthorityBlockerDisablesRouteWithoutGuessingAroundIt() = runTest {
+        val snapshot = snapshot(
+            subjectRecord = CapabilityWorkspaceSubjectRecord(
+                subject = subject(),
+                freshness = FreshnessState.CURRENT,
+                blockerCodes = setOf("EXTERNAL_AUTHORITY_REQUIRED"),
+            ),
+        )
+        val state = controller(snapshot).load()
+        assertFalse(state.routes.single().enabled)
+        assertTrue("EXTERNAL_AUTHORITY_REQUIRED" in state.routes.single().blockerCodes)
+    }
+
+    @Test
     fun projectionConflictIsDisplayedAsBlockerAndNeverChangesCanonicalSubject() = runTest {
         val canonical = subject()
         val projection = ProjectionRef(
@@ -194,7 +225,8 @@ class CapabilityWorkspaceControllerTest {
         )
         val initial = controller.load()
         val selected = controller.selectSection(initial, CapabilityWorkspaceSection.ROUTES)
-        val restored = Json.decodeFromString<CapabilityWorkspaceUiState>(Json.encodeToString(selected))
+        val encoded = Json.encodeToString(CapabilityWorkspaceUiState.serializer(), selected)
+        val restored = Json.decodeFromString(CapabilityWorkspaceUiState.serializer(), encoded)
         val reloaded = controller.load(restored)
 
         assertEquals(CapabilityWorkspaceSection.ROUTES, reloaded.selectedSection)
