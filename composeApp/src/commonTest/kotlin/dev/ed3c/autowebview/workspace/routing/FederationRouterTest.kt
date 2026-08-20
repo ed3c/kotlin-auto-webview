@@ -51,7 +51,10 @@ class FederationRouterTest {
         assertEquals(FederationRouteClass.VERIFY_CLAIM, result.routeClass)
         assertFalse(result.decision.executionAuthorityGranted)
         assertEquals(1, sink.packets.size)
-        assertEquals(setOf(subjectKey), sink.packets.single().exactSubjects)
+        val packet = sink.packets.single()
+        assertEquals(caller, packet.caller)
+        assertEquals("route the exact requirement", packet.intent)
+        assertEquals(setOf(expectation(digest)), packet.exactSubjects)
     }
 
     @Test
