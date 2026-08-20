@@ -49,9 +49,9 @@
   "runtime_env": {
     "repository": "ed3c/runtime-env",
     "issue": 62,
-    "head": "5e700031d9b45d829c65db82d8b14436db4e59bf",
-    "tree": "d7ab8c1d1f728bfa3e304584a829f360961f0491",
-    "state": "PREPARATION_COMPLETE_WITH_GREEN_CONTRACT_RECEIPT"
+    "head": "f844bbef3f4ff74151fa3caa87c4fe0a737090e8",
+    "tree": "5ee50e933bd754f421e65984043b9a195ab2f9a6",
+    "state": "RUNTIME_CONTRACT_COMPLETE"
   },
   "distribution": {
     "play_safe_application_id": "dev.ed3c.autowebview",
