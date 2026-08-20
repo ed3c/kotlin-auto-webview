@@ -15,6 +15,17 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 
+private const val GITHUB_API_VERSION = "2022-11-28"
+
+internal fun githubCheckRunQueryParameters(page: Int): Map<String, String> {
+    require(page > 0) { "GitHub check page must be positive" }
+    return linkedMapOf(
+        "filter" to "latest",
+        "per_page" to "100",
+        "page" to page.toString(),
+    )
+}
+
 fun interface GitHubTokenProvider {
     suspend fun token(): String?
 }
@@ -99,7 +110,6 @@ class GitHubRestMetadataSource(
                     .distinct()
                     .sorted()
                     .flatMap { sha -> readCheckRuns(slug, repository.repositoryId, sha) }
-                    .distinctBy(GitHubCheckRunSnapshot::checkRunId)
             } else {
                 emptyList()
             }
@@ -141,10 +151,7 @@ class GitHubRestMetadataSource(
             val body = getBody(
                 path = "/repos/${slug.owner}/${slug.name}/commits/$sha/check-runs",
                 notFoundReason = GitHubReadFailureReason.RESOURCE_NOT_FOUND,
-                parameters = mapOf(
-                    "per_page" to "100",
-                    "page" to page.toString(),
-                ),
+                parameters = githubCheckRunQueryParameters(page),
             )
             val decoded = decoder.decodeCheckRuns(body, repositoryId, expectedHeadSha = sha)
             require(decoded.totalCount >= 0) { "GitHub check-run total cannot be negative" }
@@ -188,7 +195,7 @@ class GitHubRestMetadataSource(
             client.get(endpoint.resolve(path)) {
                 header(HttpHeaders.Accept, "application/vnd.github+json")
                 header(HttpHeaders.UserAgent, "kotlin-auto-webview")
-                header("X-GitHub-Api-Version", "2022-11-28")
+                header("X-GitHub-Api-Version", GITHUB_API_VERSION)
                 if (token != null) header(HttpHeaders.Authorization, "Bearer $token")
                 parameters.forEach { (name, value) -> parameter(name, value) }
             }
@@ -267,7 +274,7 @@ internal class GitHubRestPayloadDecoder(
             state = when (dto.state.lowercase()) {
                 "open" -> GitHubIssueState.OPEN
                 "closed" -> GitHubIssueState.CLOSED
-                else -> error("Unknown GitHub issue state")
+                else -> throw IllegalArgumentException("Unknown GitHub issue state")
             },
             stateReason = when (dto.stateReason?.lowercase()) {
                 null -> GitHubIssueStateReason.NONE
@@ -286,7 +293,7 @@ internal class GitHubRestPayloadDecoder(
             dto.merged -> GitHubPullRequestState.MERGED
             dto.state.equals("open", ignoreCase = true) -> GitHubPullRequestState.OPEN
             dto.state.equals("closed", ignoreCase = true) -> GitHubPullRequestState.CLOSED
-            else -> error("Unknown GitHub pull request state")
+            else -> throw IllegalArgumentException("Unknown GitHub pull request state")
         }
         return GitHubPullRequestSnapshot(
             repositoryId = repositoryId,
@@ -342,7 +349,7 @@ internal class GitHubRestPayloadDecoder(
                 "queued" -> GitHubCheckStatus.QUEUED
                 "in_progress" -> GitHubCheckStatus.IN_PROGRESS
                 "completed" -> GitHubCheckStatus.COMPLETED
-                else -> GitHubCheckStatus.UNKNOWN
+                else -> throw IllegalArgumentException("Unknown GitHub check run status")
             }
             val conclusion = when (run.conclusion?.lowercase()) {
                 null -> GitHubCheckConclusion.UNKNOWN
@@ -355,7 +362,16 @@ internal class GitHubRestPayloadDecoder(
                 "skipped" -> GitHubCheckConclusion.SKIPPED
                 "stale" -> GitHubCheckConclusion.STALE
                 "startup_failure" -> GitHubCheckConclusion.STARTUP_FAILURE
-                else -> GitHubCheckConclusion.UNKNOWN
+                else -> throw IllegalArgumentException("Unknown GitHub check run conclusion")
+            }
+            if (status == GitHubCheckStatus.COMPLETED) {
+                require(conclusion != GitHubCheckConclusion.UNKNOWN) {
+                    "Completed GitHub check run requires a conclusion"
+                }
+            } else {
+                require(conclusion == GitHubCheckConclusion.UNKNOWN) {
+                    "Incomplete GitHub check run cannot carry a conclusion"
+                }
             }
             GitHubCheckRunSnapshot(
                 repositoryId = repositoryId,
