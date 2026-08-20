@@ -256,8 +256,11 @@ class GitHubWorkGraphMapperTest {
     @Test
     fun adapterAppliesSubjectsBeforeEdgesAndReportsLocalRejection() = runTest {
         val request = request(observationSequence = 10)
+        val snapshot = snapshot(
+            issues = listOf(issue(id = 201, number = 1, state = GitHubIssueState.OPEN)),
+            observationSequence = 10,
+        )
         val successSink = RecordingSink()
-        val snapshot = snapshot(observationSequence = 10)
         val successAdapter = GitHubWorkGraphAdapter(
             source = GitHubMetadataSource { GitHubReadResult.Success(snapshot) },
             sink = successSink,
