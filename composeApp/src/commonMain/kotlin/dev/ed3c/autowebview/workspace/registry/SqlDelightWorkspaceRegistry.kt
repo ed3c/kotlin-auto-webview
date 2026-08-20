@@ -25,7 +25,7 @@ class SqlDelightWorkspaceRegistry(
     private val database = AppDatabase(driver)
     private val queries = database.workspaceRegistryQueries
 
-    suspend fun putSubject(subject: SubjectRef, updatedAtEpochMs: Long) {
+    suspend fun putSubject(subject: SubjectRef, updatedAtEpochMs: Long): Boolean {
         require(updatedAtEpochMs >= 0) { "Subject update time cannot be negative" }
         queries.upsertWorkspaceSubject(
             logical_id = subject.key.logicalId,
@@ -33,36 +33,54 @@ class SqlDelightWorkspaceRegistry(
             payload_json = json.encodeToString(subject),
             updated_at_epoch_ms = updatedAtEpochMs,
         )
+        val stored = subjectRow(subject.key)
+        return stored != null &&
+            stored.subject == subject &&
+            stored.updatedAtEpochMs == updatedAtEpochMs &&
+            !stored.tombstoned
     }
 
-    suspend fun subject(key: SubjectKey): SubjectRef? =
-        queries.selectWorkspaceSubjectPayload(
-            logical_id = key.logicalId,
-            kind = key.kind.name,
-        )
-            .awaitAsList()
-            .singleOrNull()
-            ?.let(::decodeSubjectOrNull)
+    suspend fun subject(key: SubjectKey): SubjectRef? = subjectRow(key)?.subject
 
     suspend fun activeSubjects(limit: Int = 100): List<SubjectRef> {
         if (limit <= 0) return emptyList()
-        return queries.selectActiveWorkspaceSubjectPayloads(limit.toLong())
+        return queries.selectActiveWorkspaceSubjectRows(limit.toLong()) {
+                logicalId,
+                kind,
+                payloadJson,
+                updatedAtEpochMs,
+                tombstoned,
+            ->
+            RawSubjectRow(
+                logicalId = logicalId,
+                kind = kind,
+                payloadJson = payloadJson,
+                updatedAtEpochMs = updatedAtEpochMs,
+                tombstoned = tombstoned,
+            )
+        }
             .awaitAsList()
-            .mapNotNull(::decodeSubjectOrNull)
+            .mapNotNull(::decodeSubjectRow)
+            .filterNot(StoredSubject::tombstoned)
+            .map(StoredSubject::subject)
     }
 
-    suspend fun tombstoneSubject(key: SubjectKey, updatedAtEpochMs: Long) {
+    suspend fun tombstoneSubject(key: SubjectKey, updatedAtEpochMs: Long): Boolean {
         require(updatedAtEpochMs >= 0) { "Tombstone time cannot be negative" }
         queries.tombstoneWorkspaceSubject(
             updated_at_epoch_ms = updatedAtEpochMs,
             logical_id = key.logicalId,
             kind = key.kind.name,
         )
+        val stored = subjectRow(key)
+        return stored != null &&
+            stored.tombstoned &&
+            stored.updatedAtEpochMs == updatedAtEpochMs
     }
 
     suspend fun activeSubjectCount(): Long = queries.countActiveWorkspaceSubjects().awaitAsOne()
 
-    suspend fun putEdge(edge: TypedEdge, updatedAtEpochMs: Long) {
+    suspend fun putEdge(edge: TypedEdge, updatedAtEpochMs: Long): Boolean {
         require(updatedAtEpochMs >= 0) { "Edge update time cannot be negative" }
         queries.upsertWorkspaceEdge(
             edge_id = edge.edgeId,
@@ -74,15 +92,41 @@ class SqlDelightWorkspaceRegistry(
             payload_json = json.encodeToString(edge),
             updated_at_epoch_ms = updatedAtEpochMs,
         )
+        val stored = edgeRow(edge.edgeId)
+        return stored != null &&
+            stored.edge == edge &&
+            stored.updatedAtEpochMs == updatedAtEpochMs
     }
 
     suspend fun edgesFrom(key: SubjectKey): List<TypedEdge> =
-        queries.selectWorkspaceEdgePayloadsFrom(
+        queries.selectWorkspaceEdgeRowsFrom(
             from_logical_id = key.logicalId,
             from_kind = key.kind.name,
-        )
+        ) {
+                edgeId,
+                fromLogicalId,
+                fromKind,
+                relation,
+                toLogicalId,
+                toKind,
+                payloadJson,
+                updatedAtEpochMs,
+            ->
+            RawEdgeRow(
+                edgeId = edgeId,
+                fromLogicalId = fromLogicalId,
+                fromKind = fromKind,
+                relation = relation,
+                toLogicalId = toLogicalId,
+                toKind = toKind,
+                payloadJson = payloadJson,
+                updatedAtEpochMs = updatedAtEpochMs,
+            )
+        }
             .awaitAsList()
-            .mapNotNull(::decodeEdgeOrNull)
+            .mapNotNull(::decodeEdgeRow)
+            .filter { stored -> stored.edge.from == key }
+            .map(StoredEdge::edge)
 
     suspend fun enqueueSync(
         receipt: SyncReceipt,
@@ -96,6 +140,14 @@ class SqlDelightWorkspaceRegistry(
         require(dedupeKey.length <= 512) { "Outbox dedupe key is too long" }
         require(nextAttemptAtEpochMs >= 0) { "Next-attempt time cannot be negative" }
         require(createdAtEpochMs >= 0) { "Created time cannot be negative" }
+        require(
+            receipt.targetRevision == null &&
+                receipt.writtenDigest == null &&
+                receipt.readBackDigest == null &&
+                receipt.errorCode == null,
+        ) {
+            "New outbox receipts cannot carry pre-existing write or read-back evidence"
+        }
 
         val existing = outboxEventIdByDedupe(dedupeKey)
         if (existing != null) return false
@@ -114,7 +166,11 @@ class SqlDelightWorkspaceRegistry(
             last_error_code = receipt.errorCode,
         )
 
-        return outboxEventIdByDedupe(dedupeKey) == receipt.eventId
+        val stored = outboxStateAndReceipt(receipt.eventId)
+        return stored != null &&
+            outboxEventIdByDedupe(dedupeKey) == receipt.eventId &&
+            stored.state == SyncState.PENDING &&
+            stored.receipt == receipt
     }
 
     suspend fun dispatchableSyncReceipts(nowEpochMs: Long, limit: Int = 32): List<SyncReceipt> {
@@ -123,18 +179,39 @@ class SqlDelightWorkspaceRegistry(
         return queries.selectDispatchableWorkspaceOutboxPayloads(
             nowEpochMs,
             limit.toLong(),
-        )
+        ) {
+                eventId,
+                canonicalLogicalId,
+                canonicalKind,
+                state,
+                attemptCount,
+                payloadJson,
+            ->
+            RawSyncRow(
+                eventId = eventId,
+                canonicalLogicalId = canonicalLogicalId,
+                canonicalKind = canonicalKind,
+                state = state,
+                attemptCount = attemptCount,
+                payloadJson = payloadJson,
+            )
+        }
             .awaitAsList()
-            .mapNotNull(::decodeSyncOrNull)
+            .mapNotNull(::decodeSyncRow)
+            .filter { stored -> stored.state in DISPATCHABLE_SYNC_STATES }
+            .map(StoredSyncState::receipt)
     }
 
     suspend fun markWriteSent(eventId: String, updatedAtEpochMs: Long): SyncReceipt {
         require(updatedAtEpochMs >= 0) { "Dispatch update time cannot be negative" }
         val current = outboxStateAndReceipt(eventId)
-            ?: error("Outbox event does not exist: $eventId")
+            ?: error("Outbox event does not exist or is corrupt: $eventId")
         val next = current.receipt.copy(
             state = SyncState.WRITE_SENT,
             attempts = current.receipt.attempts + 1,
+            targetRevision = null,
+            writtenDigest = null,
+            readBackDigest = null,
             errorCode = null,
         )
         require(WorkspaceSyncTransitions.allows(current.state, next.state)) {
@@ -151,13 +228,22 @@ class SqlDelightWorkspaceRegistry(
     ) {
         require(nextAttemptAtEpochMs >= 0) { "Next-attempt time cannot be negative" }
         require(updatedAtEpochMs >= 0) { "Receipt update time cannot be negative" }
+        require(receipt.state != SyncState.WRITE_SENT) {
+            "WRITE_SENT transitions must use markWriteSent so attempts increment exactly once"
+        }
         val current = outboxStateAndReceipt(receipt.eventId)
-            ?: error("Outbox event does not exist: ${receipt.eventId}")
+            ?: error("Outbox event does not exist or is corrupt: ${receipt.eventId}")
+        require(receipt.canonicalSubject == current.receipt.canonicalSubject) {
+            "Sync canonical subject cannot change during a state transition"
+        }
+        require(receipt.target == current.receipt.target) {
+            "Sync target cannot change during a state transition"
+        }
         require(WorkspaceSyncTransitions.allows(current.state, receipt.state)) {
             "Invalid sync transition ${current.state} -> ${receipt.state}"
         }
-        require(receipt.attempts >= current.receipt.attempts) {
-            "Sync attempt count cannot decrease"
+        require(receipt.attempts == current.receipt.attempts) {
+            "Sync attempt count changes only when markWriteSent dispatches an attempt"
         }
         persistOutboxReceipt(receipt, nextAttemptAtEpochMs, updatedAtEpochMs)
     }
@@ -171,6 +257,7 @@ class SqlDelightWorkspaceRegistry(
             "Inbox changes must enter as PROPOSED"
         }
         require(receivedAtEpochMs >= 0) { "Inbox receive time cannot be negative" }
+        require(proposal.reviewer == null) { "New inbox proposals cannot be pre-reviewed" }
         if (inboxContains(proposal.proposalId)) return false
 
         queries.insertWorkspaceInboxChange(
@@ -183,14 +270,31 @@ class SqlDelightWorkspaceRegistry(
             received_at_epoch_ms = receivedAtEpochMs,
             updated_at_epoch_ms = receivedAtEpochMs,
         )
-        return inboxContains(proposal.proposalId)
+        return inboxProposal(proposal.proposalId) == proposal
     }
 
     suspend fun proposedChanges(limit: Int = 100): List<ChangeProposal> {
         if (limit <= 0) return emptyList()
-        return queries.selectProposedWorkspaceInboxPayloads(limit.toLong())
+        return queries.selectProposedWorkspaceInboxPayloads(limit.toLong()) {
+                proposalId,
+                canonicalLogicalId,
+                canonicalKind,
+                sourceProjectionId,
+                state,
+                payloadJson,
+            ->
+            RawProposalRow(
+                proposalId = proposalId,
+                canonicalLogicalId = canonicalLogicalId,
+                canonicalKind = canonicalKind,
+                sourceProjectionId = sourceProjectionId,
+                state = state,
+                payloadJson = payloadJson,
+            )
+        }
             .awaitAsList()
-            .mapNotNull(::decodeProposalOrNull)
+            .mapNotNull(::decodeProposalRow)
+            .filter { proposal -> proposal.state == ChangeProposalState.PROPOSED }
     }
 
     suspend fun recordChangeProposalDecision(proposal: ChangeProposal, updatedAtEpochMs: Long) {
@@ -199,18 +303,86 @@ class SqlDelightWorkspaceRegistry(
         }
         require(proposal.reviewer != null) { "Decision update requires a reviewer" }
         require(updatedAtEpochMs >= 0) { "Decision update time cannot be negative" }
-        require(inboxContains(proposal.proposalId)) {
-            "Inbox proposal does not exist: ${proposal.proposalId}"
+
+        val current = inboxProposal(proposal.proposalId)
+            ?: error("Inbox proposal does not exist or is corrupt: ${proposal.proposalId}")
+        require(current.state == ChangeProposalState.PROPOSED) {
+            "A reviewed proposal is terminal and cannot be decided again"
         }
+        require(proposal.canonicalSubject == current.canonicalSubject) {
+            "Proposal canonical subject cannot change during review"
+        }
+        require(proposal.sourceProjectionId == current.sourceProjectionId) {
+            "Proposal source projection cannot change during review"
+        }
+        require(proposal.proposer == current.proposer) {
+            "Proposal proposer cannot change during review"
+        }
+        require(proposal.requestedChangeDigest == current.requestedChangeDigest) {
+            "Proposal requested change cannot change during review"
+        }
+
         queries.updateWorkspaceInboxChange(
             payload_json = json.encodeToString(proposal),
             state = proposal.state.name,
             updated_at_epoch_ms = updatedAtEpochMs,
             proposal_id = proposal.proposalId,
         )
+        check(inboxProposal(proposal.proposalId) == proposal) {
+            "Proposal decision did not survive local read-back"
+        }
     }
 
     suspend fun inboxCount(): Long = queries.countWorkspaceInbox().awaitAsOne()
+
+    private suspend fun subjectRow(key: SubjectKey): StoredSubject? =
+        queries.selectWorkspaceSubjectRow(
+            logical_id = key.logicalId,
+            kind = key.kind.name,
+        ) {
+                logicalId,
+                kind,
+                payloadJson,
+                updatedAtEpochMs,
+                tombstoned,
+            ->
+            RawSubjectRow(
+                logicalId = logicalId,
+                kind = kind,
+                payloadJson = payloadJson,
+                updatedAtEpochMs = updatedAtEpochMs,
+                tombstoned = tombstoned,
+            )
+        }
+            .awaitAsList()
+            .singleOrNull()
+            ?.let(::decodeSubjectRow)
+
+    private suspend fun edgeRow(edgeId: String): StoredEdge? =
+        queries.selectWorkspaceEdgeRow(edge_id = edgeId) {
+                storedEdgeId,
+                fromLogicalId,
+                fromKind,
+                relation,
+                toLogicalId,
+                toKind,
+                payloadJson,
+                updatedAtEpochMs,
+            ->
+            RawEdgeRow(
+                edgeId = storedEdgeId,
+                fromLogicalId = fromLogicalId,
+                fromKind = fromKind,
+                relation = relation,
+                toLogicalId = toLogicalId,
+                toKind = toKind,
+                payloadJson = payloadJson,
+                updatedAtEpochMs = updatedAtEpochMs,
+            )
+        }
+            .awaitAsList()
+            .singleOrNull()
+            ?.let(::decodeEdgeRow)
 
     private suspend fun outboxEventIdByDedupe(dedupeKey: String): String? =
         queries.selectWorkspaceOutboxEventIdByDedupe(dedupe_key = dedupeKey)
@@ -222,17 +394,49 @@ class SqlDelightWorkspaceRegistry(
             .awaitAsList()
             .singleOrNull() != null
 
-    private suspend fun outboxStateAndReceipt(eventId: String): StoredSyncState? =
-        queries.selectWorkspaceOutboxStateAndPayload(event_id = eventId) { state, payloadJson ->
-            state to payloadJson
+    private suspend fun inboxProposal(proposalId: String): ChangeProposal? =
+        queries.selectWorkspaceInboxStateAndPayload(proposal_id = proposalId) {
+                storedProposalId,
+                canonicalLogicalId,
+                canonicalKind,
+                sourceProjectionId,
+                state,
+                payloadJson,
+            ->
+            RawProposalRow(
+                proposalId = storedProposalId,
+                canonicalLogicalId = canonicalLogicalId,
+                canonicalKind = canonicalKind,
+                sourceProjectionId = sourceProjectionId,
+                state = state,
+                payloadJson = payloadJson,
+            )
         }
             .awaitAsList()
             .singleOrNull()
-            ?.let { (state, payload) ->
-                val parsedState = runCatching { SyncState.valueOf(state) }.getOrNull() ?: return@let null
-                val receipt = decodeSyncOrNull(payload) ?: return@let null
-                StoredSyncState(parsedState, receipt)
-            }
+            ?.let(::decodeProposalRow)
+
+    private suspend fun outboxStateAndReceipt(eventId: String): StoredSyncState? =
+        queries.selectWorkspaceOutboxStateAndPayload(event_id = eventId) {
+                storedEventId,
+                canonicalLogicalId,
+                canonicalKind,
+                state,
+                attemptCount,
+                payloadJson,
+            ->
+            RawSyncRow(
+                eventId = storedEventId,
+                canonicalLogicalId = canonicalLogicalId,
+                canonicalKind = canonicalKind,
+                state = state,
+                attemptCount = attemptCount,
+                payloadJson = payloadJson,
+            )
+        }
+            .awaitAsList()
+            .singleOrNull()
+            ?.let(::decodeSyncRow)
 
     private suspend fun persistOutboxReceipt(
         receipt: SyncReceipt,
@@ -248,24 +452,123 @@ class SqlDelightWorkspaceRegistry(
             last_error_code = receipt.errorCode,
             event_id = receipt.eventId,
         )
+        val persisted = outboxStateAndReceipt(receipt.eventId)
+        check(
+            persisted != null &&
+                persisted.state == receipt.state &&
+                persisted.receipt == receipt,
+        ) {
+            "Sync receipt did not survive local read-back"
+        }
     }
 
-    private fun decodeSubjectOrNull(payload: String): SubjectRef? =
-        runCatching { json.decodeFromString<SubjectRef>(payload) }.getOrNull()
+    private fun decodeSubjectRow(row: RawSubjectRow): StoredSubject? {
+        if (row.tombstoned !in 0L..1L) return null
+        val subject = runCatching { json.decodeFromString<SubjectRef>(row.payloadJson) }.getOrNull()
+            ?: return null
+        if (subject.key.logicalId != row.logicalId || subject.key.kind.name != row.kind) return null
+        return StoredSubject(
+            subject = subject,
+            updatedAtEpochMs = row.updatedAtEpochMs,
+            tombstoned = row.tombstoned == 1L,
+        )
+    }
 
-    private fun decodeEdgeOrNull(payload: String): TypedEdge? =
-        runCatching { json.decodeFromString<TypedEdge>(payload) }.getOrNull()
+    private fun decodeEdgeRow(row: RawEdgeRow): StoredEdge? {
+        val edge = runCatching { json.decodeFromString<TypedEdge>(row.payloadJson) }.getOrNull()
+            ?: return null
+        if (edge.edgeId != row.edgeId) return null
+        if (edge.from.logicalId != row.fromLogicalId || edge.from.kind.name != row.fromKind) return null
+        if (edge.relation.name != row.relation) return null
+        if (edge.to.logicalId != row.toLogicalId || edge.to.kind.name != row.toKind) return null
+        return StoredEdge(edge = edge, updatedAtEpochMs = row.updatedAtEpochMs)
+    }
 
-    private fun decodeSyncOrNull(payload: String): SyncReceipt? =
-        runCatching { json.decodeFromString<SyncReceipt>(payload) }.getOrNull()
+    private fun decodeSyncRow(row: RawSyncRow): StoredSyncState? {
+        val state = runCatching { SyncState.valueOf(row.state) }.getOrNull() ?: return null
+        val receipt = runCatching { json.decodeFromString<SyncReceipt>(row.payloadJson) }.getOrNull()
+            ?: return null
+        if (receipt.eventId != row.eventId) return null
+        if (receipt.canonicalSubject.logicalId != row.canonicalLogicalId) return null
+        if (receipt.canonicalSubject.kind.name != row.canonicalKind) return null
+        if (receipt.state != state) return null
+        if (receipt.attempts.toLong() != row.attemptCount) return null
+        return StoredSyncState(state = state, receipt = receipt)
+    }
 
-    private fun decodeProposalOrNull(payload: String): ChangeProposal? =
-        runCatching { json.decodeFromString<ChangeProposal>(payload) }.getOrNull()
+    private fun decodeProposalRow(row: RawProposalRow): ChangeProposal? {
+        val state = runCatching { ChangeProposalState.valueOf(row.state) }.getOrNull() ?: return null
+        val proposal = runCatching {
+            json.decodeFromString<ChangeProposal>(row.payloadJson)
+        }.getOrNull() ?: return null
+        if (proposal.proposalId != row.proposalId) return null
+        if (proposal.canonicalSubject.logicalId != row.canonicalLogicalId) return null
+        if (proposal.canonicalSubject.kind.name != row.canonicalKind) return null
+        if (proposal.sourceProjectionId != row.sourceProjectionId) return null
+        if (proposal.state != state) return null
+        if (proposal.state == ChangeProposalState.PROPOSED && proposal.reviewer != null) return null
+        return proposal
+    }
+
+    private data class RawSubjectRow(
+        val logicalId: String,
+        val kind: String,
+        val payloadJson: String,
+        val updatedAtEpochMs: Long,
+        val tombstoned: Long,
+    )
+
+    private data class StoredSubject(
+        val subject: SubjectRef,
+        val updatedAtEpochMs: Long,
+        val tombstoned: Boolean,
+    )
+
+    private data class RawEdgeRow(
+        val edgeId: String,
+        val fromLogicalId: String,
+        val fromKind: String,
+        val relation: String,
+        val toLogicalId: String,
+        val toKind: String,
+        val payloadJson: String,
+        val updatedAtEpochMs: Long,
+    )
+
+    private data class StoredEdge(
+        val edge: TypedEdge,
+        val updatedAtEpochMs: Long,
+    )
+
+    private data class RawSyncRow(
+        val eventId: String,
+        val canonicalLogicalId: String,
+        val canonicalKind: String,
+        val state: String,
+        val attemptCount: Long,
+        val payloadJson: String,
+    )
 
     private data class StoredSyncState(
         val state: SyncState,
         val receipt: SyncReceipt,
     )
+
+    private data class RawProposalRow(
+        val proposalId: String,
+        val canonicalLogicalId: String,
+        val canonicalKind: String,
+        val sourceProjectionId: String,
+        val state: String,
+        val payloadJson: String,
+    )
+
+    private companion object {
+        val DISPATCHABLE_SYNC_STATES = setOf(
+            SyncState.PENDING,
+            SyncState.RETRYABLE_FAILURE,
+        )
+    }
 }
 
 internal object WorkspaceSyncTransitions {
