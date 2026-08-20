@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ed3c/kotlin-auto-webview/schemas/workspace/live-wave1-contract-lock.schema.json",
+  "title": "Federated Capability Workspace Live Wave-1 Contract Lock",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version","program","owner_issue","parent","repository_subjects","source_files","lanes","hard_laws","local_handoff","excluded_void_issues","stage_verdict"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "program": {"const": "FEDERATED_CAPABILITY_WORKSPACE_LIVE_WAVE1"},
+    "owner_issue": {"const": 176},
+    "parent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issue","pull_request","head_sha","tree_sha","state"],
+      "properties": {
+        "issue": {"const": 172},
+        "pull_request": {"const": 175},
+        "head_sha": {"type":"string","pattern":"^[0-9a-f]{40}$"},
+        "tree_sha": {"type":"string","pattern":"^[0-9a-f]{40}$"},
+        "state": {"const":"LIVE_EVIDENCE_PREIMPLEMENTATION_READY"}
+      }
+    },
+    "repository_subjects": {
+      "type":"array","minItems":6,"maxItems":6,
+      "items": {
+        "type":"object","additionalProperties":false,
+        "required":["subject_id","repository","commit_sha","tree_sha","issue"],
+        "properties":{
+          "subject_id":{"type":"string"},
+          "repository":{"type":"string","pattern":"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"},
+          "commit_sha":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+          "tree_sha":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+          "issue":{"type":"integer","minimum":1},
+          "pull_request":{"type":"integer","minimum":1}
+        }
+      }
+    },
+    "source_files": {
+      "type":"array","minItems":10,"maxItems":10,
+      "items":{
+        "type":"object","additionalProperties":false,
+        "required":["surface_id","repository","commit_sha","path","blob_sha","raw_url","required_symbols"],
+        "properties":{
+          "surface_id":{"type":"string"},
+          "repository":{"type":"string"},
+          "commit_sha":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+          "path":{"type":"string","minLength":1},
+          "blob_sha":{"type":"string","pattern":"^[0-9a-f]{40}$"},
+          "raw_url":{"type":"string","pattern":"^https://raw\\.githubusercontent\\.com/"},
+          "required_symbols":{"type":"array","minItems":1,"items":{"type":"string","minLength":1}}
+        }
+      }
+    },
+    "lanes":{
+      "type":"array","minItems":4,"maxItems":4,
+      "items":{
+        "type":"object","additionalProperties":false,
+        "required":["atom","issue","lane","state","git_parent","existing","missing","external_capabilities","first_safe_write","start_receipt","maximum_claim"],
+        "properties":{
+          "atom":{"enum":["L2-GH","L3-GOOGLE","L4-BETTOR","L5-DOMAIN"]},
+          "issue":{"type":"integer","minimum":1},
+          "lane":{"enum":["L2","L3","L4","L5"]},
+          "state":{"type":"string"},
+          "git_parent":{
+            "type":"object","additionalProperties":false,
+            "required":["repository","pull_request","head_sha"],
+            "properties":{
+              "repository":{"const":"ed3c/kotlin-auto-webview"},
+              "pull_request":{"type":"integer","minimum":1},
+              "head_sha":{"type":"string","pattern":"^[0-9a-f]{40}$"}
+            }
+          },
+          "existing":{"type":"array","minItems":1,"items":{"type":"string"}},
+          "missing":{"type":"array","minItems":1,"items":{"type":"string"}},
+          "external_capabilities":{"type":"array","minItems":1,"items":{"type":"string"}},
+          "external_issue":{"type":"string"},
+          "first_safe_write":{"type":"array","minItems":1,"items":{"type":"string"}},
+          "start_receipt":{
+            "type":"object","additionalProperties":false,
+            "required":["code_ready","public_canary_ready","external_ready","live_evidence_ready","reason_codes"],
+            "properties":{
+              "code_ready":{"type":"boolean"},
+              "public_canary_ready":{"type":"boolean"},
+              "external_ready":{"const":false},
+              "live_evidence_ready":{"const":false},
+              "reason_codes":{"type":"array","minItems":1,"items":{"type":"string","pattern":"^[A-Z0-9_]+$"}}
+            }
+          },
+          "maximum_claim":{"const":"IMPLEMENTATION_PREP_ONLY"}
+        }
+      }
+    },
+    "hard_laws":{"type":"object","additionalProperties":{"const":false},"minProperties":9},
+    "local_handoff":{
+      "type":"object","additionalProperties":false,
+      "required":["state","reason"],
+      "properties":{
+        "state":{"const":"ABSENT"},
+        "reason":{"const":"EXTERNAL_CAPABILITIES_AND_CONCRETE_COMMANDS_NOT_BOUND"}
+      }
+    },
+    "excluded_void_issues":{"type":"array","prefixItems":[{"const":173},{"const":174}],"items":false},
+    "stage_verdict":{"enum":["LIVE_WAVE1_IMPLEMENTATION_SURFACES_LOCKED_PENDING_CI","LIVE_WAVE1_IMPLEMENTATION_SURFACES_LOCKED"]}
+  }
+}
