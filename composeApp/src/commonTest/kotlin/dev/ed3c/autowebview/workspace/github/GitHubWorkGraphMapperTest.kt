@@ -254,8 +254,34 @@ class GitHubWorkGraphMapperTest {
     }
 
     @Test
-    fun adapterAppliesSubjectsBeforeEdgesAndReportsLocalRejection() = runTest {
+    fun adapterRejectsUnrequestedSubjectsBeforeWritingLocalState() = runTest {
+        val sink = RecordingSink()
         val request = request(observationSequence = 10)
+        val adapter = GitHubWorkGraphAdapter(
+            source = GitHubMetadataSource {
+                GitHubReadResult.Success(
+                    snapshot(
+                        issues = listOf(issue(id = 201, number = 1, state = GitHubIssueState.OPEN)),
+                        observationSequence = 10,
+                    ),
+                )
+            },
+            sink = sink,
+        )
+
+        val result = assertIs<GitHubWorkGraphRefreshResult.Rejected>(adapter.refresh(request))
+        assertEquals(GitHubProjectionRejectionReason.REQUEST_SCOPE_MISMATCH, result.reason)
+        assertTrue(sink.subjects.isEmpty())
+        assertTrue(sink.edges.isEmpty())
+    }
+
+    @Test
+    fun adapterAppliesSubjectsBeforeEdgesAndReportsLocalRejection() = runTest {
+        val request = GitHubWorkGraphRequest(
+            repository = GitHubRepositorySlug("example", "public-repository"),
+            issueNumbers = setOf(1),
+            observationSequence = 10,
+        )
         val snapshot = snapshot(
             issues = listOf(issue(id = 201, number = 1, state = GitHubIssueState.OPEN)),
             observationSequence = 10,
