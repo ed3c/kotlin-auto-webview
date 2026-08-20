@@ -55,24 +55,30 @@ CREATE TABLE workspace_inbox_change (
 CREATE INDEX workspace_inbox_state_idx
 ON workspace_inbox_change(state, received_at_epoch_ms, proposal_id);
 
-upsertWorkspaceSubject:
-INSERT INTO workspace_subject_projection(
+updateWorkspaceSubjectIfFresh:
+UPDATE workspace_subject_projection
+SET payload_json = :payload_json,
+    updated_at_epoch_ms = :updated_at_epoch_ms,
+    tombstoned = 0
+WHERE logical_id = :logical_id
+  AND kind = :kind
+  AND (
+    :updated_at_epoch_ms > updated_at_epoch_ms
+    OR (
+      :updated_at_epoch_ms = updated_at_epoch_ms
+      AND :payload_json = payload_json
+      AND tombstoned = 0
+    )
+  );
+
+insertWorkspaceSubjectIfAbsent:
+INSERT OR IGNORE INTO workspace_subject_projection(
   logical_id,
   kind,
   payload_json,
   updated_at_epoch_ms,
   tombstoned
-) VALUES (?, ?, ?, ?, 0)
-ON CONFLICT(logical_id, kind) DO UPDATE SET
-  payload_json = excluded.payload_json,
-  updated_at_epoch_ms = excluded.updated_at_epoch_ms,
-  tombstoned = 0
-WHERE excluded.updated_at_epoch_ms > workspace_subject_projection.updated_at_epoch_ms
-   OR (
-     excluded.updated_at_epoch_ms = workspace_subject_projection.updated_at_epoch_ms
-     AND excluded.payload_json = workspace_subject_projection.payload_json
-     AND workspace_subject_projection.tombstoned = 0
-   );
+) VALUES (:logical_id, :kind, :payload_json, :updated_at_epoch_ms, 0);
 
 selectWorkspaceSubjectRow:
 SELECT logical_id, kind, payload_json, updated_at_epoch_ms, tombstoned
@@ -99,8 +105,26 @@ SELECT COUNT(*)
 FROM workspace_subject_projection
 WHERE tombstoned = 0;
 
-upsertWorkspaceEdge:
-INSERT INTO workspace_edge_projection(
+updateWorkspaceEdgeIfFresh:
+UPDATE workspace_edge_projection
+SET payload_json = :payload_json,
+    updated_at_epoch_ms = :updated_at_epoch_ms
+WHERE edge_id = :edge_id
+  AND from_logical_id = :from_logical_id
+  AND from_kind = :from_kind
+  AND relation = :relation
+  AND to_logical_id = :to_logical_id
+  AND to_kind = :to_kind
+  AND (
+    :updated_at_epoch_ms > updated_at_epoch_ms
+    OR (
+      :updated_at_epoch_ms = updated_at_epoch_ms
+      AND :payload_json = payload_json
+    )
+  );
+
+insertWorkspaceEdgeIfAbsent:
+INSERT OR IGNORE INTO workspace_edge_projection(
   edge_id,
   from_logical_id,
   from_kind,
@@ -109,22 +133,16 @@ INSERT INTO workspace_edge_projection(
   to_kind,
   payload_json,
   updated_at_epoch_ms
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-ON CONFLICT(edge_id) DO UPDATE SET
-  payload_json = excluded.payload_json,
-  updated_at_epoch_ms = excluded.updated_at_epoch_ms
-WHERE excluded.from_logical_id = workspace_edge_projection.from_logical_id
-  AND excluded.from_kind = workspace_edge_projection.from_kind
-  AND excluded.relation = workspace_edge_projection.relation
-  AND excluded.to_logical_id = workspace_edge_projection.to_logical_id
-  AND excluded.to_kind = workspace_edge_projection.to_kind
-  AND (
-    excluded.updated_at_epoch_ms > workspace_edge_projection.updated_at_epoch_ms
-    OR (
-      excluded.updated_at_epoch_ms = workspace_edge_projection.updated_at_epoch_ms
-      AND excluded.payload_json = workspace_edge_projection.payload_json
-    )
-  );
+) VALUES (
+  :edge_id,
+  :from_logical_id,
+  :from_kind,
+  :relation,
+  :to_logical_id,
+  :to_kind,
+  :payload_json,
+  :updated_at_epoch_ms
+);
 
 selectWorkspaceEdgeRow:
 SELECT
