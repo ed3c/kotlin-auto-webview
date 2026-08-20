@@ -9,6 +9,8 @@ import android.os.Bundle
 import android.provider.Settings
 import android.util.Log
 import android.view.View
+import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import dev.ed3c.autowebview.device.policy.DistributionProfile
@@ -25,6 +27,7 @@ import dev.ed3c.autowebview.executor.SelectOptionPayload
 import dev.ed3c.autowebview.executor.webview.PlaySafeWebViewBrowserActionPlatform
 import dev.ed3c.autowebview.executor.webview.PlaySafeWebViewPageObservation
 import dev.ed3c.autowebview.executor.webview.PlaySafeWebViewPolicy
+import java.io.ByteArrayInputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -396,6 +399,18 @@ class AndroidAutomationEvidenceInstrumentation : Instrumentation() {
                 )
                 webView.layout(0, 0, 1080, 1920)
                 webView.webViewClient = object : WebViewClient() {
+                    override fun shouldInterceptRequest(
+                        view: WebView?,
+                        request: WebResourceRequest?,
+                    ): WebResourceResponse? {
+                        if (request?.url?.toString() != CLICK_DESTINATION) return null
+                        return WebResourceResponse(
+                            "text/html",
+                            "UTF-8",
+                            ByteArrayInputStream(CLICK_DESTINATION_HTML.toByteArray(Charsets.UTF_8)),
+                        )
+                    }
+
                     override fun onPageFinished(view: WebView?, url: String?) {
                         if (url == BASE_PAGE_URL) loaded.countDown()
                     }
@@ -473,11 +488,16 @@ class AndroidAutomationEvidenceInstrumentation : Instrumentation() {
         const val BASE_PAGE_URL = "https://app.example.test/page"
         const val CLICK_DESTINATION = "https://app.example.test/complete"
 
+        val CLICK_DESTINATION_HTML = """
+            <!doctype html>
+            <html><body><p>Completed</p></body></html>
+        """.trimIndent()
+
         val FIXTURE_HTML = """
             <!doctype html>
             <html>
               <body>
-                <a aria-label="Complete" href="/complete" onclick="history.pushState(null, '', '/complete'); return false;">Complete</a>
+                <a aria-label="Complete" href="/complete">Complete</a>
                 <input aria-label="Name" type="text" />
                 <select aria-label="Choice">
                   <option value="a">A</option>
