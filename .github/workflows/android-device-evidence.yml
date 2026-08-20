@@ -53,15 +53,50 @@ jobs:
         run: python3 scripts/evidence/android/verify_selected_sources.py
 
       - name: Build explicit Android profiles and unit controls
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p build/reports/android-distribution
-          scripts/ci/run-gradle-with-annotations.sh \
-            :composeApp:reportAndroidDistributionSourceSets \
+
+          # Keep each helper invocation short enough that its deterministic
+          # annotation-log filename remains below filesystem component limits.
+          # Retry only an explicitly observed external Maven HTTP-429 failure;
+          # every other failure remains immediately fatal.
+          run_gradle_with_bounded_429_retry() {
+            local label="$1"
+            shift
+            local attempt status log
+            for attempt in 1 2 3; do
+              log="build/reports/android-distribution/${label}-attempt-${attempt}.log"
+              set +e
+              scripts/ci/run-gradle-with-annotations.sh "$@" 2>&1 | tee "$log"
+              status=${PIPESTATUS[0]}
+              set -e
+              if [ "$status" -eq 0 ]; then
+                return 0
+              fi
+              if ! grep -Eqi 'status code 429|too many requests' "$log"; then
+                return "$status"
+              fi
+              if [ "$attempt" -eq 3 ]; then
+                echo "external Maven HTTP 429 persisted through bounded retries" >&2
+                return "$status"
+              fi
+              sleep $((attempt * 10))
+            done
+          }
+
+          run_gradle_with_bounded_429_retry source-sets \
+            :composeApp:reportAndroidDistributionSourceSets
+          run_gradle_with_bounded_429_retry unit-controls \
             :composeApp:testPlaySafeDebugUnitTest \
-            :composeApp:testEnterpriseDebugUnitTest \
+            :composeApp:testEnterpriseDebugUnitTest
+          run_gradle_with_bounded_429_retry debug-profiles \
             :composeApp:assemblePlaySafeDebug \
-            :composeApp:assembleEnterpriseDebug \
-            :composeApp:assemblePlaySafeRelease \
+            :composeApp:assembleEnterpriseDebug
+          run_gradle_with_bounded_429_retry playsafe-release \
+            :composeApp:assemblePlaySafeRelease
+          run_gradle_with_bounded_429_retry enterprise-release \
             :composeApp:assembleEnterpriseRelease
 
       - name: Capture exact task and dependency surfaces
@@ -105,7 +140,8 @@ jobs:
       - name: Compile framework-only instrumented evidence APKs
         run: |
           scripts/ci/run-gradle-with-annotations.sh \
-            :composeApp:assemblePlaySafeDebugAndroidTest \
+            :composeApp:assemblePlaySafeDebugAndroidTest
+          scripts/ci/run-gradle-with-annotations.sh \
             :composeApp:assembleEnterpriseDebugAndroidTest
 
       - uses: actions/upload-artifact@v4
