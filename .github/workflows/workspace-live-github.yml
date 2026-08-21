@@ -1,0 +1,67 @@
+name: Workspace Live GitHub
+
+on:
+  pull_request:
+    paths:
+      - 'composeApp/src/desktopTest/**/workspace/github/live/**'
+      - 'tests/evidence/workspace/github/**'
+      - 'scripts/evidence/workspace/github/**'
+      - 'receipts/workspace/live/github/**'
+      - '.github/workflows/workspace-live-github.yml'
+      - 'docs/evidence/workspace/live-github/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-canary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Enforce no-credential public mode
+        shell: bash
+        run: |
+          test -z "${GITHUB_TOKEN:-}"
+          test -z "${GH_TOKEN:-}"
+      - name: Execute existing W2 transport through W1 read-back
+        shell: bash
+        env:
+          KAW_LIVE_GITHUB_CANARY: '1'
+          KAW_LIVE_GITHUB_SUBJECT_PATH: ${{ github.workspace }}/tests/evidence/workspace/github/public-canary-subject.json
+          KAW_LIVE_GITHUB_RECEIPT_PATH: ${{ runner.temp }}/kaw-live-github/public-canary.json
+          KAW_IMPLEMENTATION_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          mkdir -p "$(dirname "$KAW_LIVE_GITHUB_RECEIPT_PATH")"
+          ./gradlew :composeApp:desktopTest \
+            --tests 'dev.ed3c.autowebview.workspace.github.live.GitHubPublicCanaryTest' \
+            --no-daemon
+      - name: Verify sanitized literal L2 receipt
+        shell: bash
+        env:
+          RECEIPT: ${{ runner.temp }}/kaw-live-github/public-canary.json
+          SUBJECT: ${{ github.workspace }}/tests/evidence/workspace/github/public-canary-subject.json
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python3 scripts/evidence/workspace/github/verify_live_github_receipt.py \
+            "$RECEIPT" \
+            "$SUBJECT" \
+            --expected-implementation-head "$EXPECTED_HEAD"
+          sha256sum "$RECEIPT" > "${RECEIPT}.sha256"
+      - name: Run receipt laundering mutations
+        run: python3 -m unittest discover -s tests/evidence/workspace/github -p 'test_*.py' -v
+      - name: Upload sanitized live receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-live-github-public-receipt
+          path: |
+            ${{ runner.temp }}/kaw-live-github/public-canary.json
+            ${{ runner.temp }}/kaw-live-github/public-canary.json.sha256
+          if-no-files-found: error
+          retention-days: 30
