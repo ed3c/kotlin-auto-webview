@@ -1,0 +1,41 @@
+{
+  "schema": "kaw.workspace.live-github-public-subject.v1",
+  "repository": {
+    "full_name": "ed3c/kotlin-auto-webview",
+    "id": 1334777764,
+    "node_id": "R_kgDOT48XpA",
+    "visibility": "public"
+  },
+  "issue": {
+    "number": 165,
+    "id": 5206660666,
+    "node_id": "I_kwDOT48XpM8AAAABNldWOg",
+    "state": "open"
+  },
+  "pull_request": {
+    "number": 177,
+    "id": 4325936842,
+    "node_id": "PR_kwDOT48XpM8AAAABAdiOyg",
+    "head_sha": "a7032eaf4f5a3ffaece06d01657897ad0444344a",
+    "base_sha": "b9049a2c1d781218b264ee82a817f69ed1580f92"
+  },
+  "commit": {
+    "sha": "a7032eaf4f5a3ffaece06d01657897ad0444344a",
+    "tree_sha": "e49575deb635d206bf78d0070783fca5865ab5fd"
+  },
+  "expected_checks": [
+    {"id": 96556935225, "name": "contract-lock", "run_id": 32409680210},
+    {"id": 96556941355, "name": "preflight", "run_id": 32409680188},
+    {"id": 96556935271, "name": "common-web-desktop", "run_id": 32409680201},
+    {"id": 96556935495, "name": "android", "run_id": 32409680201},
+    {"id": 96556935695, "name": "ios", "run_id": 32409680201}
+  ],
+  "transport": {
+    "class": "GitHubRestMetadataSource",
+    "source_commit": "3294fb2b4d86fef91f3f2c63e28718c490147808",
+    "source_blob": "9b677be0c8bd1da0f1488acb83488677eae11a81",
+    "credential_mode": "NONE",
+    "max_check_pages": 10,
+    "timeout_seconds": 60
+  }
+}
