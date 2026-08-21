@@ -28,17 +28,27 @@ unauthenticated GET-only api.github.com
 → sanitized receipt artifact
 ```
 
-The dedicated `Workspace Live GitHub` workflow writes the receipt to runner-temporary storage, validates it, hashes it, and uploads the JSON plus SHA-256 as a workflow artifact. Raw response bodies, tokens, headers, cookies, emails, and private locators are never part of the receipt.
+The dedicated `Workspace Live GitHub` workflow writes the receipt to runner-temporary storage, validates it, hashes it, and uploads the JSON, SHA-256, and immutable provenance-limit manifest as a workflow artifact. Raw response bodies, tokens, headers, cookies, emails, and private locators are never part of the receipt.
 
-## Identity ceiling
+## Identity and provenance ceiling
 
-The W2 runtime model retains stable REST numeric IDs, repository slug, canonical URLs, commit SHA, tree SHA, and check IDs. It does not retain GitHub GraphQL node IDs. Node IDs are therefore pinned by the preceding exact remote preparation receipt, while this live canary reports:
+The W2 runtime model retains stable REST numeric IDs, repository slug, canonical URLs, commit SHA, tree SHA, check-run IDs, check names, head SHA, status, and conclusion.
+
+It does **not** retain:
+
+- GitHub GraphQL node IDs;
+- the workflow-run ID that produced a check run.
+
+Those identities are pinned by the preceding exact remote preparation receipt but are not re-derived by the W2 runtime model. The live evidence therefore keeps these states explicit:
 
 ```text
-runtime_node_id_validation = PREP_BINDING_ONLY_W2_MODEL_ABSENT
+runtime_node_id_validation         = PREP_BINDING_ONLY_W2_MODEL_ABSENT
+runtime_workflow_run_id_validation = PREP_BINDING_ONLY_W2_MODEL_ABSENT
 ```
 
-This limitation is explicit and cannot be promoted to runtime node-ID verification.
+`source_workflow_run_ids` in the receipt is a prep-bound denominator that links the exact successful checks to their previously verified workflow runs. It is not a runtime workflow-run-ID claim.
+
+The artifact includes `receipts/workspace/live/github/provenance-limits.json`; mutation tests reject promotion of either prep-bound identity to runtime PASS.
 
 ## Evidence ceiling
 
