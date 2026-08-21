@@ -1,0 +1,192 @@
+{
+  "schema": "community-skill-edition/v1",
+  "editionId": "EDITION:DEMO:001",
+  "version": 1,
+  "supersedesEditionVersion": null,
+  "mode": "REFERENCE_EDITION",
+  "sourceBinding": {
+    "sourceBindingId": "SOURCE:YOUTUBE:XLN01",
+    "platform": "YOUTUBE",
+    "sourceId": "Xln-On3syJk",
+    "sourceUrl": "https://www.youtube.com/watch?v=Xln-On3syJk",
+    "channelId": null,
+    "observedAt": "2026-08-19T05:30:00Z",
+    "accessState": "PUBLIC_VISIBLE",
+    "availabilityState": "AVAILABLE",
+    "embedState": "NOT_EXERCISED",
+    "revisionFingerprint": "sha256:source-metadata-placeholder"
+  },
+  "playbackLane": "YOUTUBE_FOREGROUND_DOCK",
+  "sourceMediaReuse": {
+    "frameCaptureAllowed": false,
+    "sourceSegmentRetentionAllowed": false,
+    "renderedDerivativeAllowed": false,
+    "nativePipAllowed": false
+  },
+  "officialClipReferences": [],
+  "contributors": [
+    {
+      "contributorId": "CONTRIBUTOR:ALPHA",
+      "displayName": "Alpha Curator",
+      "accountState": "AUTHENTICATED",
+      "profileVerificationState": "UNVERIFIED",
+      "contributionRightsState": "PRIVATE_DRAFT_ONLY"
+    },
+    {
+      "contributorId": "CONTRIBUTOR:BETA",
+      "displayName": "Beta Curator",
+      "accountState": "AUTHENTICATED",
+      "profileVerificationState": "UNVERIFIED",
+      "contributionRightsState": "PRIVATE_DRAFT_ONLY"
+    }
+  ],
+  "cardSelections": [
+    {
+      "cardSelectionId": "SELECTION:001",
+      "cardId": "CARD:XLN:D001",
+      "contributorId": "CONTRIBUTOR:ALPHA",
+      "sourceBindingId": "SOURCE:YOUTUBE:XLN01",
+      "tStartMs": 258000,
+      "tEndMs": 310000,
+      "evidenceClass": "SOURCE_OBSERVATION",
+      "playAction": "USER_INITIATED_SEEK",
+      "independentCardTextHash": "sha256:card-d001-placeholder"
+    },
+    {
+      "cardSelectionId": "SELECTION:002",
+      "cardId": "CARD:XLN:F001",
+      "contributorId": "CONTRIBUTOR:ALPHA",
+      "sourceBindingId": "SOURCE:YOUTUBE:XLN01",
+      "tStartMs": 731000,
+      "tEndMs": 790000,
+      "evidenceClass": "SOURCE_OBSERVATION",
+      "playAction": "USER_INITIATED_SEEK",
+      "independentCardTextHash": "sha256:card-f001-placeholder"
+    },
+    {
+      "cardSelectionId": "SELECTION:003",
+      "cardId": "CARD:XLN:T001",
+      "contributorId": "CONTRIBUTOR:BETA",
+      "sourceBindingId": "SOURCE:YOUTUBE:XLN01",
+      "tStartMs": 1020000,
+      "tEndMs": 1095000,
+      "evidenceClass": "HYPOTHESIS",
+      "playAction": "USER_INITIATED_SEEK",
+      "independentCardTextHash": "sha256:card-t001-placeholder"
+    }
+  ],
+  "skillPatches": [
+    {
+      "patchId": "PATCH:ALPHA:001",
+      "contributorId": "CONTRIBUTOR:ALPHA",
+      "baseSkillId": "SKILL:CREATOR:PAIN_TO_OFFER",
+      "baseSkillVersion": 1,
+      "selectedCardIds": [
+        "CARD:XLN:D001",
+        "CARD:XLN:F001"
+      ],
+      "evidenceRefs": [
+        "CARD:XLN:D001",
+        "CARD:XLN:F001"
+      ],
+      "procedureDeltaDigest": "sha256:patch-alpha-placeholder",
+      "contributionRightsState": "PRIVATE_DRAFT_ONLY",
+      "moderationState": "PENDING",
+      "qualificationState": "NOT_EXERCISED"
+    },
+    {
+      "patchId": "PATCH:BETA:001",
+      "contributorId": "CONTRIBUTOR:BETA",
+      "baseSkillId": "SKILL:CREATOR:PAIN_TO_OFFER",
+      "baseSkillVersion": 1,
+      "selectedCardIds": [
+        "CARD:XLN:T001"
+      ],
+      "evidenceRefs": [
+        "CARD:XLN:T001"
+      ],
+      "procedureDeltaDigest": "sha256:patch-beta-placeholder",
+      "contributionRightsState": "PRIVATE_DRAFT_ONLY",
+      "moderationState": "PENDING",
+      "qualificationState": "NOT_EXERCISED"
+    }
+  ],
+  "procedureVariants": [
+    {
+      "variantId": "VARIANT:ALPHA:001",
+      "patchIds": [
+        "PATCH:ALPHA:001"
+      ],
+      "applicability": [
+        "Expertise-led creator with direct access to a relevant audience"
+      ],
+      "negativeTriggers": [
+        "Commissioned work where demand is already contractually established"
+      ],
+      "evidenceRefs": [
+        "CARD:XLN:D001",
+        "CARD:XLN:F001"
+      ],
+      "qualificationState": "NOT_EXERCISED"
+    },
+    {
+      "variantId": "VARIANT:BETA:001",
+      "patchIds": [
+        "PATCH:BETA:001"
+      ],
+      "applicability": [
+        "Creator who already has a validated audience problem but lacks an offer"
+      ],
+      "negativeTriggers": [
+        "Audience demand remains unknown"
+      ],
+      "evidenceRefs": [
+        "CARD:XLN:T001"
+      ],
+      "qualificationState": "NOT_EXERCISED"
+    }
+  ],
+  "conflicts": [
+    {
+      "conflictId": "CONFLICT:001",
+      "variantIds": [
+        "VARIANT:ALPHA:001",
+        "VARIANT:BETA:001"
+      ],
+      "statement": "The variants disagree on whether an offer test may begin before additional public content validation.",
+      "resolutionState": "EVIDENCE_REQUIRED"
+    }
+  ],
+  "moderation": {
+    "state": "PRIVATE_DRAFT_ONLY",
+    "decisionIds": []
+  },
+  "rightsReceipt": {
+    "rightsReceiptId": "RIGHTS:REFERENCE:001",
+    "state": "PLATFORM_REFERENCE_ONLY",
+    "sourceBindingId": "SOURCE:YOUTUBE:XLN01",
+    "licenseId": null,
+    "rightsOwner": null,
+    "expiresAt": null,
+    "attributionRequired": false
+  },
+  "sourceRevocation": {
+    "policyId": "REVOCATION:POLICY:001",
+    "freshnessCheckRequired": true,
+    "onDeleted": "SOURCE_UNAVAILABLE",
+    "onPrivate": "SOURCE_UNAVAILABLE",
+    "onEmbedDisabled": "OPEN_IN_YOUTUBE_APP",
+    "onRightsRevoked": "DEGRADE_TO_LOCATORS"
+  },
+  "publicationState": "PRIVATE_PREVIEW",
+  "ugcControls": {
+    "filteringEnabled": false,
+    "reportingEnabled": false,
+    "blockingEnabled": false,
+    "publishedContactAvailable": false,
+    "copyrightTakedownEnabled": false,
+    "sourceCreatorOptOutEnabled": false
+  },
+  "createdAt": "2026-08-19T05:30:00Z",
+  "updatedAt": "2026-08-19T05:30:00Z"
+}
