@@ -1,0 +1,233 @@
+{
+  "schema_version": 1,
+  "program": "FEDERATED_CAPABILITY_WORKSPACE_L2_PUBLIC_GITHUB_CANARY_PREP",
+  "owner_issue": 178,
+  "delivery_issue": 165,
+  "stage_state": "L2_PUBLIC_CANARY_IMPLEMENTATION_PREP_READY",
+  "parent": {
+    "issue": 176,
+    "pull_request": 177,
+    "head_sha": "a7032eaf4f5a3ffaece06d01657897ad0444344a",
+    "tree_sha": "e49575deb635d206bf78d0070783fca5865ab5fd",
+    "relation": "EVIDENCE_DEPENDENCY"
+  },
+  "implementation_git_parent": {
+    "pull_request": 158,
+    "head_sha": "3294fb2b4d86fef91f3f2c63e28718c490147808",
+    "tree_sha": "923ed99356690020eb01f79255392d138083dc1a",
+    "branch": "feat/workspace-github-workgraph"
+  },
+  "transport_binding": {
+    "reuse_required": true,
+    "new_transport_allowed": false,
+    "class": "GitHubRestMetadataSource",
+    "source_files": [
+      {
+        "path": "composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/github/GitHubRestMetadataSource.kt",
+        "commit_sha": "3294fb2b4d86fef91f3f2c63e28718c490147808",
+        "blob_sha": "9b677be0c8bd1da0f1488acb83488677eae11a81",
+        "required_symbols": [
+          "GitHubTokenProvider",
+          "GitHubApiEndpoint",
+          "GitHubRestMetadataSource",
+          "GitHubMetadataSource"
+        ]
+      },
+      {
+        "path": "composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/github/GitHubWorkGraphContracts.kt",
+        "commit_sha": "3294fb2b4d86fef91f3f2c63e28718c490147808",
+        "blob_sha": "60f0bc1474fe24fb4e35b814cd8a6e83214dbb7b",
+        "required_symbols": [
+          "GitHubWorkGraphRequest",
+          "GitHubWorkGraphSnapshot",
+          "GitHubReadResult",
+          "GitHubMetadataSource"
+        ]
+      },
+      {
+        "path": "composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/github/GitHubWorkGraphAdapter.kt",
+        "commit_sha": "3294fb2b4d86fef91f3f2c63e28718c490147808",
+        "blob_sha": "15d512a6bd331b5ab05e4332dbd4b24db7f5f7df",
+        "required_symbols": [
+          "GitHubWorkGraphAdapter",
+          "GitHubWorkGraphMapper"
+        ]
+      }
+    ]
+  },
+  "canary_subject": {
+    "repository": {
+      "full_name": "ed3c/kotlin-auto-webview",
+      "id": 1334777764,
+      "node_id": "R_kgDOT48XpA",
+      "visibility": "public",
+      "default_branch": "main"
+    },
+    "issue": {
+      "number": 165,
+      "id": 5206660666,
+      "node_id": "I_kwDOT48XpM8AAAABNldWOg",
+      "state": "open"
+    },
+    "pull_request": {
+      "number": 177,
+      "id": 4325936842,
+      "node_id": "PR_kwDOT48XpM8AAAABAdiOyg",
+      "state": "open",
+      "draft": true,
+      "head_sha": "a7032eaf4f5a3ffaece06d01657897ad0444344a",
+      "base_sha": "b9049a2c1d781218b264ee82a817f69ed1580f92"
+    },
+    "commit": {
+      "sha": "a7032eaf4f5a3ffaece06d01657897ad0444344a",
+      "tree_sha": "e49575deb635d206bf78d0070783fca5865ab5fd"
+    },
+    "workflow_runs": [
+      {
+        "name": "Workspace Live Wave-1",
+        "id": 32409680210,
+        "conclusion": "success",
+        "head_sha": "a7032eaf4f5a3ffaece06d01657897ad0444344a"
+      },
+      {
+        "name": "Workspace Live Preflight",
+        "id": 32409680188,
+        "conclusion": "success",
+        "head_sha": "a7032eaf4f5a3ffaece06d01657897ad0444344a"
+      },
+      {
+        "name": "CI",
+        "id": 32409680201,
+        "conclusion": "success",
+        "head_sha": "a7032eaf4f5a3ffaece06d01657897ad0444344a"
+      }
+    ],
+    "check_jobs": [
+      {
+        "name": "contract-lock",
+        "id": 96556935225,
+        "run_id": 32409680210,
+        "conclusion": "success",
+        "head_sha": "a7032eaf4f5a3ffaece06d01657897ad0444344a"
+      },
+      {
+        "name": "preflight",
+        "id": 96556941355,
+        "run_id": 32409680188,
+        "conclusion": "success",
+        "head_sha": "a7032eaf4f5a3ffaece06d01657897ad0444344a"
+      },
+      {
+        "name": "common-web-desktop",
+        "id": 96556935271,
+        "run_id": 32409680201,
+        "conclusion": "success",
+        "head_sha": "a7032eaf4f5a3ffaece06d01657897ad0444344a"
+      },
+      {
+        "name": "android",
+        "id": 96556935495,
+        "run_id": 32409680201,
+        "conclusion": "success",
+        "head_sha": "a7032eaf4f5a3ffaece06d01657897ad0444344a"
+      },
+      {
+        "name": "ios",
+        "id": 96556935695,
+        "run_id": 32409680201,
+        "conclusion": "success",
+        "head_sha": "a7032eaf4f5a3ffaece06d01657897ad0444344a"
+      }
+    ]
+  },
+  "request_contract": {
+    "origin": "https://api.github.com",
+    "allowed_methods": [
+      "GET"
+    ],
+    "credential_mode": "NONE",
+    "token_provider_must_not_be_called": true,
+    "max_pages": 10,
+    "per_page": 100,
+    "total_timeout_seconds": 60,
+    "resources": [
+      "/repos/ed3c/kotlin-auto-webview",
+      "/repos/ed3c/kotlin-auto-webview/issues/165",
+      "/repos/ed3c/kotlin-auto-webview/pulls/177",
+      "/repos/ed3c/kotlin-auto-webview/git/commits/a7032eaf4f5a3ffaece06d01657897ad0444344a",
+      "/repos/ed3c/kotlin-auto-webview/actions/runs/32409680210",
+      "/repos/ed3c/kotlin-auto-webview/actions/runs/32409680188",
+      "/repos/ed3c/kotlin-auto-webview/actions/runs/32409680201"
+    ]
+  },
+  "implementation_packet": {
+    "branch": "feat/workspace-live-github",
+    "base_branch": "feat/workspace-github-workgraph",
+    "base_head_sha": "3294fb2b4d86fef91f3f2c63e28718c490147808",
+    "first_safe_write": [
+      "composeApp/src/commonTest/kotlin/dev/ed3c/autowebview/workspace/github/live/**",
+      "composeApp/src/desktopTest/**workspace/github**",
+      "tests/evidence/workspace/github/**",
+      "scripts/evidence/workspace/github/**",
+      "receipts/workspace/live/github/**",
+      ".github/workflows/workspace-live-github.yml",
+      "docs/evidence/workspace/live-github/**"
+    ],
+    "forbidden_write": [
+      "composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/github/GitHubRestMetadataSource.kt",
+      "README.md",
+      "README.zh-TW.md",
+      "AGENTS.md",
+      "docs/TRACEABILITY.md",
+      "docs/git/STACKED_PRS.md"
+    ],
+    "planned_test_target": "dev.ed3c.autowebview.workspace.github.live.GitHubPublicCanaryTest",
+    "planned_receipt_verifier": "scripts/evidence/workspace/github/verify_live_github_receipt.py"
+  },
+  "start_receipt": {
+    "interface_locked": true,
+    "public_subject_bound": true,
+    "prep_remote_readback_required": true,
+    "code_ready": true,
+    "public_canary_implementation_ready": true,
+    "public_canary_executed": false,
+    "private_canary_ready": false,
+    "live_evidence_ready": false,
+    "reason_codes": [
+      "EXISTING_W2_TRANSPORT_REUSED",
+      "EXACT_PUBLIC_SUBJECT_BOUND",
+      "KOTLIN_CANARY_NOT_IMPLEMENTED",
+      "PRIVATE_SCOPE_EXTERNAL",
+      "L2_RECEIPT_ABSENT"
+    ]
+  },
+  "external_capabilities": [
+    {
+      "id": "PUBLIC_GITHUB_HTTPS",
+      "state": "AVAILABLE_FOR_PREP_READBACK",
+      "credential_required": false
+    },
+    {
+      "id": "GITHUB_PRIVATE_REPOSITORY_SCOPE",
+      "state": "EXTERNAL_AUTHORITY_REQUIRED",
+      "credential_required": true
+    }
+  ],
+  "local_handoff": {
+    "state": "ABSENT",
+    "reason": "KOTLIN_COMMAND_TARGETS_NOT_MATERIALIZED",
+    "placeholder_commands_allowed": false
+  },
+  "evidence_boundary": {
+    "prep_remote_readback": "PREPARATION_ONLY",
+    "kotlin_app_live_canary": "NOT_EXERCISED",
+    "w1_live_readback": "NOT_EXERCISED",
+    "l2_live_evidence": "NOT_EXERCISED",
+    "private_access": "NOT_EXERCISED",
+    "maximum_claim": "IMPLEMENTATION_PREP_ONLY"
+  },
+  "excluded_issue_numbers": [
+    173,
+    174
+  ]
+}

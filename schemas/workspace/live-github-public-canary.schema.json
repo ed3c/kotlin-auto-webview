@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ed3c/kotlin-auto-webview/schemas/workspace/live-github-public-canary.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "program",
+    "owner_issue",
+    "delivery_issue",
+    "stage_state",
+    "parent",
+    "implementation_git_parent",
+    "transport_binding",
+    "canary_subject",
+    "request_contract",
+    "implementation_packet",
+    "start_receipt",
+    "external_capabilities",
+    "local_handoff",
+    "evidence_boundary",
+    "excluded_issue_numbers"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "program": {
+      "const": "FEDERATED_CAPABILITY_WORKSPACE_L2_PUBLIC_GITHUB_CANARY_PREP"
+    },
+    "owner_issue": {
+      "const": 178
+    },
+    "delivery_issue": {
+      "const": 165
+    },
+    "stage_state": {
+      "const": "L2_PUBLIC_CANARY_IMPLEMENTATION_PREP_READY"
+    },
+    "parent": {
+      "$ref": "#/$defs/parent"
+    },
+    "implementation_git_parent": {
+      "$ref": "#/$defs/gitParent"
+    },
+    "transport_binding": {
+      "type": "object"
+    },
+    "canary_subject": {
+      "type": "object"
+    },
+    "request_contract": {
+      "type": "object"
+    },
+    "implementation_packet": {
+      "type": "object"
+    },
+    "start_receipt": {
+      "type": "object"
+    },
+    "external_capabilities": {
+      "type": "array",
+      "minItems": 2
+    },
+    "local_handoff": {
+      "type": "object"
+    },
+    "evidence_boundary": {
+      "type": "object"
+    },
+    "excluded_issue_numbers": {
+      "const": [
+        173,
+        174
+      ]
+    }
+  },
+  "$defs": {
+    "sha40": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "parent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issue",
+        "pull_request",
+        "head_sha",
+        "tree_sha",
+        "relation"
+      ],
+      "properties": {
+        "issue": {
+          "const": 176
+        },
+        "pull_request": {
+          "const": 177
+        },
+        "head_sha": {
+          "$ref": "#/$defs/sha40"
+        },
+        "tree_sha": {
+          "$ref": "#/$defs/sha40"
+        },
+        "relation": {
+          "const": "EVIDENCE_DEPENDENCY"
+        }
+      }
+    },
+    "gitParent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pull_request",
+        "head_sha",
+        "tree_sha",
+        "branch"
+      ],
+      "properties": {
+        "pull_request": {
+          "const": 158
+        },
+        "head_sha": {
+          "$ref": "#/$defs/sha40"
+        },
+        "tree_sha": {
+          "$ref": "#/$defs/sha40"
+        },
+        "branch": {
+          "const": "feat/workspace-github-workgraph"
+        }
+      }
+    }
+  }
+}

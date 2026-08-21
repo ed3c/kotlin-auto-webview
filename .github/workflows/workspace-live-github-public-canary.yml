@@ -1,0 +1,32 @@
+name: Workspace Live GitHub Public Canary Prep
+
+on:
+  pull_request:
+    paths:
+      - 'docs/workspace/live/github-public-canary/**'
+      - 'schemas/workspace/live-github-public-canary.schema.json'
+      - 'scripts/ci/check-workspace-live-github-public-canary.py'
+      - 'tests/docs/workspace/live/github-public-canary/**'
+      - '.github/workflows/workspace-live-github-public-canary.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  public-canary-prep:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Parse machine contracts
+        run: |
+          python3 -m json.tool docs/workspace/live/github-public-canary/canary-contract.json >/dev/null
+          python3 -m json.tool schemas/workspace/live-github-public-canary.schema.json >/dev/null
+      - name: Verify exact public GitHub subjects without credentials
+        env:
+          GITHUB_TOKEN: ''
+        run: python3 scripts/ci/check-workspace-live-github-public-canary.py --verify-remote
+      - name: Run L2 preparation mutations
+        run: python3 -m unittest discover -s tests/docs/workspace/live/github-public-canary -p 'test_*.py' -v
