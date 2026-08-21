@@ -1,0 +1,71 @@
+{
+  "schema": "kaw.workspace.google-docs-transport-limits.v1",
+  "program": "FEDERATED_CAPABILITY_WORKSPACE_L3_GOOGLE_TRANSPORT",
+  "implementation_issue": 182,
+  "delivery_issue": 166,
+  "stage_state": "L3_GOOGLE_DOCS_TRANSPORT_CODE_READY",
+  "git_parent": {
+    "pull_request": 160,
+    "head_sha": "95754e2a7ea6a09da030da3803313fe49641b677",
+    "branch": "feat/workspace-google-projection"
+  },
+  "w3_contracts": [
+    {
+      "path": "composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/google/GoogleProjectionContracts.kt",
+      "blob_sha": "02485d957d4b3432ba4e3310d3949c9ae6a71b7f",
+      "modified": false
+    },
+    {
+      "path": "composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/google/GoogleProjectionSaga.kt",
+      "blob_sha": "37e91707786273af29b29208e2e42db9f1f13dac",
+      "modified": false
+    }
+  ],
+  "implementation": {
+    "transport_class": "GoogleDocsProjectionTransport",
+    "executor_class": "KtorGoogleDocsApiExecutor",
+    "capability_class": "GoogleDocsAccessCapability",
+    "api_origin": "https://docs.googleapis.com",
+    "oauth_ui_location": "EXTERNAL_SYSTEM_BROWSER_OR_NATIVE_CREDENTIAL_MANAGER",
+    "docs_revision_precondition": "writeControl.requiredRevisionId",
+    "second_pre_write_read": true,
+    "authenticated_read_back_required_by_saga": true,
+    "rendered_digest_algorithm": "sha256",
+    "foreign_target_overwrite": "BLOCKED",
+    "corrupt_managed_target_overwrite": "BLOCKED",
+    "sheets_write_state": "BLOCKED_NO_PROVABLE_REVISION_PRECONDITION"
+  },
+  "allowed_scopes": [
+    "https://www.googleapis.com/auth/documents",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/drive"
+  ],
+  "evidence": {
+    "deterministic_kotlin_tests": "REQUIRED",
+    "mutation_tests": "REQUIRED",
+    "live_google_account": "NOT_EXERCISED",
+    "live_docs_file": "NOT_EXERCISED",
+    "live_sheet_file": "NOT_EXERCISED",
+    "oauth_consent": "EXTERNAL_AUTHORITY_REQUIRED",
+    "organization_dlp": "EXTERNAL_AUTHORITY_REQUIRED",
+    "content_rights": "EXTERNAL_AUTHORITY_REQUIRED",
+    "maximum_claim": "DETERMINISTIC_GOOGLE_DOCS_TRANSPORT_IMPLEMENTED"
+  },
+  "forbidden_claims": [
+    "LIVE_GOOGLE_PROJECTION_ACCOUNT_PASS",
+    "GOOGLE_ACCOUNT_OWNERSHIP",
+    "CONTENT_RIGHTS_ADMITTED",
+    "GOOGLE_SHEETS_CONDITIONAL_WRITE_PASS",
+    "PRODUCTION_SYNC_PASS",
+    "USER_OUTCOME_PASS",
+    "MERGE_RELEASE_AUTHORIZED"
+  ],
+  "secrets": {
+    "access_token_in_source": false,
+    "refresh_token_in_source": false,
+    "client_secret_in_source": false,
+    "account_email_in_receipt": false,
+    "private_file_id_in_receipt": false,
+    "response_body_in_receipt": false
+  }
+}
