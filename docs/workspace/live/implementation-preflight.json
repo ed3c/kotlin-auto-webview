@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "program": "FEDERATED_CAPABILITY_WORKSPACE_LIVE_EVIDENCE",
+  "owner_issue": 172,
+  "parent_epic": 164,
+  "foundation": [
+    {"atom":"W0","issue":120,"pr":136,"head_sha":"fba4a7f1c7cb8ca014d5a3cfe083fd9beaea4c5c","workflow_run_ids":[32248605485],"state":"CLOSED_DETERMINISTIC"},
+    {"atom":"W1","issue":121,"pr":139,"head_sha":"286f588226be7b0f9ecb63042e3eaefd5bc77dd7","workflow_run_ids":[32332217916],"state":"CLOSED_DETERMINISTIC"},
+    {"atom":"W2","issue":122,"pr":158,"head_sha":"3294fb2b4d86fef91f3f2c63e28718c490147808","workflow_run_ids":[32345280914],"state":"CLOSED_DETERMINISTIC"},
+    {"atom":"W3","issue":123,"pr":160,"head_sha":"95754e2a7ea6a09da030da3803313fe49641b677","workflow_run_ids":[32377060202],"state":"CLOSED_DETERMINISTIC"},
+    {"atom":"W4","issue":124,"pr":161,"head_sha":"56eb824866e7e74d63a4297748c647cff738db51","workflow_run_ids":[32379913900],"state":"CLOSED_DETERMINISTIC"},
+    {"atom":"W5","issue":125,"pr":162,"head_sha":"f0e37a4f2b39dd825bfd379d42f96c29ce887f37","workflow_run_ids":[32389825474],"state":"CLOSED_DETERMINISTIC"},
+    {"atom":"W6","issue":126,"pr":163,"head_sha":"c19d4e561cb09cb1c6c96c2b0f8df0c88b7d987b","workflow_run_ids":[32391189801,32391189864],"state":"CLOSED_DETERMINISTIC"}
+  ],
+  "atoms": [
+    {
+      "atom":"L2-GH","issue":165,"lane":"L2","state":"READY_FOR_IMPLEMENTATION_PREP",
+      "git_parent":{"pr":158,"head_sha":"3294fb2b4d86fef91f3f2c63e28718c490147808"},
+      "planned_branch":"feat/workspace-live-github",
+      "planned_paths":["composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/github/live/**","composeApp/src/commonTest/kotlin/dev/ed3c/autowebview/workspace/github/live/**","tests/evidence/workspace/github/**","scripts/evidence/workspace/github/**","receipts/workspace/live/github/**",".github/workflows/workspace-live-github.yml","docs/evidence/workspace/live-github/**"],
+      "start_dependencies":[126],"completion_dependencies":[],"evidence_dependencies":[122,126],
+      "external_authorities":["GITHUB_CREDENTIAL_AND_SCOPE","PRIVATE_REPOSITORY_ACCESS"],
+      "maximum_claim":"EXACT_READ_ONLY_LIVE_GITHUB_CONNECTOR"
+    },
+    {
+      "atom":"L3-GOOGLE","issue":166,"lane":"L3","state":"READY_FOR_IMPLEMENTATION_PREP",
+      "git_parent":{"pr":160,"head_sha":"95754e2a7ea6a09da030da3803313fe49641b677"},
+      "planned_branch":"feat/workspace-live-google",
+      "planned_paths":["composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/google/live/**","tests/evidence/workspace/google/**","scripts/evidence/workspace/google/**","receipts/workspace/live/google/**",".github/workflows/workspace-live-google.yml","docs/evidence/workspace/live-google/**"],
+      "start_dependencies":[126],"completion_dependencies":[],"evidence_dependencies":[121,123,126],
+      "external_authorities":["GOOGLE_ACCOUNT","OAUTH_SCOPES","ORGANIZATION_DLP","TEST_FILE"],
+      "maximum_claim":"EXACT_ADMITTED_GOOGLE_PROJECTION_ACCOUNT"
+    },
+    {
+      "atom":"L4-BETTOR","issue":167,"lane":"L4","state":"READY_FOR_CROSS_REPO_PREP",
+      "git_parent":{"pr":161,"head_sha":"56eb824866e7e74d63a4297748c647cff738db51"},
+      "planned_branch":"feat/workspace-live-bettor-handoff",
+      "planned_paths":["composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/routing/bettor/**","tests/evidence/workspace/bettor/**","scripts/evidence/workspace/bettor/**","receipts/workspace/live/bettor/**",".github/workflows/workspace-live-bettor.yml","docs/evidence/workspace/live-bettor/**"],
+      "start_dependencies":[126],"completion_dependencies":[],"evidence_dependencies":[124,126],
+      "external_issues":["ed3c/bettor-arena#197"],
+      "external_authorities":["BETTOR_DEPLOYMENT","PROVIDER_CREDENTIALS","BUDGET"],
+      "maximum_claim":"EXACT_LIVE_KAW_TO_BETTOR_HANDOFF"
+    },
+    {
+      "atom":"L5-DOMAIN","issue":168,"lane":"L5","state":"READY_FOR_CROSS_REPO_PREP",
+      "git_parent":{"pr":161,"head_sha":"56eb824866e7e74d63a4297748c647cff738db51"},
+      "planned_branch":"feat/workspace-live-domain-receipt",
+      "planned_paths":["composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/domain/**","tests/evidence/workspace/domain/**","scripts/evidence/workspace/domain/**","receipts/workspace/live/domain/**",".github/workflows/workspace-live-domain.yml","docs/evidence/workspace/live-domain/**"],
+      "start_dependencies":[126],"completion_dependencies":[],"evidence_dependencies":[124,126],
+      "external_issues":["ed3c/truth-verify-loop#47"],
+      "external_authorities":["DOMAIN_DEPLOYMENT","SOURCE_ACCESS","SEMANTIC_DISPUTE"],
+      "maximum_claim":"EXACT_LIVE_DOMAIN_AUTHORITY_RECEIPT"
+    },
+    {
+      "atom":"L6-DEVICE","issue":169,"lane":"L6","state":"BLOCKED_EXTERNAL_DEVICE",
+      "git_parent":{"pr":162,"head_sha":"f0e37a4f2b39dd825bfd379d42f96c29ce887f37"},
+      "planned_branch":"test/workspace-physical-device",
+      "planned_paths":["composeApp/src/androidInstrumentedTest/**workspace**","composeApp/src/iosTest/**workspace**","tests/evidence/workspace/device/**","scripts/evidence/workspace/device/**","receipts/workspace/live/device/**",".github/workflows/workspace-device-evidence.yml","docs/evidence/workspace/physical-device/**"],
+      "start_dependencies":[126],"completion_dependencies":[],"evidence_dependencies":[125,126],
+      "external_authorities":["PHYSICAL_ANDROID_DEVICE","PHYSICAL_IOS_DEVICE","DEVICE_TRUST","SIGNING_PROVISIONING"],
+      "maximum_claim":"EXACT_PHYSICAL_DEVICE_WORKSPACE_BEHAVIOR"
+    },
+    {
+      "atom":"L7-USER","issue":170,"lane":"L7","state":"BLOCKED_ON_LIVE_VERTICAL_SLICE",
+      "git_parent":null,"planned_branch":"experiment/workspace-user-outcome",
+      "planned_paths":["experiments/workspace/**","schemas/workspace/user-outcome*.json","receipts/workspace/user/**","docs/evidence/workspace/user-outcome/**"],
+      "start_dependencies":[125],"completion_dependencies":[165,166,167,168],"evidence_dependencies":[125],
+      "external_authorities":["USER_RECRUITMENT","CONSENT","COMPENSATION","DATA_RETENTION"],
+      "maximum_claim":"EXACT_CONSENTED_USABILITY_OUTCOME"
+    },
+    {
+      "atom":"P1-EVIDENCE","issue":171,"lane":"CONVERGENCE","state":"BLOCKED_ON_LIVE_RECEIPTS",
+      "git_parent":{"pr":163,"head_sha":"c19d4e561cb09cb1c6c96c2b0f8df0c88b7d987b"},
+      "planned_branch":"test/workspace-live-evidence-convergence",
+      "planned_paths":["receipts/workspace/**","scripts/evidence/workspace/**","tests/evidence/workspace/**","schemas/workspace/evidence*.json",".github/workflows/workspace-evidence.yml","docs/evidence/workspace/**"],
+      "start_dependencies":[165,166,167,168,169,170],"completion_dependencies":[165,166,167,168,169,170],"evidence_dependencies":[126],
+      "external_authorities":["SEMANTIC_CONFLICT","MERGE_RELEASE"],
+      "maximum_claim":"EXACT_L2_L7_DENOMINATOR_CONVERGENCE"
+    },
+    {
+      "atom":"P1-PREP","issue":172,"lane":"PREIMPLEMENTATION","state":"CURRENT",
+      "git_parent":{"pr":163,"head_sha":"c19d4e561cb09cb1c6c96c2b0f8df0c88b7d987b"},
+      "planned_branch":"docs/workspace-live-evidence-preflight",
+      "planned_paths":["docs/workspace/live/**","schemas/workspace/live-preflight*.json","scripts/ci/check-workspace-live-preflight.py","tests/docs/workspace/live/**",".github/workflows/workspace-live-preflight.yml"],
+      "start_dependencies":[126],"completion_dependencies":[],"evidence_dependencies":[126],
+      "external_authorities":["NONE_FOR_DOCS_ONLY"],
+      "maximum_claim":"LIVE_EVIDENCE_PREIMPLEMENTATION_READY"
+    }
+  ],
+  "required_lanes": {
+    "L2":"NOT_EXERCISED","L3":"NOT_EXERCISED","L4":"NOT_EXERCISED","L5":"NOT_EXERCISED","L6":"NOT_EXERCISED","L7":"ABSENT"
+  },
+  "local_handoff": {
+    "state":"ABSENT",
+    "reason":"EXTERNAL_CAPABILITIES_AND_CONCRETE_COMMANDS_NOT_YET_BOUND"
+  },
+  "hard_laws": {
+    "fixture_is_live":false,
+    "ci_is_physical_device":false,
+    "route_ack_is_execution":false,
+    "domain_receipt_ref_is_verdict_content":false,
+    "account_access_is_content_rights":false,
+    "technical_evidence_is_user_outcome":false,
+    "google_projection_is_canonical_authority":false
+  },
+  "void_issues_excluded":[173,174]
+}
