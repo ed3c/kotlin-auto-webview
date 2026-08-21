@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/kotlin-auto-webview/receipts/workspace/live/github/receipt.schema.json",
+  "title": "Kotlin Auto WebView public live GitHub connector receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "lane", "status", "maximum_claim", "transport", "subject",
+    "execution", "result", "disclosure", "cleanup", "evidence_boundary"
+  ],
+  "properties": {
+    "schema": {"const": "kaw.workspace.live-github-receipt.v1"},
+    "lane": {"const": "L2_LIVE_GITHUB_CONNECTOR"},
+    "status": {"const": "PASS"},
+    "maximum_claim": {"const": "PUBLIC_EXACT_SUBJECT_READ_AND_LOCAL_PROJECTION"},
+    "transport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["class", "source_commit", "source_blob", "credential_mode", "credential_provider_bound"],
+      "properties": {
+        "class": {"const": "GitHubRestMetadataSource"},
+        "source_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "source_blob": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "credential_mode": {"const": "NONE"},
+        "credential_provider_bound": {"const": false}
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_full_name", "repository_id", "repository_node_id",
+        "issue_number", "issue_id", "issue_node_id",
+        "pull_request_number", "pull_request_id", "pull_request_node_id",
+        "head_sha", "tree_sha", "runtime_node_id_validation"
+      ],
+      "properties": {
+        "repository_full_name": {"const": "ed3c/kotlin-auto-webview"},
+        "repository_id": {"const": 1334777764},
+        "repository_node_id": {"type": "string", "minLength": 1},
+        "issue_number": {"const": 165},
+        "issue_id": {"const": 5206660666},
+        "issue_node_id": {"type": "string", "minLength": 1},
+        "pull_request_number": {"const": 177},
+        "pull_request_id": {"const": 4325936842},
+        "pull_request_node_id": {"type": "string", "minLength": 1},
+        "head_sha": {"const": "a7032eaf4f5a3ffaece06d01657897ad0444344a"},
+        "tree_sha": {"const": "e49575deb635d206bf78d0070783fca5865ab5fd"},
+        "runtime_node_id_validation": {"const": "PREP_BINDING_ONLY_W2_MODEL_ABSENT"}
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "implementation_head_sha", "workflow_run_id", "workflow_run_attempt",
+        "runner_os", "started_at", "ended_at", "observation_sequence"
+      ],
+      "properties": {
+        "implementation_head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "workflow_run_id": {"type": "integer", "minimum": 1},
+        "workflow_run_attempt": {"type": "integer", "minimum": 1},
+        "runner_os": {"type": "string", "minLength": 1},
+        "started_at": {"type": "string", "format": "date-time"},
+        "ended_at": {"type": "string", "format": "date-time"},
+        "observation_sequence": {"type": "integer", "minimum": 0}
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "subjects_applied", "edges_applied", "active_subjects_after_reopen",
+        "w1_subject_read_back", "w1_edge_read_back", "all_returned_checks_exact_head",
+        "exact_successful_check_ids", "exact_successful_check_names", "source_workflow_run_ids"
+      ],
+      "properties": {
+        "subjects_applied": {"type": "integer", "minimum": 9},
+        "edges_applied": {"type": "integer", "minimum": 1},
+        "active_subjects_after_reopen": {"type": "integer", "minimum": 9},
+        "w1_subject_read_back": {"const": true},
+        "w1_edge_read_back": {"const": true},
+        "all_returned_checks_exact_head": {"const": true},
+        "exact_successful_check_ids": {"type": "array", "minItems": 5, "uniqueItems": true, "items": {"type": "integer", "minimum": 1}},
+        "exact_successful_check_names": {"type": "array", "minItems": 5, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "source_workflow_run_ids": {"type": "array", "minItems": 3, "uniqueItems": true, "items": {"type": "integer", "minimum": 1}}
+      }
+    },
+    "disclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "authorization_header_persisted", "token_persisted", "cookie_persisted",
+        "email_persisted", "response_body_persisted", "private_locator_persisted"
+      ],
+      "properties": {
+        "authorization_header_persisted": {"const": false},
+        "token_persisted": {"const": false},
+        "cookie_persisted": {"const": false},
+        "email_persisted": {"const": false},
+        "response_body_persisted": {"const": false},
+        "private_locator_persisted": {"const": false}
+      }
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["temporary_database_removed", "credential_cleanup_required", "temporary_response_files_persisted"],
+      "properties": {
+        "temporary_database_removed": {"const": true},
+        "credential_cleanup_required": {"const": false},
+        "temporary_response_files_persisted": {"const": false}
+      }
+    },
+    "evidence_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["public_repository", "private_repository", "github_mutation", "merge_release", "l3_to_l6", "l7_user_outcome"],
+      "properties": {
+        "public_repository": {"const": "PASS"},
+        "private_repository": {"const": "NOT_EXERCISED"},
+        "github_mutation": {"const": "NOT_IMPLEMENTED"},
+        "merge_release": {"const": "NOT_AUTHORIZED"},
+        "l3_to_l6": {"const": "NOT_EXERCISED"},
+        "l7_user_outcome": {"const": "ABSENT"}
+      }
+    }
+  }
+}
