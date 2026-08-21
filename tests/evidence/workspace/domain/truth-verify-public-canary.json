@@ -1,0 +1,41 @@
+{
+  "schema": "kaw.workspace.live-domain-selector.v1",
+  "producer": {
+    "repository_full_name": "ed3c/truth-verify-loop",
+    "pull_request_number": 48,
+    "head_branch": "feat/kaw-domain-receipt-canary",
+    "base_branch": "main",
+    "receipt_path": "receipts/kaw/public-claim-canary.json",
+    "required_workflow_names": [
+      "KAW Domain Receipt",
+      "verify"
+    ]
+  },
+  "receipt": {
+    "schema": "tvl.kaw-domain-receipt.v1",
+    "receipt_id": "TVL-KAW-PUBLIC-SYNTHETIC-1",
+    "authority_owner": "truth-verify-loop",
+    "lane": "L5_LIVE_DOMAIN_AUTHORITY_RECEIPT",
+    "environment": "PUBLIC_SYNTHETIC_CI",
+    "closure_engine_blob": "3cbbc664e3a28f99be097996dc6e229a6417c581",
+    "semantic_verifier_schema_blob": "2c9085b66d080abcede3861812d15bdc92986d04",
+    "claim_id": "synthetic-sdk-release",
+    "claim_digest": "49baf11ae87da437f87de2380672fb2d7b92810b2b2ad948f278637433b06c21",
+    "verdict_state": "SUPPORTED",
+    "evidence_ceiling": "DOMAIN_VERDICT"
+  },
+  "transport": {
+    "origin": "https://api.github.com",
+    "credential_mode": "NONE",
+    "timeout_seconds": 60
+  },
+  "evidence_boundary": {
+    "maximum_claim": "EXACT_PUBLIC_DOMAIN_RECEIPT_VALIDATION",
+    "private_source_access": "NOT_EXERCISED",
+    "other_domain_authorities": "NOT_EXERCISED",
+    "production_deployment": "NOT_EXERCISED",
+    "user_outcome": "ABSENT",
+    "paid_outcome": "ABSENT",
+    "merge_release": "NOT_AUTHORIZED"
+  }
+}

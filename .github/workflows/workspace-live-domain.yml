@@ -1,0 +1,70 @@
+name: Workspace Live Domain
+
+on:
+  pull_request:
+    paths:
+      - 'composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/domain/**'
+      - 'composeApp/src/commonTest/**/workspace/domain/**'
+      - 'composeApp/src/desktopTest/**/workspace/domain/**'
+      - 'tests/evidence/workspace/domain/**'
+      - 'scripts/evidence/workspace/domain/**'
+      - 'receipts/workspace/live/domain/**'
+      - '.github/workflows/workspace-live-domain.yml'
+      - 'docs/evidence/workspace/live-domain/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  public-domain-canary:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb
+      - name: Enforce public no-credential mode
+        shell: bash
+        run: |
+          test -z "${GITHUB_TOKEN:-}"
+          test -z "${GH_TOKEN:-}"
+      - name: Fetch and validate exact Truth Verify receipt
+        shell: bash
+        env:
+          KAW_LIVE_DOMAIN_CANARY: '1'
+          KAW_LIVE_DOMAIN_SELECTOR_PATH: ${{ github.workspace }}/tests/evidence/workspace/domain/truth-verify-public-canary.json
+          KAW_LIVE_DOMAIN_RECEIPT_PATH: ${{ runner.temp }}/kaw-live-domain/public-canary.json
+          KAW_IMPLEMENTATION_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          mkdir -p "$(dirname "$KAW_LIVE_DOMAIN_RECEIPT_PATH")"
+          ./gradlew :composeApp:desktopTest \
+            --tests 'dev.ed3c.autowebview.workspace.domain.live.TruthVerifyLoopPublicCanaryTest' \
+            --no-daemon
+      - name: Verify sanitized L5 receipt
+        shell: bash
+        env:
+          RECEIPT: ${{ runner.temp }}/kaw-live-domain/public-canary.json
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          python3 scripts/evidence/workspace/domain/verify_live_domain_receipt.py \
+            "$RECEIPT" \
+            --expected-implementation-head "$EXPECTED_HEAD"
+          sha256sum "$RECEIPT" > "${RECEIPT}.sha256"
+      - name: Run domain-receipt laundering mutations
+        run: python3 -m unittest discover -s tests/evidence/workspace/domain -p 'test_*.py' -v
+      - name: Upload sanitized L5 receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: workspace-live-domain-public-receipt
+          path: |
+            ${{ runner.temp }}/kaw-live-domain/public-canary.json
+            ${{ runner.temp }}/kaw-live-domain/public-canary.json.sha256
+            tests/evidence/workspace/domain/truth-verify-public-canary.json
+          if-no-files-found: error
+          retention-days: 30
