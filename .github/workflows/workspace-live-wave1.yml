@@ -1,0 +1,31 @@
+name: Workspace Live Wave-1
+
+on:
+  pull_request:
+    paths:
+      - "docs/workspace/live/wave1/**"
+      - "schemas/workspace/live-wave1*.json"
+      - "scripts/ci/check-workspace-live-wave1.py"
+      - "tests/docs/workspace/live/wave1/**"
+      - ".github/workflows/workspace-live-wave1.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract-lock:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Parse machine contracts
+        run: |
+          python3 -m json.tool docs/workspace/live/wave1/contract-lock.json >/dev/null
+          python3 -m json.tool schemas/workspace/live-wave1-contract-lock.schema.json >/dev/null
+      - name: Verify exact repository and interface subjects
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 scripts/ci/check-workspace-live-wave1.py --verify-remote
+      - name: Run Wave-1 contract mutations
+        run: python3 -m unittest discover -s tests/docs/workspace/live/wave1 -p 'test_*.py' -v
