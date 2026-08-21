@@ -1,0 +1,56 @@
+CREATE TABLE workspace_subject_projection (
+  logical_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  updated_at_epoch_ms INTEGER NOT NULL,
+  tombstoned INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (logical_id, kind)
+);
+
+CREATE INDEX workspace_subject_active_idx
+ON workspace_subject_projection(tombstoned, updated_at_epoch_ms DESC, logical_id ASC);
+
+CREATE TABLE workspace_edge_projection (
+  edge_id TEXT NOT NULL PRIMARY KEY,
+  from_logical_id TEXT NOT NULL,
+  from_kind TEXT NOT NULL,
+  relation TEXT NOT NULL,
+  to_logical_id TEXT NOT NULL,
+  to_kind TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  updated_at_epoch_ms INTEGER NOT NULL
+);
+
+CREATE INDEX workspace_edge_from_idx
+ON workspace_edge_projection(from_logical_id, from_kind, relation, edge_id);
+
+CREATE TABLE workspace_outbox_event (
+  event_id TEXT NOT NULL PRIMARY KEY,
+  canonical_logical_id TEXT NOT NULL,
+  canonical_kind TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  state TEXT NOT NULL,
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  dedupe_key TEXT NOT NULL UNIQUE,
+  next_attempt_at_epoch_ms INTEGER NOT NULL,
+  created_at_epoch_ms INTEGER NOT NULL,
+  updated_at_epoch_ms INTEGER NOT NULL,
+  last_error_code TEXT
+);
+
+CREATE INDEX workspace_outbox_dispatch_idx
+ON workspace_outbox_event(state, next_attempt_at_epoch_ms, created_at_epoch_ms, event_id);
+
+CREATE TABLE workspace_inbox_change (
+  proposal_id TEXT NOT NULL PRIMARY KEY,
+  canonical_logical_id TEXT NOT NULL,
+  canonical_kind TEXT NOT NULL,
+  source_projection_id TEXT NOT NULL,
+  payload_json TEXT NOT NULL,
+  state TEXT NOT NULL,
+  received_at_epoch_ms INTEGER NOT NULL,
+  updated_at_epoch_ms INTEGER NOT NULL
+);
+
+CREATE INDEX workspace_inbox_state_idx
+ON workspace_inbox_change(state, received_at_epoch_ms, proposal_id);

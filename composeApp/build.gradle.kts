@@ -113,6 +113,18 @@ sqldelight {
     }
 }
 
+// Schema snapshots may be stored as tracked .db.gz artifacts when the transport that produced a
+// branch cannot safely write binary SQLite bytes. Materialization is part of the Gradle graph —
+// not a CI-only setup step — so local and hosted callers see the same expanded snapshot and digest
+// checks before SQLDelight or the readable-snapshot gate consumes it.
+val materializeSchemaSnapshots by tasks.registering(Exec::class) {
+    group = "verification"
+    description = "Materialize and digest-check compressed SQLDelight schema snapshots."
+    val materializer = rootProject.layout.projectDirectory.file("scripts/ci/materialize-schema-snapshots.py")
+    val migrations = layout.projectDirectory.dir("src/commonMain/sqldelight/migrations")
+    commandLine("python3", materializer.asFile.absolutePath, migrations.asFile.absolutePath)
+}
+
 // An unreadable schema snapshot makes `verifyMigrations` infer an empty schema, which it then
 // reports as every statement in the migration referring to something that does not exist. The
 // errors all name the migration, so the migration is what gets edited — that cost three attempts
@@ -125,6 +137,7 @@ val checkSchemaSnapshots by tasks.registering(Exec::class) {
     description = "Reject an unreadable SQLDelight schema snapshot before the generator sees it."
     val checker = rootProject.layout.projectDirectory.file("scripts/ci/check-schema-snapshots.py")
     val migrations = layout.projectDirectory.dir("src/commonMain/sqldelight/migrations")
+    dependsOn(materializeSchemaSnapshots)
     commandLine("python3", checker.asFile.absolutePath, migrations.asFile.absolutePath)
 }
 
