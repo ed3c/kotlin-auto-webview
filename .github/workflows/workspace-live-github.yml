@@ -54,7 +54,8 @@ jobs:
             "$SUBJECT" \
             --expected-implementation-head "$EXPECTED_HEAD"
           sha256sum "$RECEIPT" > "${RECEIPT}.sha256"
-      - name: Run receipt laundering mutations
+          python3 -m json.tool receipts/workspace/live/github/provenance-limits.json >/dev/null
+      - name: Run receipt and provenance laundering mutations
         run: python3 -m unittest discover -s tests/evidence/workspace/github -p 'test_*.py' -v
       - name: Upload sanitized live receipt
         uses: actions/upload-artifact@v4
@@ -63,5 +64,6 @@ jobs:
           path: |
             ${{ runner.temp }}/kaw-live-github/public-canary.json
             ${{ runner.temp }}/kaw-live-github/public-canary.json.sha256
+            receipts/workspace/live/github/provenance-limits.json
           if-no-files-found: error
           retention-days: 30
