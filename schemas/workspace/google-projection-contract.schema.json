@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ed3c/kotlin-auto-webview/schemas/workspace/google-projection-contract.schema.json",
+  "title": "Federated Workspace Google Projection Contract",
+  "description": "Portable W3 binding and public-receipt shapes. Google file IDs and revisions are local-only and are excluded from public receipts.",
+  "$defs": {
+    "subjectKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["logicalId", "kind"],
+      "properties": {
+        "logicalId": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._:-]{2,127}$"
+        },
+        "kind": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "projectionId",
+        "canonicalSubject",
+        "kind",
+        "fileId",
+        "destinationAdmission"
+      ],
+      "properties": {
+        "projectionId": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._:-]{2,127}$"
+        },
+        "canonicalSubject": {
+          "$ref": "#/$defs/subjectKey"
+        },
+        "kind": {
+          "enum": ["DOC", "SHEET"]
+        },
+        "fileId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{6,256}$"
+        },
+        "expectedRevision": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "displayName": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 512,
+          "description": "Human label only. It is never projection identity."
+        },
+        "destinationAdmission": {
+          "enum": ["ADMITTED", "LOCAL_ONLY", "EXTERNAL_AUTHORITY_REQUIRED"]
+        }
+      }
+    },
+    "publicReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["canonicalSubjectKind", "projectionKind", "state", "attempts"],
+      "properties": {
+        "canonicalSubjectKind": {"type": "string", "minLength": 1},
+        "projectionKind": {"enum": ["DOC", "SHEET"]},
+        "state": {"enum": ["SYNCED", "RETRY", "CONFLICT", "BLOCKED"]},
+        "attempts": {"type": "integer", "minimum": 0},
+        "reasonCode": {
+          "type": ["string", "null"],
+          "pattern": "^[A-Z0-9_:-]{1,128}$"
+        }
+      },
+      "not": {
+        "anyOf": [
+          {"required": ["fileId"]},
+          {"required": ["revision"]},
+          {"required": ["eventId"]},
+          {"required": ["canonicalUrl"]}
+        ]
+      }
+    }
+  },
+  "oneOf": [
+    {"$ref": "#/$defs/binding"},
+    {"$ref": "#/$defs/publicReceipt"}
+  ]
+}
