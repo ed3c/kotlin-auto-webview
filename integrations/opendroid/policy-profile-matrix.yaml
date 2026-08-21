@@ -1,0 +1,43 @@
+schema: kotlin-auto-webview/opendroid-policy-profile-matrix/v1
+profiles:
+  PLAY_SAFE:
+    compile_ceiling:
+      own_webview_automation: true
+      deterministic_human_authored_rules: true
+      accessibility_service: false
+      device_wide_autonomous_actions: false
+      shizuku: false
+      root: false
+      generic_shell: false
+      inbound_mobile_mcp: false
+    runtime_rule: any capability outside this ceiling fails closed
+  ENTERPRISE_SIDELOAD:
+    compile_ceiling:
+      own_webview_automation: true
+      typed_device_actions: true
+      accessibility_service: provisioned-only
+      shizuku_user_service: typed-allowlist-only
+      root: false
+      generic_shell: false
+      terminal: false
+      inbound_mobile_mcp: false
+    runtime_rule: profile + local capability policy + HITL + exact revalidation + verifier are all required
+  ACCESSIBILITY_TOOL:
+    compile_ceiling:
+      enabled: false
+    runtime_rule: code or agent cannot self-admit; external policy/legal/store evidence is required
+stable_effect_states: [NONE, APPLIED, UNKNOWN]
+stable_admission_states:
+  - ADOPT_AS_CONTRACT
+  - ADAPT_BEHIND_POLICY
+  - REFERENCE_ONLY
+  - DENIED_BY_ARCHITECTURE
+  - EXTERNAL_POLICY_ADMIT_REQUIRED
+hard_denials:
+  - direct_mcp_execute_action
+  - caller_supplied_shell
+  - root_fallback
+  - generic_terminal
+  - model_generated_coordinate_authority
+  - first_match_target_authority
+  - raw_screen_data_before_privacy_filter
