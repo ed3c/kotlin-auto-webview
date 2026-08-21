@@ -1,0 +1,39 @@
+name: Workspace Live Google Transport
+
+on:
+  pull_request:
+    paths:
+      - 'composeApp/src/commonMain/kotlin/dev/ed3c/autowebview/workspace/google/live/**'
+      - 'composeApp/src/commonTest/kotlin/dev/ed3c/autowebview/workspace/google/live/**'
+      - 'tests/evidence/workspace/google/**'
+      - 'scripts/evidence/workspace/google/**'
+      - 'receipts/workspace/live/google/**'
+      - '.github/workflows/workspace-live-google-transport.yml'
+      - 'docs/evidence/workspace/live-google/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docs-transport:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Run deterministic Google Docs transport tests
+        run: |
+          ./gradlew :composeApp:desktopTest \
+            --tests 'dev.ed3c.autowebview.workspace.google.live.GoogleDocsProjectionTransportTest' \
+            --no-daemon
+      - name: Verify evidence ceiling
+        run: |
+          python3 scripts/evidence/workspace/google/verify_google_transport_limits.py \
+            receipts/workspace/live/google/transport-limits.json
+      - name: Run Google transport laundering mutations
+        run: python3 -m unittest discover -s tests/evidence/workspace/google -p 'test_*.py' -v
