@@ -1,0 +1,30 @@
+{
+  "schema": "kaw.workspace.live-github-provenance-limits.v1",
+  "runtime_validated": {
+    "repository_rest_numeric_id": true,
+    "issue_rest_numeric_id": true,
+    "pull_request_rest_numeric_id": true,
+    "commit_sha": true,
+    "tree_sha": true,
+    "check_run_id": true,
+    "check_name": true,
+    "check_head_sha": true,
+    "check_status_and_conclusion": true,
+    "w1_subject_read_back": true,
+    "w1_edge_read_back": true
+  },
+  "prep_bound_only": {
+    "repository_graphql_node_id": "W2_MODEL_ABSENT",
+    "issue_graphql_node_id": "W2_MODEL_ABSENT",
+    "pull_request_graphql_node_id": "W2_MODEL_ABSENT",
+    "source_workflow_run_ids": "W2_CHECK_MODEL_DOES_NOT_RETAIN_WORKFLOW_RUN_ID"
+  },
+  "forbidden_promotions": [
+    "PREP_BOUND_NODE_ID_TO_RUNTIME_PASS",
+    "PREP_BOUND_WORKFLOW_RUN_ID_TO_RUNTIME_PASS",
+    "CHECK_SUCCESS_TO_USER_OUTCOME",
+    "PUBLIC_ACCESS_TO_PRIVATE_SCOPE",
+    "READ_ACCESS_TO_MUTATION_AUTHORITY"
+  ],
+  "maximum_claim": "PUBLIC_EXACT_SUBJECT_READ_AND_LOCAL_PROJECTION"
+}
