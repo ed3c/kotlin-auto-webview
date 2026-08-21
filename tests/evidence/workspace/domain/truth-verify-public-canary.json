@@ -2,6 +2,7 @@
   "schema": "kaw.workspace.live-domain-selector.v1",
   "producer": {
     "repository_full_name": "ed3c/truth-verify-loop",
+    "pull_request_number": 48,
     "head_branch": "feat/kaw-domain-receipt-canary",
     "base_branch": "main",
     "receipt_path": "receipts/kaw/public-claim-canary.json",
