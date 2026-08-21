@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/kotlin-auto-webview/receipts/workspace/live/domain/receipt.schema.json",
+  "title": "KAW live public domain-authority receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "lane",
+    "status",
+    "maximum_claim",
+    "producer",
+    "execution",
+    "subject",
+    "authority",
+    "validation",
+    "disclosure",
+    "evidence_boundary"
+  ],
+  "properties": {
+    "schema": {"const": "kaw.workspace.live-domain-receipt.v1"},
+    "lane": {"const": "L5_LIVE_DOMAIN_AUTHORITY_RECEIPT"},
+    "status": {"const": "PASS"},
+    "maximum_claim": {"const": "EXACT_PUBLIC_DOMAIN_RECEIPT_VALIDATION"},
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_full_name",
+        "repository_id",
+        "pull_request_number",
+        "commit_sha",
+        "tree_sha",
+        "receipt_path",
+        "receipt_blob_sha",
+        "receipt_content_sha256",
+        "workflow_runs"
+      ],
+      "properties": {
+        "repository_full_name": {"const": "ed3c/truth-verify-loop"},
+        "repository_id": {"type": "integer", "minimum": 1},
+        "pull_request_number": {"type": "integer", "minimum": 1},
+        "commit_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "tree_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "receipt_path": {"const": "receipts/kaw/public-claim-canary.json"},
+        "receipt_blob_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "receipt_content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "workflow_runs": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "run_id", "conclusion"],
+            "properties": {
+              "name": {"enum": ["KAW Domain Receipt", "verify"]},
+              "run_id": {"type": "integer", "minimum": 1},
+              "conclusion": {"const": "success"}
+            }
+          }
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "implementation_head_sha",
+        "workflow_run_id",
+        "workflow_run_attempt",
+        "runner_os",
+        "started_at",
+        "ended_at"
+      ],
+      "properties": {
+        "implementation_head_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "workflow_run_id": {"type": "integer", "minimum": 1},
+        "workflow_run_attempt": {"type": "integer", "minimum": 1},
+        "runner_os": {"type": "string", "minLength": 1},
+        "started_at": {"type": "string", "format": "date-time"},
+        "ended_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim_id", "claim_digest", "receipt_id"],
+      "properties": {
+        "claim_id": {"const": "synthetic-sdk-release"},
+        "claim_digest": {"const": "49baf11ae87da437f87de2380672fb2d7b92810b2b2ad948f278637433b06c21"},
+        "receipt_id": {"const": "TVL-KAW-PUBLIC-SYNTHETIC-1"}
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "environment",
+        "verdict_state",
+        "closed",
+        "closure_digest",
+        "source_freshness",
+        "evidence_ceiling"
+      ],
+      "properties": {
+        "owner": {"const": "truth-verify-loop"},
+        "environment": {"const": "PUBLIC_SYNTHETIC_CI"},
+        "verdict_state": {"enum": ["SUPPORTED", "REFUTED", "CONFLICTED", "STALE", "UNVERIFIABLE"]},
+        "closed": {"type": "boolean"},
+        "closure_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "source_freshness": {"enum": ["CURRENT", "STALE"]},
+        "evidence_ceiling": {"const": "DOMAIN_VERDICT"}
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exact_repository",
+        "exact_commit",
+        "exact_tree",
+        "exact_blob",
+        "exact_content_digest",
+        "producer_workflows_exact_head",
+        "verdict_preserved",
+        "raw_source_imported",
+        "raw_evidence_imported"
+      ],
+      "properties": {
+        "exact_repository": {"const": true},
+        "exact_commit": {"const": true},
+        "exact_tree": {"const": true},
+        "exact_blob": {"const": true},
+        "exact_content_digest": {"const": true},
+        "producer_workflows_exact_head": {"const": true},
+        "verdict_preserved": {"const": true},
+        "raw_source_imported": {"const": false},
+        "raw_evidence_imported": {"const": false}
+      }
+    },
+    "disclosure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "credential_persisted",
+        "authorization_header_persisted",
+        "cookie_persisted",
+        "email_persisted",
+        "internal_reasoning_persisted",
+        "private_locator_persisted",
+        "raw_source_persisted",
+        "raw_evidence_persisted"
+      ],
+      "properties": {
+        "credential_persisted": {"const": false},
+        "authorization_header_persisted": {"const": false},
+        "cookie_persisted": {"const": false},
+        "email_persisted": {"const": false},
+        "internal_reasoning_persisted": {"const": false},
+        "private_locator_persisted": {"const": false},
+        "raw_source_persisted": {"const": false},
+        "raw_evidence_persisted": {"const": false}
+      }
+    },
+    "evidence_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "l2_public_github",
+        "l3_google",
+        "l4_bettor",
+        "l5_domain_authority",
+        "l6_physical_device",
+        "l7_user_outcome",
+        "paid_outcome",
+        "merge_release"
+      ],
+      "properties": {
+        "l2_public_github": {"const": "PASS_SEPARATE_RECEIPT"},
+        "l3_google": {"const": "NOT_EXERCISED"},
+        "l4_bettor": {"const": "NOT_EXERCISED"},
+        "l5_domain_authority": {"const": "PASS"},
+        "l6_physical_device": {"const": "NOT_EXERCISED"},
+        "l7_user_outcome": {"const": "ABSENT"},
+        "paid_outcome": {"const": "ABSENT"},
+        "merge_release": {"const": "NOT_AUTHORIZED"}
+      }
+    }
+  }
+}
