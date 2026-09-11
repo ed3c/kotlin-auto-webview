@@ -37,7 +37,7 @@ class McpWebViewNavigationInstrumentedTest {
     fun confirmedMcpProposalReachesRealWebViewAndObservedUrlBecomesApplied() = runBlocking {
         val destination = "https://fixture.test/next"
         val fixtureHtml = "<html><head><title>Fixture</title></head><body>applied</body></html>"
-        val finished = CountDownLatch(1)
+        val navigationAccepted = CountDownLatch(1)
         var observedUrl: String? = null
 
         scenario = ActivityScenario.launch(MainActivity::class.java)
@@ -46,11 +46,11 @@ class McpWebViewNavigationInstrumentedTest {
             webView.webViewClient = object : WebViewClient() {
                 override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
                     observedUrl = url
+                    if (url == destination) navigationAccepted.countDown()
                 }
 
                 override fun onPageFinished(view: WebView, url: String) {
                     observedUrl = url
-                    if (url == destination) finished.countDown()
                 }
             }
             activity.setContentView(webView)
@@ -71,7 +71,7 @@ class McpWebViewNavigationInstrumentedTest {
         val proposalId = Json.parseToJsonElement(proposalText).jsonObject["proposalId"]!!.jsonPrimitive.content
 
         instrumentation.runOnMainSync { runBlocking { runtime.confirmPendingAction() } }
-        assertTrue(finished.await(20, TimeUnit.SECONDS), "fixture navigation did not finish")
+        assertTrue(navigationAccepted.await(20, TimeUnit.SECONDS), "WebView did not accept the fixture URL")
         assertEquals(destination, observedUrl)
 
         runtime.onPageContext(
