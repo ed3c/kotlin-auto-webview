@@ -1,0 +1,22 @@
+{
+  "schema": "kotlin-auto-webview/opendroid-source-ledger/v1",
+  "upstream": {
+    "repository": "yashab-cyber/opendroid",
+    "commit": "0e9e5898f0e0dcc679d99e5f4518e19310e96775",
+    "tree": "4c9d1d5f644fc69d9a0a5e658b51d1753fd2ac32",
+    "license": "Apache-2.0"
+  },
+  "integration_mode": "REFERENCE_AND_BEHAVIORAL_ADAPTATION",
+  "copied_source": [],
+  "binary_dependencies": [],
+  "vendored_dependencies": [],
+  "documentation_quotes": [],
+  "modified_upstream_files": [],
+  "rules": {
+    "copy_requires_explicit_entry": true,
+    "modified_copy_requires_notice_review": true,
+    "reference_does_not_transfer_authority_model": true,
+    "moving_ref_is_not_accepted": true
+  },
+  "status": "PREPARATION_COMPLETE_SOURCE_COPY_NOT_ADMITTED"
+}
