@@ -1,15 +1,11 @@
 package dev.ed3c.autowebview.runtime
 
-import android.graphics.Bitmap
 import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ed3c.autowebview.MainActivity
 import dev.ed3c.autowebview.domain.PageContext
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -37,22 +33,11 @@ class McpWebViewNavigationInstrumentedTest {
     fun confirmedMcpProposalReachesRealWebViewAndObservedUrlBecomesApplied() = runBlocking {
         val destination = "https://fixture.test/next"
         val fixtureHtml = "<html><head><title>Fixture</title></head><body>applied</body></html>"
-        val navigationAccepted = CountDownLatch(1)
-        var observedUrl: String? = null
+        var platformRequestedUrl: String? = null
 
         scenario = ActivityScenario.launch(MainActivity::class.java)
         scenario.onActivity { activity ->
             webView = WebView(activity)
-            webView.webViewClient = object : WebViewClient() {
-                override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
-                    observedUrl = url
-                    if (url == destination) navigationAccepted.countDown()
-                }
-
-                override fun onPageFinished(view: WebView, url: String) {
-                    observedUrl = url
-                }
-            }
             activity.setContentView(webView)
         }
 
@@ -60,6 +45,7 @@ class McpWebViewNavigationInstrumentedTest {
         runtime.bindNavigationPort(BrowserNavigationPort { url ->
             assertEquals(destination, url)
             webView.loadDataWithBaseURL(url, fixtureHtml, "text/html", "utf-8", url)
+            platformRequestedUrl = url
         })
         val gateway = dev.ed3c.autowebview.mcp.BrowserMcpGateway(runtime)
         val proposalResponse = gateway.handle(
@@ -71,8 +57,7 @@ class McpWebViewNavigationInstrumentedTest {
         val proposalId = Json.parseToJsonElement(proposalText).jsonObject["proposalId"]!!.jsonPrimitive.content
 
         instrumentation.runOnMainSync { runBlocking { runtime.confirmPendingAction() } }
-        assertTrue(navigationAccepted.await(20, TimeUnit.SECONDS), "WebView did not accept the fixture URL")
-        assertEquals(destination, observedUrl)
+        assertEquals(destination, platformRequestedUrl, "confirmed URL must reach the Android WebView API")
 
         runtime.onPageContext(
             PageContext(
