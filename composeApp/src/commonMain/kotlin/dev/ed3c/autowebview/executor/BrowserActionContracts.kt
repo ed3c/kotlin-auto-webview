@@ -65,6 +65,7 @@ data class BrowserActionProposal(
     val expectedAccessibleName: String? = null,
     val kind: BrowserActionKind,
     val payload: BrowserActionPayload,
+    val expectedUrl: String? = null,
     val risk: ActionRisk = ActionRisk.HIGH,
     val createdAtEpochMs: Long,
     val maximumPageAgeMs: Long = 15_000,
@@ -151,6 +152,7 @@ data class BrowserActionCommand(
     val targetFingerprint: String,
     val kind: BrowserActionKind,
     val payload: BrowserActionPayload,
+    val expectedUrl: String? = null,
 )
 
 fun interface BrowserActionCancellationSignal {
@@ -171,6 +173,10 @@ sealed interface PlatformBrowserActionResult {
     @Serializable
     @SerialName("completed")
     data object Completed : PlatformBrowserActionResult
+
+    @Serializable
+    @SerialName("dispatched_awaiting_observation")
+    data object DispatchedAwaitingObservation : PlatformBrowserActionResult
 
     @Serializable
     @SerialName("cancelled_before_side_effect")
@@ -220,6 +226,7 @@ enum class BrowserExecutionState {
     RESOLVING_TARGET,
     REVALIDATING_TARGET,
     EXECUTING,
+    AWAITING_OBSERVATION,
     SUCCEEDED,
     REJECTED,
     CANCELLED,
@@ -267,6 +274,13 @@ sealed interface BrowserActionExecutionResult {
     @Serializable
     @SerialName("succeeded")
     data class Succeeded(
+        override val proposalId: String,
+        override val trace: List<BrowserExecutionTraceEntry>,
+    ) : BrowserActionExecutionResult
+
+    @Serializable
+    @SerialName("awaiting_observation")
+    data class AwaitingObservation(
         override val proposalId: String,
         override val trace: List<BrowserExecutionTraceEntry>,
     ) : BrowserActionExecutionResult

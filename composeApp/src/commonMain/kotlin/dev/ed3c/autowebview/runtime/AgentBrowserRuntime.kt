@@ -15,6 +15,19 @@ import dev.ed3c.autowebview.domain.PageContext
 import dev.ed3c.autowebview.domain.ProjectionHint
 import dev.ed3c.autowebview.domain.SemanticCacheRecord
 import dev.ed3c.autowebview.domain.StableIds
+import dev.ed3c.autowebview.executor.BoundedBrowserActionExecutor
+import dev.ed3c.autowebview.executor.BrowserActionConfirmationReceipt
+import dev.ed3c.autowebview.executor.BrowserActionExecutionContext
+import dev.ed3c.autowebview.executor.BrowserActionExecutionResult
+import dev.ed3c.autowebview.executor.BrowserActionKind
+import dev.ed3c.autowebview.executor.BrowserActionPayload
+import dev.ed3c.autowebview.executor.BrowserActionPlatform
+import dev.ed3c.autowebview.executor.BrowserActionProposal
+import dev.ed3c.autowebview.executor.BrowserSideEffectState
+import dev.ed3c.autowebview.executor.ClickPayload
+import dev.ed3c.autowebview.executor.FillTextPayload
+import dev.ed3c.autowebview.executor.SelectOptionPayload
+import dev.ed3c.autowebview.executor.UserInteractionProbe
 import dev.ed3c.autowebview.privacy.PrivacyGuard
 import dev.ed3c.autowebview.projection.ProjectionEngine
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +55,12 @@ class AgentBrowserRuntime(
     private var navigationBinding: BoundNavigationPort? = null
     private var activeNavigation: ActiveNavigation? = null
     private val navigationStatuses = linkedMapOf<String, NavigationActionStatus>()
+    private var interactionSequence = 0L
+    private var interactionBindingSequence = 0L
+    private var interactionBinding: BoundInteractionPlatform? = null
+    private var activeInteraction: ActiveInteraction? = null
+    private val interactionProposals = linkedMapOf<String, StoredInteractionProposal>()
+    private val interactionStatuses = linkedMapOf<String, NavigationActionStatus>()
 
     private val mutableContext = MutableStateFlow<PageContext?>(null)
     val currentContext: StateFlow<PageContext?> = mutableContext.asStateFlow()
@@ -72,6 +91,7 @@ class AgentBrowserRuntime(
         )
         audit("context", "Captured and locally sanitized page context", mapOf("url" to sanitized.url))
         completeObservedNavigation(sanitized)
+        completeObservedInteraction(sanitized)
     }
 
     suspend fun proposeNavigation(url: String): NavigationProposal {
@@ -125,6 +145,114 @@ class AgentBrowserRuntime(
         navigationStatuses[proposalId]
     }
 
+    suspend fun actionStatus(proposalId: String): NavigationActionStatus? = navigationMutex.withLock {
+        navigationStatuses[proposalId] ?: interactionStatuses[proposalId]
+    }
+
+    fun bindInteractionPlatform(platform: BrowserActionPlatform): Long {
+        interactionBindingSequence += 1
+        val generation = interactionBindingSequence
+        interactionBinding = BoundInteractionPlatform(generation, platform)
+        return generation
+    }
+
+    fun unbindInteractionPlatform(generation: Long) {
+        if (interactionBinding?.generation == generation) interactionBinding = null
+    }
+
+    suspend fun proposeInteraction(
+        kind: BrowserActionKind,
+        targetFingerprint: String,
+        value: String? = null,
+        expectedUrl: String? = null,
+    ): BrowserInteractionProposal {
+        require(targetFingerprint.matches(Regex("[0-9a-f]{8,64}"))) {
+            "targetFingerprint must be a bounded lowercase hexadecimal identity"
+        }
+        val page = currentContext.value ?: throw IllegalArgumentException("Current page context is required")
+        require(page.interactiveElements.count { it.fingerprint == targetFingerprint } == 1) {
+            "targetFingerprint must resolve exactly once in the current page context"
+        }
+        val payload: BrowserActionPayload = when (kind) {
+            BrowserActionKind.CLICK -> {
+                require(value == null) { "click does not accept a value" }
+                val destination = expectedUrl ?: throw IllegalArgumentException("click requires expectedUrl")
+                requireSameOriginHttps(page.url, destination)
+                ClickPayload
+            }
+            BrowserActionKind.FILL_TEXT -> {
+                require(expectedUrl == null) { "fill_text does not accept expectedUrl" }
+                FillTextPayload(value ?: throw IllegalArgumentException("fill_text requires value"))
+            }
+            BrowserActionKind.SELECT_OPTION -> {
+                require(expectedUrl == null) { "select_option does not accept expectedUrl" }
+                SelectOptionPayload(value ?: throw IllegalArgumentException("select_option requires value"))
+            }
+        }
+        val createdAt = now()
+        val proposal = navigationMutex.withLock {
+            interactionSequence += 1
+            val id = StableIds.from(
+                "interaction",
+                interactionSequence.toString(),
+                page.url,
+                page.capturedAtEpochMs.toString(),
+                targetFingerprint,
+                kind.name,
+            )
+            BrowserActionProposal(
+                id = id,
+                agentActionId = id,
+                pageUrl = page.url,
+                pageCapturedAtEpochMs = page.capturedAtEpochMs,
+                targetFingerprint = targetFingerprint,
+                kind = kind,
+                payload = payload,
+                expectedUrl = expectedUrl,
+                createdAtEpochMs = createdAt,
+            )
+        }
+        val action = AgentAction(
+            id = proposal.agentActionId,
+            capabilityId = "browser.interact",
+            name = "Interact with current page",
+            description = "Execute one typed " + kind.name.lowercase() + " action after confirmation",
+            arguments = buildMap {
+                put("kind", kind.name)
+                put("pageUrl", page.url)
+                put("targetFingerprint", targetFingerprint)
+                expectedUrl?.let { put("expectedUrl", it) }
+            },
+            risk = ActionRisk.HIGH,
+        )
+        val decision = propose(action)
+        navigationMutex.withLock {
+            val status = when (decision) {
+                is PolicyDecision.RequiresConfirmation -> {
+                    putStoredInteraction(
+                        StoredInteractionProposal(
+                            proposal = proposal,
+                            bindingGeneration = interactionBinding?.generation,
+                        ),
+                    )
+                    NavigationActionStatus(proposal.id, NavigationActionState.WAITING_FOR_CONFIRMATION, decision.reason)
+                }
+                PolicyDecision.Allowed -> NavigationActionStatus(
+                    proposal.id,
+                    NavigationActionState.EXECUTING,
+                    "Allowed by policy but confirmation contract was not applied",
+                )
+                is PolicyDecision.Denied -> NavigationActionStatus(
+                    proposal.id,
+                    NavigationActionState.REJECTED,
+                    decision.reason,
+                )
+            }
+            putInteractionStatus(status)
+        }
+        return BrowserInteractionProposal(proposal.id, decision)
+    }
+
     suspend fun propose(action: AgentAction, grantedPermissions: Set<String> = emptySet()): PolicyDecision {
         val decision = capabilities.evaluate(action, grantedPermissions)
         when (decision) {
@@ -141,6 +269,10 @@ class AgentBrowserRuntime(
             executeConfirmedNavigation(pending)
             return
         }
+        if (pending?.capabilityId == "browser.interact") {
+            executeConfirmedInteraction(pending)
+            return
+        }
         dispatcher.dispatch(DispatcherEvent.ActionConfirmed)
         audit("hitl", "User confirmed pending action")
     }
@@ -152,6 +284,10 @@ class AgentBrowserRuntime(
             navigationMutex.withLock {
                 if (navigationStatuses.containsKey(it)) {
                     putNavigationStatus(NavigationActionStatus(it, NavigationActionState.REJECTED, "Rejected by user"))
+                }
+                if (interactionStatuses.containsKey(it)) {
+                    interactionProposals.remove(it)
+                    putInteractionStatus(NavigationActionStatus(it, NavigationActionState.REJECTED, "Rejected by user"))
                 }
             }
         }
@@ -165,6 +301,10 @@ class AgentBrowserRuntime(
             navigationMutex.withLock {
                 if (navigationStatuses.containsKey(it)) {
                     putNavigationStatus(NavigationActionStatus(it, NavigationActionState.REJECTED, "Preempted by user input"))
+                }
+                if (interactionStatuses.containsKey(it)) {
+                    interactionProposals.remove(it)
+                    putInteractionStatus(NavigationActionStatus(it, NavigationActionState.REJECTED, "Preempted by user input"))
                 }
             }
         }
@@ -230,6 +370,133 @@ class AgentBrowserRuntime(
         }
     }
 
+    private suspend fun executeConfirmedInteraction(action: AgentAction) {
+        val stored = navigationMutex.withLock { interactionProposals.remove(action.id) }
+        val binding = interactionBinding
+        if (
+            stored == null ||
+            binding == null ||
+            stored.bindingGeneration == null ||
+            stored.bindingGeneration != binding.generation
+        ) {
+            dispatcher.dispatch(DispatcherEvent.ActionFailed("No matching current WebView action binding"))
+            navigationMutex.withLock {
+                putInteractionStatus(
+                    NavigationActionStatus(action.id, NavigationActionState.NONE, "No matching current WebView action binding"),
+                )
+            }
+            return
+        }
+
+        dispatcher.dispatch(DispatcherEvent.ActionConfirmed)
+        val confirmedAt = now()
+        navigationMutex.withLock {
+            putInteractionStatus(
+                NavigationActionStatus(action.id, NavigationActionState.EXECUTING, "Confirmed and executing typed action"),
+            )
+        }
+        audit(
+            "hitl",
+            "User confirmed pending typed WebView action",
+            mapOf("proposalId" to action.id, "kind" to stored.proposal.kind.name),
+        )
+        val page = currentContext.value
+        if (page == null) {
+            failInteraction(action.id, NavigationActionState.NONE, "Current page context is absent")
+            return
+        }
+        val result = BoundedBrowserActionExecutor(binding.platform).execute(
+            proposal = stored.proposal,
+            context = BrowserActionExecutionContext(
+                page = page,
+                dispatcher = dispatcherState.value,
+                confirmation = BrowserActionConfirmationReceipt(
+                    proposalId = stored.proposal.id,
+                    agentActionId = stored.proposal.agentActionId,
+                    pageUrl = stored.proposal.pageUrl,
+                    targetFingerprint = stored.proposal.targetFingerprint,
+                    confirmedAtEpochMs = confirmedAt,
+                ),
+                nowEpochMs = confirmedAt,
+                userInteraction = UserInteractionProbe {
+                    dispatcherState.value.mode == dev.ed3c.autowebview.dispatcher.DispatcherMode.OBSERVING_USER
+                },
+            ),
+        )
+        when (result) {
+            is BrowserActionExecutionResult.Succeeded -> {
+                dispatcher.dispatch(DispatcherEvent.ActionCompleted)
+                navigationMutex.withLock {
+                    putInteractionStatus(
+                        NavigationActionStatus(action.id, NavigationActionState.APPLIED, "Fresh exact DOM postcondition observed"),
+                    )
+                }
+            }
+            is BrowserActionExecutionResult.AwaitingObservation -> {
+                val expected = stored.proposal.expectedUrl
+                if (stored.proposal.kind != BrowserActionKind.CLICK || expected == null) {
+                    failInteraction(action.id, NavigationActionState.UNKNOWN, "Action observation contract is absent")
+                } else {
+                    navigationMutex.withLock {
+                        activeInteraction = ActiveInteraction(
+                            proposalId = action.id,
+                            expectedUrl = expected,
+                            bindingGeneration = binding.generation,
+                            confirmedAtEpochMs = confirmedAt,
+                        )
+                        putInteractionStatus(
+                            NavigationActionStatus(action.id, NavigationActionState.EXECUTING, "Click dispatched; awaiting fresh URL"),
+                        )
+                    }
+                }
+            }
+            is BrowserActionExecutionResult.Rejected,
+            is BrowserActionExecutionResult.Cancelled -> {
+                failInteraction(action.id, NavigationActionState.NONE, "Typed action rejected before a proven side effect")
+            }
+            is BrowserActionExecutionResult.TimedOut -> {
+                failInteraction(action.id, result.sideEffectState.toNavigationState(), "Typed action timed out")
+            }
+            is BrowserActionExecutionResult.Failed -> {
+                failInteraction(action.id, result.sideEffectState.toNavigationState(), "Typed action effect is unknown")
+            }
+        }
+    }
+
+    private suspend fun completeObservedInteraction(context: PageContext) {
+        val active = navigationMutex.withLock { activeInteraction } ?: return
+        if (context.capturedAtEpochMs < active.confirmedAtEpochMs) return
+        if (interactionBinding?.generation != active.bindingGeneration) {
+            failInteraction(active.proposalId, NavigationActionState.UNKNOWN, "WebView action binding changed after dispatch")
+            return
+        }
+        if (context.url == active.expectedUrl) {
+            navigationMutex.withLock {
+                activeInteraction = null
+                putInteractionStatus(
+                    NavigationActionStatus(active.proposalId, NavigationActionState.APPLIED, "Observed exact fresh click URL"),
+                )
+            }
+            dispatcher.dispatch(DispatcherEvent.ActionCompleted)
+        } else {
+            failInteraction(active.proposalId, NavigationActionState.UNKNOWN, "Observed a different fresh click URL")
+        }
+    }
+
+    private suspend fun failInteraction(proposalId: String, state: NavigationActionState, reason: String) {
+        navigationMutex.withLock {
+            if (activeInteraction?.proposalId == proposalId) activeInteraction = null
+            putInteractionStatus(NavigationActionStatus(proposalId, state, reason))
+        }
+        dispatcher.dispatch(DispatcherEvent.ActionFailed(reason))
+    }
+
+    private fun BrowserSideEffectState.toNavigationState(): NavigationActionState = when (this) {
+        BrowserSideEffectState.NONE -> NavigationActionState.NONE
+        BrowserSideEffectState.APPLIED -> NavigationActionState.APPLIED
+        BrowserSideEffectState.UNKNOWN -> NavigationActionState.UNKNOWN
+    }
+
     private suspend fun failActiveNavigation(
         proposalId: String,
         state: NavigationActionState,
@@ -247,6 +514,36 @@ class AgentBrowserRuntime(
         while (navigationStatuses.size > MAX_NAVIGATION_STATUSES) {
             navigationStatuses.remove(navigationStatuses.keys.first())
         }
+    }
+
+    private fun putStoredInteraction(stored: StoredInteractionProposal) {
+        interactionProposals[stored.proposal.id] = stored
+        while (interactionProposals.size > MAX_NAVIGATION_STATUSES) {
+            interactionProposals.remove(interactionProposals.keys.first())
+        }
+    }
+
+    private fun putInteractionStatus(status: NavigationActionStatus) {
+        interactionStatuses[status.proposalId] = status
+        while (interactionStatuses.size > MAX_NAVIGATION_STATUSES) {
+            interactionStatuses.remove(interactionStatuses.keys.first())
+        }
+    }
+
+    private fun requireSameOriginHttps(pageUrl: String, expectedUrl: String) {
+        require(expectedUrl.length <= 2_048 && expectedUrl.none { it.code < 0x20 || it.code == 0x7f }) {
+            "expectedUrl is outside the bounded URL contract"
+        }
+        require(httpsAuthority(pageUrl) == httpsAuthority(expectedUrl)) {
+            "click expectedUrl must remain on the current HTTPS origin"
+        }
+    }
+
+    private fun httpsAuthority(url: String): String {
+        require(url.startsWith("https://")) { "only HTTPS action URLs are accepted" }
+        val authority = url.removePrefix("https://").substringBefore('/').substringBefore('?').substringBefore('#')
+        require(authority.isNotBlank() && '@' !in authority) { "URL host is required and credentials are forbidden" }
+        return authority.lowercase()
     }
 
     private fun summarize(context: PageContext): String {
@@ -293,9 +590,26 @@ class AgentBrowserRuntime(
                     displayName = "Interact with page",
                     description = "Click or fill a non-sensitive element after approval",
                     maximumRisk = ActionRisk.HIGH,
-                    enabledByDefault = false,
+                    enabledByDefault = true,
                 ),
             ),
         )
     }
+
+    private data class BoundInteractionPlatform(
+        val generation: Long,
+        val platform: BrowserActionPlatform,
+    )
+
+    private data class StoredInteractionProposal(
+        val proposal: BrowserActionProposal,
+        val bindingGeneration: Long?,
+    )
+
+    private data class ActiveInteraction(
+        val proposalId: String,
+        val expectedUrl: String,
+        val bindingGeneration: Long,
+        val confirmedAtEpochMs: Long,
+    )
 }

@@ -153,6 +153,7 @@ class BoundedBrowserActionExecutor(
                             targetFingerprint = target.fingerprint,
                             kind = proposal.kind,
                             payload = proposal.payload,
+                            expectedUrl = proposal.expectedUrl,
                         ),
                         cancellationSignal,
                     )
@@ -160,6 +161,13 @@ class BoundedBrowserActionExecutor(
                     PlatformBrowserActionResult.Completed -> {
                         mark(BrowserExecutionState.SUCCEEDED)
                         BrowserActionExecutionResult.Succeeded(
+                            proposalId = proposal.id,
+                            trace = trace.toList(),
+                        )
+                    }
+                    PlatformBrowserActionResult.DispatchedAwaitingObservation -> {
+                        mark(BrowserExecutionState.AWAITING_OBSERVATION)
+                        BrowserActionExecutionResult.AwaitingObservation(
                             proposalId = proposal.id,
                             trace = trace.toList(),
                         )

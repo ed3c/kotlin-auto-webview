@@ -40,9 +40,13 @@ import com.multiplatform.webview.web.rememberWebViewNavigator
 import com.multiplatform.webview.web.rememberWebViewState
 import dev.ed3c.autowebview.runtime.AgentBrowserRuntime
 import dev.ed3c.autowebview.runtime.BrowserNavigationPort
+import dev.ed3c.autowebview.executor.BrowserScriptEvaluator
+import dev.ed3c.autowebview.executor.CurrentWebViewBrowserActionPlatform
 import dev.ed3c.autowebview.web.ContextExtractorScript
 import dev.ed3c.autowebview.web.PageContextMessageHandler
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
 
 @Composable
 fun BrowserWorkspace(runtime: AgentBrowserRuntime) {
@@ -51,10 +55,26 @@ fun BrowserWorkspace(runtime: AgentBrowserRuntime) {
     val webViewState = rememberWebViewState(address)
     val navigator = rememberWebViewNavigator()
     val jsBridge = rememberWebViewJsBridge(navigator)
+    val actionPlatform = remember(runtime, navigator) {
+        CurrentWebViewBrowserActionPlatform(
+            currentContext = { runtime.currentContext.value },
+            evaluator = BrowserScriptEvaluator { script ->
+                suspendCancellableCoroutine { continuation ->
+                    navigator.evaluateJavaScript(script) { result ->
+                        if (continuation.isActive) continuation.resume(result)
+                    }
+                }
+            },
+        )
+    }
 
-    DisposableEffect(runtime, navigator) {
-        val generation = runtime.bindNavigationPort(BrowserNavigationPort { url -> navigator.loadUrl(url) })
-        onDispose { runtime.unbindNavigationPort(generation) }
+    DisposableEffect(runtime, navigator, actionPlatform) {
+        val navigationGeneration = runtime.bindNavigationPort(BrowserNavigationPort { url -> navigator.loadUrl(url) })
+        val interactionGeneration = runtime.bindInteractionPlatform(actionPlatform)
+        onDispose {
+            runtime.unbindNavigationPort(navigationGeneration)
+            runtime.unbindInteractionPlatform(interactionGeneration)
+        }
     }
 
     LaunchedEffect(jsBridge) {
