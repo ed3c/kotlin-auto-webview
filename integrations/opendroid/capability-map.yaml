@@ -1,0 +1,144 @@
+schema: kotlin-auto-webview/opendroid-capability-map/v1
+upstream:
+  repository: yashab-cyber/opendroid
+  commit: 0e9e5898f0e0dcc679d99e5f4518e19310e96775
+  tree: 4c9d1d5f644fc69d9a0a5e658b51d1753fd2ac32
+admission_rules:
+  model_or_network_text_is_proposal_only: true
+  platform_callback_is_not_postcondition_proof: true
+  first_match_targeting_is_authority: false
+  generic_shell_or_root_surface: false
+  mobile_inbound_mcp_authority: false
+capabilities:
+  - id: action-taxonomy
+    source: app/src/main/java/com/opendroid/ai/actions/ActionDispatcher.kt
+    blob: 60287ce616911f4b59de1ecb523d27a8bdecae8a
+    decision: ADAPT_BEHIND_POLICY
+    profile_ceiling: ENTERPRISE_SIDELOAD
+    contract_owner: issue-66
+    policy_owner: local-capability-policy
+    verifier: typed-postcondition-verifier
+    negative_control: raw-alias-cannot-dispatch
+    evidence_lane: STATIC
+    rationale: Preserve discoverability and canonical IDs, reject alias-to-authority behavior.
+  - id: action-auto-mapping
+    source: app/src/main/java/com/opendroid/ai/actions/ActionAutoMapper.kt
+    blob: 59ba61a2b136f1eb626c271e794706ab66fffd63
+    decision: REFERENCE_ONLY
+    profile_ceiling: NONE
+    contract_owner: issue-69
+    policy_owner: typed-workflow-admission
+    verifier: plan-revision-verifier
+    negative_control: semantic-alias-must-not-widen-capability
+    evidence_lane: STATIC
+    rationale: Mapping may propose a canonical action candidate but cannot grant authority.
+  - id: accessibility-observation
+    source: app/src/main/java/com/opendroid/ai/accessibility/AccessibilityNodeTraversal.kt
+    blob: 02fe4abcaaa76491cb67fcfec60d650ae8fbf311
+    decision: ADAPT_BEHIND_POLICY
+    profile_ceiling: ENTERPRISE_SIDELOAD
+    contract_owner: issue-67
+    policy_owner: privacy-bounded-observer
+    verifier: snapshot-generation-binding
+    negative_control: stale-or-ambiguous-target-denied
+    evidence_lane: EMULATOR
+    rationale: Retain tree-observation concept only after privacy filtering and exact subject binding.
+  - id: accessibility-action-service
+    source: app/src/main/java/com/opendroid/ai/accessibility/OpenDroidAccessibilityService.kt
+    blob: 99f0e28dce230e870d0551be95a61952e11ff985
+    decision: ADAPT_BEHIND_POLICY
+    profile_ceiling: ENTERPRISE_SIDELOAD
+    contract_owner: issue-73
+    policy_owner: distribution-profile-plus-hitl
+    verifier: action-specific-postcondition
+    negative_control: play-safe-artifact-must-not-package-service
+    evidence_lane: PHYSICAL
+    rationale: Device-wide execution is excluded from PLAY_SAFE and remains locally admitted only.
+  - id: generic-app-automation
+    source: app/src/main/java/com/opendroid/ai/accessibility/GenericAppAutomator.kt
+    blob: 7825d9ec738522182a7babf136533e9f0cf05faf
+    decision: REFERENCE_ONLY
+    profile_ceiling: NONE
+    contract_owner: issue-67
+    policy_owner: exact-target-resolver
+    verifier: uniqueness-and-freshness
+    negative_control: first-text-match-denied
+    evidence_lane: STATIC
+    rationale: First-match convenience logic is not reusable as action authority.
+  - id: postcondition-verification-pattern
+    source: app/src/main/java/com/opendroid/ai/accessibility/CallFlowVerifier.kt
+    blob: e7cfe5bc3089834f543a0f8bd415647921bd37bb
+    decision: ADOPT_AS_CONTRACT
+    profile_ceiling: ENTERPRISE_SIDELOAD
+    contract_owner: issue-68
+    policy_owner: effect-ledger
+    verifier: independently-observed-postcondition
+    negative_control: dispatch-success-without-postcondition-is-UNKNOWN
+    evidence_lane: LOCAL
+    rationale: Reuse the verification idea, not implementation coupling.
+  - id: multi-step-call-flow
+    source: app/src/main/java/com/opendroid/ai/actions/CallFlowExecutor.kt
+    blob: e933602c28ff108f8ef82b8fdc1d7c97f4474909
+    decision: ADAPT_BEHIND_POLICY
+    profile_ceiling: ENTERPRISE_SIDELOAD
+    contract_owner: issue-69
+    policy_owner: typed-workflow-dag
+    verifier: per-node-effect-ledger
+    negative_control: string-interpolation-cannot-cross-sensitive-field
+    evidence_lane: LOCAL
+    rationale: Replace implicit sequential authority with immutable typed DAG revisions.
+  - id: sms-and-communications
+    source: app/src/main/java/com/opendroid/ai/actions/CommunicationActions.kt
+    blob: 7c5f44a5b3d107891e4646cc2dc277ad7b40a57b
+    decision: EXTERNAL_POLICY_ADMIT_REQUIRED
+    profile_ceiling: ENTERPRISE_SIDELOAD
+    contract_owner: future-capability-leaf
+    policy_owner: per-capability-policy
+    verifier: recipient-and-content-postcondition
+    negative_control: no-generic-send-capability
+    evidence_lane: PHYSICAL
+    rationale: Sensitive side effects require a separate capability leaf and product decision.
+  - id: calendar-actions
+    source: app/src/main/java/com/opendroid/ai/actions/CalendarActions.kt
+    blob: b885606ca317bc82a4551cbb3b5e286e243adf75
+    decision: EXTERNAL_POLICY_ADMIT_REQUIRED
+    profile_ceiling: ENTERPRISE_SIDELOAD
+    contract_owner: future-capability-leaf
+    policy_owner: per-capability-policy
+    verifier: calendar-state-postcondition
+    negative_control: no-broad-calendar-authority
+    evidence_lane: PHYSICAL
+    rationale: Deferred until a typed, least-privilege capability leaf exists.
+  - id: raw-coordinate-or-gesture-authority
+    source: app/src/main/java/com/opendroid/ai/actions/AdvancedControlActions.kt
+    blob: a7c5b663b6d6666b9d132c80f96d5b8f76e7965a
+    decision: DENIED_BY_ARCHITECTURE
+    profile_ceiling: NONE
+    contract_owner: none
+    policy_owner: architecture-denylist
+    verifier: none
+    negative_control: model-generated-coordinate-rejected
+    evidence_lane: STATIC
+    rationale: Raw coordinates are not accepted as model/MCP authority.
+  - id: direct-mcp-execution
+    source: README.md
+    blob: e3fec9627be574d7b2e2767718ce0a2c99c0a346
+    decision: DENIED_BY_ARCHITECTURE
+    profile_ceiling: NONE
+    contract_owner: none
+    policy_owner: proposal-only-mcp
+    verifier: none
+    negative_control: inbound-mobile-execute-action-absent
+    evidence_lane: STATIC
+    rationale: Existing kotlin-auto-webview MCP boundary remains proposal-only.
+  - id: privileged-shell-root-terminal
+    source: README.md
+    blob: e3fec9627be574d7b2e2767718ce0a2c99c0a346
+    decision: DENIED_BY_ARCHITECTURE
+    profile_ceiling: NONE
+    contract_owner: none
+    policy_owner: architecture-denylist
+    verifier: none
+    negative_control: caller-supplied-command-string-rejected
+    evidence_lane: STATIC
+    rationale: Generic command execution is outside the product capability model.

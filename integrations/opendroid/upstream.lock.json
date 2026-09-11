@@ -1,0 +1,29 @@
+{
+  "schema": "kotlin-auto-webview/opendroid-upstream-lock/v1",
+  "repository": "yashab-cyber/opendroid",
+  "commit": "0e9e5898f0e0dcc679d99e5f4518e19310e96775",
+  "tree": "4c9d1d5f644fc69d9a0a5e658b51d1753fd2ac32",
+  "license": {
+    "spdx": "Apache-2.0",
+    "path": "LICENSE",
+    "blob": "789a5cebf5fefbc9a1b73af4d7725aaa3c9c2446"
+  },
+  "inspected_subjects": [
+    {"path":"README.md","blob":"e3fec9627be574d7b2e2767718ce0a2c99c0a346"},
+    {"path":"app/build.gradle","blob":"427c18fad53280f7a7d8fa5e71781d37a71c2759"},
+    {"path":"app/src/main/java/com/opendroid/ai/actions/ActionAutoMapper.kt","blob":"59ba61a2b136f1eb626c271e794706ab66fffd63"},
+    {"path":"app/src/main/java/com/opendroid/ai/actions/ActionDispatcher.kt","blob":"60287ce616911f4b59de1ecb523d27a8bdecae8a"},
+    {"path":"app/src/main/java/com/opendroid/ai/actions/AdvancedControlActions.kt","blob":"a7c5b663b6d6666b9d132c80f96d5b8f76e7965a"},
+    {"path":"app/src/main/java/com/opendroid/ai/actions/CalendarActions.kt","blob":"b885606ca317bc82a4551cbb3b5e286e243adf75"},
+    {"path":"app/src/main/java/com/opendroid/ai/actions/CallFlowExecutor.kt","blob":"e933602c28ff108f8ef82b8fdc1d7c97f4474909"},
+    {"path":"app/src/main/java/com/opendroid/ai/actions/CommunicationActions.kt","blob":"7c5f44a5b3d107891e4646cc2dc277ad7b40a57b"},
+    {"path":"app/src/main/java/com/opendroid/ai/accessibility/AccessibilityNodeTraversal.kt","blob":"02fe4abcaaa76491cb67fcfec60d650ae8fbf311"},
+    {"path":"app/src/main/java/com/opendroid/ai/accessibility/CallFlowVerifier.kt","blob":"e7cfe5bc3089834f543a0f8bd415647921bd37bb"},
+    {"path":"app/src/main/java/com/opendroid/ai/accessibility/GenericAppAutomator.kt","blob":"7825d9ec738522182a7babf136533e9f0cf05faf"},
+    {"path":"app/src/main/java/com/opendroid/ai/accessibility/OpenDroidAccessibilityService.kt","blob":"99f0e28dce230e870d0551be95a61952e11ff985"},
+    {"path":"app/src/main/java/com/opendroid/ai/accessibility/SmsAutomator.kt","blob":"960841de89fdc1662528cdbf26ad549cbbd6f4ea"},
+    {"path":"app/src/main/java/com/opendroid/ai/accessibility/WhatsAppAutomator.kt","blob":"43545d48407f5fce9fea780c461499e5fb27e480"}
+  ],
+  "refresh_rule": "Any upstream commit, tree, inspected blob, license subject, permission group, action family, or authority-flow change invalidates this lock and yields STALE_SOURCE_PIN until reviewed.",
+  "copy_policy": "reference-only by default; copied or modified source requires explicit provenance and notice review before admission"
+}
