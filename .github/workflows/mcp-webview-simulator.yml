@@ -61,7 +61,7 @@ jobs:
         with:
           gradle-version: '8.11.1'
       - name: Run shared lifecycle tests on iOS Simulator
-        run: ./gradlew :composeApp:iosSimulatorArm64Test
+        run: ./gradlew :composeApp:iosSimulatorArm64Test -Pkotlin.native.cacheKind=none
       - name: Build iOS app for simulator
         run: |
           xcodebuild \
