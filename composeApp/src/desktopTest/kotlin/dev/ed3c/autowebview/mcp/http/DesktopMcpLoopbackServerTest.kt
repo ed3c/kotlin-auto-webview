@@ -105,7 +105,11 @@ class DesktopMcpLoopbackServerTest {
                 .jsonArray
                 .map { it.jsonObject.getValue("name").jsonPrimitive.content }
             assertEquals(
-                listOf("browser_capture_context", "browser_propose_navigation"),
+                listOf(
+                    "browser_capture_context",
+                    "browser_propose_navigation",
+                    "browser_action_status",
+                ),
                 names,
             )
 

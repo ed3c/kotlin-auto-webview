@@ -37,10 +37,15 @@ import com.multiplatform.webview.web.LoadingState
 import com.multiplatform.webview.web.WebView
 import com.multiplatform.webview.web.rememberWebViewNavigator
 import com.multiplatform.webview.web.rememberWebViewState
+import dev.ed3c.autowebview.navigation.BoundWebViewNavigationPort
+import dev.ed3c.autowebview.navigation.MainFrameUrlObserver
 import dev.ed3c.autowebview.runtime.AgentBrowserRuntime
 import dev.ed3c.autowebview.web.ContextExtractorScript
 import dev.ed3c.autowebview.web.PageContextMessageHandler
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 
 @Composable
 fun BrowserWorkspace(runtime: AgentBrowserRuntime) {
@@ -49,6 +54,28 @@ fun BrowserWorkspace(runtime: AgentBrowserRuntime) {
     val webViewState = rememberWebViewState(address)
     val navigator = rememberWebViewNavigator()
     val jsBridge = rememberWebViewJsBridge(navigator)
+
+    // Bind typed BrowserNavigationPort with bindingGeneration; cancel/finally unbinds same generation.
+    // Raw navigator stays UI-local and is never exposed to the runtime/agent surface.
+    LaunchedEffect(runtime, navigator, webViewState) {
+        val generation = runtime.bindNavigationPort(
+            portFactory = { assignedGeneration ->
+                BoundWebViewNavigationPort(
+                    bindingGeneration = assignedGeneration,
+                    currentBindingGeneration = { runtime.currentBindingGeneration() },
+                    loadUrl = { url -> navigator.loadUrl(url) },
+                )
+            },
+            urlObserver = MainFrameUrlObserver { webViewState.lastLoadedUrl },
+        )
+        try {
+            awaitCancellation()
+        } finally {
+            withContext(NonCancellable) {
+                runtime.unbindNavigationPort(generation)
+            }
+        }
+    }
 
     LaunchedEffect(jsBridge) {
         jsBridge.register(PageContextMessageHandler(scope, runtime))
