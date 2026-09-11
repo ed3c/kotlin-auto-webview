@@ -21,6 +21,10 @@ jobs:
       # reviewable while everything still compiles and every test still passes.
       - name: Reject undeclared NUL bytes in tracked sources
         run: python3 scripts/ci/check-text-sources.py
+      - name: Verify three-node Agent document route
+        run: |
+          python3 scripts/ci/check-agent-document-route.py --selftest
+          python3 scripts/ci/check-agent-document-route.py
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
