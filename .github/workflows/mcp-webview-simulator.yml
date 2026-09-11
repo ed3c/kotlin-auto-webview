@@ -95,9 +95,10 @@ jobs:
             -parse-as-library \
             -module-name KAWIOSApp \
             -sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
-            -target arm64-apple-ios15.0-simulator \
+            -target arm64-apple-ios26.0-simulator \
             -F "$framework_dir" \
             -framework KotlinAutoWebView \
+            -lsqlite3 \
             -o "$app_path/KotlinAutoWebView"
           cp iosApp/iosApp/Info.plist "$app_path/Info.plist"
           /usr/libexec/PlistBuddy -c 'Add :CFBundleExecutable string KotlinAutoWebView' "$app_path/Info.plist"
