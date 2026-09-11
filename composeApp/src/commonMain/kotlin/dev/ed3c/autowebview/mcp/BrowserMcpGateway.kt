@@ -1,9 +1,7 @@
 package dev.ed3c.autowebview.mcp
 
 import dev.ed3c.autowebview.capability.PolicyDecision
-import dev.ed3c.autowebview.domain.ActionRisk
-import dev.ed3c.autowebview.domain.AgentAction
-import dev.ed3c.autowebview.domain.StableIds
+import dev.ed3c.autowebview.runtime.NavigationActionState
 import dev.ed3c.autowebview.runtime.AgentBrowserRuntime
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -101,6 +99,26 @@ class BrowserMcpGateway(
                 put("description", "Sanitized page context captured from the embedded WebView")
                 put("mimeType", "application/json")
             })
+            add(buildJsonObject {
+                put("name", "browser_action_status")
+                put("description", "Read one bounded navigation proposal status")
+                put("inputSchema", buildJsonObject {
+                    put("type", "object")
+                    putJsonObject("properties") {
+                        putJsonObject("proposalId") {
+                            put("type", "string")
+                            put("maxLength", 128)
+                        }
+                    }
+                    put("required", JsonArray(listOf(JsonPrimitive("proposalId"))))
+                    put("additionalProperties", false)
+                })
+                putJsonObject("annotations") {
+                    put("readOnlyHint", true)
+                    put("destructiveHint", false)
+                    put("openWorldHint", false)
+                }
+            })
         }
     }
 
@@ -170,28 +188,46 @@ class BrowserMcpGateway(
 
         return when (name) {
             "browser_capture_context" -> toolTextResult(id, runtime.currentContextJson())
+            "browser_action_status" -> {
+                val proposalId = arguments["proposalId"]?.asString()
+                    ?: return error(id, INVALID_PARAMS, "proposalId is required")
+                require(proposalId.length <= 128) { "proposalId exceeds 128 characters" }
+                val status = runtime.navigationStatus(proposalId)
+                    ?: return error(id, RESOURCE_NOT_FOUND, "Action status not found")
+                toolTextResult(id, buildJsonObject {
+                    put("proposalId", status.proposalId)
+                    put("state", status.state.name)
+                    put("terminal", status.state in TERMINAL_NAVIGATION_STATES)
+                    put("reason", status.reason)
+                }.toString())
+            }
             "browser_propose_navigation" -> {
                 val url = arguments["url"]?.asString()
                     ?: return error(id, INVALID_PARAMS, "url is required")
                 require(url.length <= MAX_URL_CHARS) { "url exceeds $MAX_URL_CHARS characters" }
                 require(url.startsWith("https://")) { "only HTTPS navigation is accepted" }
                 require(url.none { it.code < 0x20 || it.code == 0x7f }) { "url contains control characters" }
+                val authority = url.removePrefix("https://").substringBefore('/').substringBefore('?').substringBefore('#')
+                require(authority.isNotBlank() && '@' !in authority) { "URL host is required and credentials are forbidden" }
 
-                val action = AgentAction(
-                    id = StableIds.from("navigate", url),
-                    capabilityId = "browser.navigate",
-                    name = "Navigate",
-                    description = "Navigate to $url",
-                    arguments = mapOf("url" to url),
-                    risk = ActionRisk.MEDIUM,
-                )
-                val decision = runtime.propose(action)
+                val proposal = runtime.proposeNavigation(url)
+                val decision = proposal.decision
                 val message = when (decision) {
                     PolicyDecision.Allowed -> "Navigation proposal accepted by policy"
                     is PolicyDecision.RequiresConfirmation -> "Navigation proposal awaits user confirmation: ${decision.reason}"
                     is PolicyDecision.Denied -> "Navigation proposal denied: ${decision.reason}"
                 }
-                toolTextResult(id, message, isError = decision is PolicyDecision.Denied)
+                toolTextResult(id, buildJsonObject {
+                    put("proposalId", proposal.proposalId)
+                    put("state", if (decision is PolicyDecision.RequiresConfirmation) {
+                        NavigationActionState.WAITING_FOR_CONFIRMATION.name
+                    } else if (decision is PolicyDecision.Denied) {
+                        NavigationActionState.REJECTED.name
+                    } else {
+                        NavigationActionState.EXECUTING.name
+                    })
+                    put("message", message)
+                }.toString(), isError = decision is PolicyDecision.Denied)
             }
             else -> error(id, METHOD_NOT_FOUND, "Unknown tool: $name")
         }
@@ -240,6 +276,12 @@ class BrowserMcpGateway(
     private fun JsonElement.asString(): String? = (this as? JsonPrimitive)?.content
 
     companion object {
+        private val TERMINAL_NAVIGATION_STATES = setOf(
+            NavigationActionState.APPLIED,
+            NavigationActionState.NONE,
+            NavigationActionState.UNKNOWN,
+            NavigationActionState.REJECTED,
+        )
         const val MODERN_PROTOCOL_VERSION = "2026-07-28"
         const val LEGACY_PROTOCOL_VERSION = "2025-11-25"
         const val CURRENT_PAGE_URI = "browser://current-page"

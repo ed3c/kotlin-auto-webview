@@ -5,6 +5,7 @@ import dev.ed3c.autowebview.domain.PageContext
 import dev.ed3c.autowebview.runtime.AgentBrowserRuntime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlin.test.Test
@@ -43,14 +44,23 @@ class BrowserMcpGatewayTest {
     }
 
     @Test
-    fun navigationToolCreatesProposalButDoesNotExecute() = runTest {
+    fun navigationToolCreatesProposalAndExposesBoundedStatus() = runTest {
         val runtime = AgentBrowserRuntime()
         val response = BrowserMcpGateway(runtime).handle(
             """{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"browser_propose_navigation","arguments":{"url":"https://example.com/next"}}}""",
         )
-        assertTrue("awaits user confirmation" in response)
+        assertTrue("WAITING_FOR_CONFIRMATION" in response)
         assertEquals(DispatcherMode.WAITING_FOR_CONFIRMATION, runtime.dispatcherState.value.mode)
         assertEquals("https://example.com/next", runtime.dispatcherState.value.pendingAction?.arguments?.get("url"))
+
+        val resultText = json.parseToJsonElement(response).jsonObject["result"]!!.jsonObject["content"]!!
+            .jsonArray.first().jsonObject["text"]!!.jsonPrimitive.content
+        val proposalId = json.parseToJsonElement(resultText).jsonObject["proposalId"]!!.jsonPrimitive.content
+        val status = BrowserMcpGateway(runtime).handle(
+            """{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"browser_action_status","arguments":{"proposalId":"$proposalId"}}}""",
+        )
+        assertTrue("WAITING_FOR_CONFIRMATION" in status)
+        assertTrue("\\\"terminal\\\":false" in status)
     }
 
     @Test
@@ -60,5 +70,19 @@ class BrowserMcpGatewayTest {
         )
         val code = json.parseToJsonElement(response).jsonObject["error"]!!.jsonObject["code"]!!.jsonPrimitive.content
         assertEquals("-32602", code)
+    }
+
+    @Test
+    fun rejectsCredentialBearingAndControlCharacterNavigation() = runTest {
+        val gateway = BrowserMcpGateway(AgentBrowserRuntime())
+        val credential = gateway.handle(
+            """{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"browser_propose_navigation","arguments":{"url":"https://user:secret@example.com"}}}""",
+        )
+        val control = gateway.handle(
+            """{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"browser_propose_navigation","arguments":{"url":"https://example.com/\\u0000"}}}""",
+        )
+
+        assertTrue("credentials are forbidden" in credential)
+        assertTrue("control characters" in control)
     }
 }

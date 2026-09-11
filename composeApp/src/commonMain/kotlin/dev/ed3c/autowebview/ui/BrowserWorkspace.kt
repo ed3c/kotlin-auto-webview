@@ -21,6 +21,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +39,7 @@ import com.multiplatform.webview.web.WebView
 import com.multiplatform.webview.web.rememberWebViewNavigator
 import com.multiplatform.webview.web.rememberWebViewState
 import dev.ed3c.autowebview.runtime.AgentBrowserRuntime
+import dev.ed3c.autowebview.runtime.BrowserNavigationPort
 import dev.ed3c.autowebview.web.ContextExtractorScript
 import dev.ed3c.autowebview.web.PageContextMessageHandler
 import kotlinx.coroutines.launch
@@ -49,6 +51,11 @@ fun BrowserWorkspace(runtime: AgentBrowserRuntime) {
     val webViewState = rememberWebViewState(address)
     val navigator = rememberWebViewNavigator()
     val jsBridge = rememberWebViewJsBridge(navigator)
+
+    DisposableEffect(runtime, navigator) {
+        val generation = runtime.bindNavigationPort(BrowserNavigationPort { url -> navigator.loadUrl(url) })
+        onDispose { runtime.unbindNavigationPort(generation) }
+    }
 
     LaunchedEffect(jsBridge) {
         jsBridge.register(PageContextMessageHandler(scope, runtime))
