@@ -99,26 +99,6 @@ class BrowserMcpGateway(
                 put("description", "Sanitized page context captured from the embedded WebView")
                 put("mimeType", "application/json")
             })
-            add(buildJsonObject {
-                put("name", "browser_action_status")
-                put("description", "Read one bounded navigation proposal status")
-                put("inputSchema", buildJsonObject {
-                    put("type", "object")
-                    putJsonObject("properties") {
-                        putJsonObject("proposalId") {
-                            put("type", "string")
-                            put("maxLength", 128)
-                        }
-                    }
-                    put("required", JsonArray(listOf(JsonPrimitive("proposalId"))))
-                    put("additionalProperties", false)
-                })
-                putJsonObject("annotations") {
-                    put("readOnlyHint", true)
-                    put("destructiveHint", false)
-                    put("openWorldHint", false)
-                }
-            })
         }
     }
 
@@ -150,6 +130,26 @@ class BrowserMcpGateway(
                 put("name", "browser_capture_context")
                 put("description", "Read the sanitized current-page context already held by the app")
                 put("inputSchema", emptyObjectSchema())
+                putJsonObject("annotations") {
+                    put("readOnlyHint", true)
+                    put("destructiveHint", false)
+                    put("openWorldHint", false)
+                }
+            })
+            add(buildJsonObject {
+                put("name", "browser_action_status")
+                put("description", "Read one bounded navigation proposal status")
+                put("inputSchema", buildJsonObject {
+                    put("type", "object")
+                    putJsonObject("properties") {
+                        putJsonObject("proposalId") {
+                            put("type", "string")
+                            put("maxLength", 128)
+                        }
+                    }
+                    put("required", JsonArray(listOf(JsonPrimitive("proposalId"))))
+                    put("additionalProperties", false)
+                })
                 putJsonObject("annotations") {
                     put("readOnlyHint", true)
                     put("destructiveHint", false)

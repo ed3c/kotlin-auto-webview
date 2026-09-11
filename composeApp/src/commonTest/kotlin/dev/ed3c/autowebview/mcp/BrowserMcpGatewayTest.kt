@@ -26,6 +26,24 @@ class BrowserMcpGatewayTest {
     }
 
     @Test
+    fun advertisesStatusAsToolNotResource() = runTest {
+        val gateway = BrowserMcpGateway(AgentBrowserRuntime())
+        val tools = gateway.handle(
+            """{"jsonrpc":"2.0","id":7,"method":"tools/list","params":{}}""",
+        )
+        val resources = gateway.handle(
+            """{"jsonrpc":"2.0","id":8,"method":"resources/list","params":{}}""",
+        )
+        val toolNames = json.parseToJsonElement(tools).jsonObject["result"]!!.jsonObject["tools"]!!
+            .jsonArray.map { it.jsonObject["name"]!!.jsonPrimitive.content }
+        val resourceNames = json.parseToJsonElement(resources).jsonObject["result"]!!.jsonObject["resources"]!!
+            .jsonArray.map { it.jsonObject["name"]!!.jsonPrimitive.content }
+
+        assertTrue("browser_action_status" in toolNames)
+        assertTrue("browser_action_status" !in resourceNames)
+    }
+
+    @Test
     fun exposesOnlySanitizedCurrentPageResource() = runTest {
         val runtime = AgentBrowserRuntime()
         runtime.onPageContext(
