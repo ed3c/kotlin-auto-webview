@@ -99,6 +99,8 @@ jobs:
             -F "$framework_dir" \
             -framework KotlinAutoWebView \
             -lsqlite3 \
+            -Xlinker -U -Xlinker _sqlite3_enable_load_extension \
+            -Xlinker -U -Xlinker _sqlite3_load_extension \
             -o "$app_path/KotlinAutoWebView"
           cp iosApp/iosApp/Info.plist "$app_path/Info.plist"
           /usr/libexec/PlistBuddy -c 'Add :CFBundleExecutable string KotlinAutoWebView' "$app_path/Info.plist"
