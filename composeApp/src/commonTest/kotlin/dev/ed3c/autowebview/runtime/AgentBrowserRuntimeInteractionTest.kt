@@ -1,5 +1,6 @@
 package dev.ed3c.autowebview.runtime
 
+import dev.ed3c.autowebview.capability.PolicyDecision
 import dev.ed3c.autowebview.domain.InteractiveElement
 import dev.ed3c.autowebview.domain.PageContext
 import dev.ed3c.autowebview.executor.BrowserActionCancellationSignal
@@ -63,6 +64,23 @@ class AgentBrowserRuntimeInteractionTest {
         runtime.confirmPendingAction()
 
         assertEquals(0, platform.performCount)
+        assertEquals(NavigationActionState.REJECTED, runtime.actionStatus(proposal.proposalId)?.state)
+    }
+
+    @Test
+    fun unboundInteractionCapabilityFailsClosed() = runTest {
+        val runtime = AgentBrowserRuntime()
+        val generation = runtime.bindInteractionPlatform(FakePlatform(PlatformBrowserActionResult.Completed))
+        runtime.onPageContext(page())
+        runtime.unbindInteractionPlatform(generation)
+
+        val proposal = runtime.proposeInteraction(
+            BrowserActionKind.FILL_TEXT,
+            FINGERPRINT,
+            value = "bounded",
+        )
+
+        assertIs<PolicyDecision.Denied>(proposal.decision)
         assertEquals(NavigationActionState.REJECTED, runtime.actionStatus(proposal.proposalId)?.state)
     }
 

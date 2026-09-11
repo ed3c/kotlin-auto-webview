@@ -153,11 +153,15 @@ class AgentBrowserRuntime(
         interactionBindingSequence += 1
         val generation = interactionBindingSequence
         interactionBinding = BoundInteractionPlatform(generation, platform)
+        capabilities.setEnabled("browser.interact", true)
         return generation
     }
 
     fun unbindInteractionPlatform(generation: Long) {
-        if (interactionBinding?.generation == generation) interactionBinding = null
+        if (interactionBinding?.generation == generation) {
+            interactionBinding = null
+            capabilities.setEnabled("browser.interact", false)
+        }
     }
 
     suspend fun proposeInteraction(
@@ -590,7 +594,7 @@ class AgentBrowserRuntime(
                     displayName = "Interact with page",
                     description = "Click or fill a non-sensitive element after approval",
                     maximumRisk = ActionRisk.HIGH,
-                    enabledByDefault = true,
+                    enabledByDefault = false,
                 ),
             ),
         )
