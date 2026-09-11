@@ -1,7 +1,12 @@
+@file:OptIn(org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeCacheApi::class)
+
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.plugin.mpp.DisableCacheInKotlinVersion
+import org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable
 import org.jetbrains.kotlin.gradle.targets.js.webpack.KotlinWebpackConfig
+import java.net.URI
 
 plugins {
     alias(libs.plugins.kotlin.multiplatform)
@@ -21,14 +26,26 @@ kotlin {
 
     jvm("desktop")
 
+    val iosSimulatorTarget = iosSimulatorArm64()
     listOf(
         iosArm64(),
-        iosSimulatorArm64(),
+        iosSimulatorTarget,
     ).forEach { target ->
         target.binaries.framework {
             baseName = "KotlinAutoWebView"
             isStatic = true
         }
+    }
+
+    // Kotlin/Native's cached Compose objects currently target a newer iOS simulator SDK than
+    // the test binary. Keep this temporary workaround scoped to that one binary; the app
+    // framework remains cache-enabled and is built independently below in simulator evidence.
+    iosSimulatorTarget.binaries.withType(TestExecutable::class.java).configureEach {
+        disableNativeCache(
+            DisableCacheInKotlinVersion.`2_4_0`,
+            "Xcode 16.4 cannot link the cached Compose test objects for the iOS 15 target",
+            URI("https://github.com/ed3c/kotlin-auto-webview/issues/192"),
+        )
     }
 
     @OptIn(ExperimentalWasmDsl::class)
@@ -78,6 +95,13 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.androidx.activity.compose)
             implementation(libs.sqldelight.android.driver)
+        }
+
+        val androidInstrumentedTest by getting
+        androidInstrumentedTest.dependencies {
+            implementation(kotlin("test"))
+            implementation("androidx.test:runner:1.6.2")
+            implementation("androidx.test.ext:junit:1.2.1")
         }
 
         val iosArm64Main by getting
@@ -154,6 +178,7 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {

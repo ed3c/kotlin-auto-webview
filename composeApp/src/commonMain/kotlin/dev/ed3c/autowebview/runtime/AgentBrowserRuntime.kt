@@ -20,6 +20,8 @@ import dev.ed3c.autowebview.projection.ProjectionEngine
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlin.time.Clock
@@ -34,6 +36,13 @@ class AgentBrowserRuntime(
     val capabilities: CapabilityRegistry = defaultCapabilities(),
     private val json: Json = Json { ignoreUnknownKeys = true; encodeDefaults = true },
 ) {
+    private val navigationMutex = Mutex()
+    private var navigationSequence = 0L
+    private var navigationBindingSequence = 0L
+    private var navigationBinding: BoundNavigationPort? = null
+    private var activeNavigation: ActiveNavigation? = null
+    private val navigationStatuses = linkedMapOf<String, NavigationActionStatus>()
+
     private val mutableContext = MutableStateFlow<PageContext?>(null)
     val currentContext: StateFlow<PageContext?> = mutableContext.asStateFlow()
 
@@ -62,6 +71,58 @@ class AgentBrowserRuntime(
             ),
         )
         audit("context", "Captured and locally sanitized page context", mapOf("url" to sanitized.url))
+        completeObservedNavigation(sanitized)
+    }
+
+    suspend fun proposeNavigation(url: String): NavigationProposal {
+        val action = navigationMutex.withLock {
+            navigationSequence += 1
+            AgentAction(
+                id = StableIds.from("navigate", navigationSequence.toString(), url),
+                capabilityId = "browser.navigate",
+                name = "Navigate",
+                description = "Navigate to $url",
+                arguments = mapOf("url" to url),
+                risk = ActionRisk.MEDIUM,
+            )
+        }
+        val decision = propose(action)
+        navigationMutex.withLock {
+            val status = when (decision) {
+                PolicyDecision.Allowed -> NavigationActionStatus(
+                    action.id,
+                    NavigationActionState.EXECUTING,
+                    "Allowed by policy but awaiting an execution binding",
+                )
+                is PolicyDecision.RequiresConfirmation -> NavigationActionStatus(
+                    action.id,
+                    NavigationActionState.WAITING_FOR_CONFIRMATION,
+                    decision.reason,
+                )
+                is PolicyDecision.Denied -> NavigationActionStatus(
+                    action.id,
+                    NavigationActionState.REJECTED,
+                    decision.reason,
+                )
+            }
+            putNavigationStatus(status)
+        }
+        return NavigationProposal(action.id, decision)
+    }
+
+    fun bindNavigationPort(port: BrowserNavigationPort): Long {
+        navigationBindingSequence += 1
+        val generation = navigationBindingSequence
+        navigationBinding = BoundNavigationPort(generation, port)
+        return generation
+    }
+
+    fun unbindNavigationPort(generation: Long) {
+        if (navigationBinding?.generation == generation) navigationBinding = null
+    }
+
+    suspend fun navigationStatus(proposalId: String): NavigationActionStatus? = navigationMutex.withLock {
+        navigationStatuses[proposalId]
     }
 
     suspend fun propose(action: AgentAction, grantedPermissions: Set<String> = emptySet()): PolicyDecision {
@@ -75,17 +136,38 @@ class AgentBrowserRuntime(
     }
 
     suspend fun confirmPendingAction() {
+        val pending = dispatcherState.value.pendingAction
+        if (pending?.capabilityId == "browser.navigate") {
+            executeConfirmedNavigation(pending)
+            return
+        }
         dispatcher.dispatch(DispatcherEvent.ActionConfirmed)
         audit("hitl", "User confirmed pending action")
     }
 
     suspend fun rejectPendingAction() {
+        val pendingId = dispatcherState.value.pendingAction?.id
         dispatcher.dispatch(DispatcherEvent.ActionRejected)
+        pendingId?.let {
+            navigationMutex.withLock {
+                if (navigationStatuses.containsKey(it)) {
+                    putNavigationStatus(NavigationActionStatus(it, NavigationActionState.REJECTED, "Rejected by user"))
+                }
+            }
+        }
         audit("hitl", "User rejected pending action")
     }
 
     suspend fun userInteractionStarted() {
+        val pendingId = dispatcherState.value.pendingAction?.id
         dispatcher.dispatch(DispatcherEvent.UserInteractionStarted)
+        pendingId?.let {
+            navigationMutex.withLock {
+                if (navigationStatuses.containsKey(it)) {
+                    putNavigationStatus(NavigationActionStatus(it, NavigationActionState.REJECTED, "Preempted by user input"))
+                }
+            }
+        }
     }
 
     suspend fun userInteractionEnded() {
@@ -93,6 +175,79 @@ class AgentBrowserRuntime(
     }
 
     fun currentContextJson(): String = mutableContext.value?.let(json::encodeToString) ?: "{}"
+
+    private suspend fun executeConfirmedNavigation(action: AgentAction) {
+        val binding = navigationBinding
+        val url = action.arguments["url"]
+        if (binding == null || url == null) {
+            dispatcher.dispatch(DispatcherEvent.ActionFailed("No current WebView navigation binding"))
+            navigationMutex.withLock {
+                putNavigationStatus(
+                    NavigationActionStatus(action.id, NavigationActionState.NONE, "No current WebView navigation binding"),
+                )
+            }
+            return
+        }
+
+        dispatcher.dispatch(DispatcherEvent.ActionConfirmed)
+        val confirmedAt = now()
+        navigationMutex.withLock {
+            activeNavigation = ActiveNavigation(action.id, url, binding.generation, confirmedAt)
+            putNavigationStatus(
+                NavigationActionStatus(action.id, NavigationActionState.EXECUTING, "Confirmed and dispatched"),
+            )
+        }
+        audit("hitl", "User confirmed pending navigation", mapOf("proposalId" to action.id))
+
+        if (navigationBinding?.generation != binding.generation) {
+            failActiveNavigation(action.id, NavigationActionState.NONE, "WebView binding changed before dispatch")
+            return
+        }
+        try {
+            binding.port.loadUrl(url)
+        } catch (_: Throwable) {
+            failActiveNavigation(action.id, NavigationActionState.UNKNOWN, "Navigation dispatch failed; effect is unknown")
+        }
+    }
+
+    private suspend fun completeObservedNavigation(context: PageContext) {
+        val active = navigationMutex.withLock { activeNavigation } ?: return
+        if (context.capturedAtEpochMs < active.confirmedAtEpochMs) return
+        if (navigationBinding?.generation != active.bindingGeneration) {
+            failActiveNavigation(active.proposalId, NavigationActionState.UNKNOWN, "WebView binding changed after dispatch")
+            return
+        }
+        if (context.url == active.expectedUrl) {
+            navigationMutex.withLock {
+                activeNavigation = null
+                putNavigationStatus(
+                    NavigationActionStatus(active.proposalId, NavigationActionState.APPLIED, "Observed exact fresh URL"),
+                )
+            }
+            dispatcher.dispatch(DispatcherEvent.ActionCompleted)
+        } else {
+            failActiveNavigation(active.proposalId, NavigationActionState.UNKNOWN, "Observed a different fresh URL")
+        }
+    }
+
+    private suspend fun failActiveNavigation(
+        proposalId: String,
+        state: NavigationActionState,
+        reason: String,
+    ) {
+        navigationMutex.withLock {
+            if (activeNavigation?.proposalId == proposalId) activeNavigation = null
+            putNavigationStatus(NavigationActionStatus(proposalId, state, reason))
+        }
+        dispatcher.dispatch(DispatcherEvent.ActionFailed(reason))
+    }
+
+    private fun putNavigationStatus(status: NavigationActionStatus) {
+        navigationStatuses[status.proposalId] = status
+        while (navigationStatuses.size > MAX_NAVIGATION_STATUSES) {
+            navigationStatuses.remove(navigationStatuses.keys.first())
+        }
+    }
 
     private fun summarize(context: PageContext): String {
         val source = context.selection.ifBlank { context.markdown }
@@ -116,6 +271,7 @@ class AgentBrowserRuntime(
     private fun now(): Long = Clock.System.now().toEpochMilliseconds()
 
     companion object {
+        private const val MAX_NAVIGATION_STATUSES = 32
         fun defaultCapabilities() = CapabilityRegistry(
             listOf(
                 CapabilityDescriptor(
