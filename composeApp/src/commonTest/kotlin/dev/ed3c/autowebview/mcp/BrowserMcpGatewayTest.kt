@@ -3,6 +3,8 @@ package dev.ed3c.autowebview.mcp
 import dev.ed3c.autowebview.dispatcher.DispatcherMode
 import dev.ed3c.autowebview.domain.PageContext
 import dev.ed3c.autowebview.domain.InteractiveElement
+import dev.ed3c.autowebview.executor.BrowserScriptEvaluator
+import dev.ed3c.autowebview.executor.CurrentWebViewBrowserActionPlatform
 import dev.ed3c.autowebview.runtime.AgentBrowserRuntime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -109,6 +111,12 @@ class BrowserMcpGatewayTest {
     @Test
     fun typedFillProposalIsDiscoverableBoundedAndDoesNotEchoValue() = runTest {
         val runtime = AgentBrowserRuntime()
+        runtime.bindInteractionPlatform(
+            CurrentWebViewBrowserActionPlatform(
+                currentContext = { runtime.latestPageContext() },
+                evaluator = BrowserScriptEvaluator { error("proposal must not evaluate JavaScript") },
+            ),
+        )
         runtime.onPageContext(
             PageContext(
                 url = "https://app.example.test/form",
