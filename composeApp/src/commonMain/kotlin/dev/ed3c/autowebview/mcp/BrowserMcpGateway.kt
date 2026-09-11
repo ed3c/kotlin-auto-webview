@@ -1,6 +1,7 @@
 package dev.ed3c.autowebview.mcp
 
 import dev.ed3c.autowebview.capability.PolicyDecision
+import dev.ed3c.autowebview.executor.BrowserActionKind
 import dev.ed3c.autowebview.runtime.NavigationActionState
 import dev.ed3c.autowebview.runtime.AgentBrowserRuntime
 import kotlinx.serialization.json.Json
@@ -138,7 +139,7 @@ class BrowserMcpGateway(
             })
             add(buildJsonObject {
                 put("name", "browser_action_status")
-                put("description", "Read one bounded navigation proposal status")
+                put("description", "Read one bounded navigation or typed-action proposal status")
                 put("inputSchema", buildJsonObject {
                     put("type", "object")
                     putJsonObject("properties") {
@@ -178,6 +179,44 @@ class BrowserMcpGateway(
                     put("openWorldHint", true)
                 }
             })
+            add(buildJsonObject {
+                put("name", "browser_propose_action")
+                put("description", "Propose one typed action against an exact target in the current WebView")
+                put("inputSchema", buildJsonObject {
+                    put("type", "object")
+                    putJsonObject("properties") {
+                        putJsonObject("kind") {
+                            put("type", "string")
+                            put("enum", JsonArray(listOf(
+                                JsonPrimitive("click"),
+                                JsonPrimitive("fill_text"),
+                                JsonPrimitive("select_option"),
+                            )))
+                        }
+                        putJsonObject("targetFingerprint") {
+                            put("type", "string")
+                            put("pattern", "^[0-9a-f]{8,64}$")
+                        }
+                        putJsonObject("value") {
+                            put("type", "string")
+                            put("maxLength", 2_048)
+                        }
+                        putJsonObject("expectedUrl") {
+                            put("type", "string")
+                            put("format", "uri")
+                            put("pattern", "^https://")
+                            put("maxLength", MAX_URL_CHARS)
+                        }
+                    }
+                    put("required", JsonArray(listOf(JsonPrimitive("kind"), JsonPrimitive("targetFingerprint"))))
+                    put("additionalProperties", false)
+                })
+                putJsonObject("annotations") {
+                    put("readOnlyHint", false)
+                    put("destructiveHint", true)
+                    put("openWorldHint", true)
+                }
+            })
         }
     }
 
@@ -192,7 +231,7 @@ class BrowserMcpGateway(
                 val proposalId = arguments["proposalId"]?.asString()
                     ?: return error(id, INVALID_PARAMS, "proposalId is required")
                 require(proposalId.length <= 128) { "proposalId exceeds 128 characters" }
-                val status = runtime.navigationStatus(proposalId)
+                val status = runtime.actionStatus(proposalId)
                     ?: return error(id, RESOURCE_NOT_FOUND, "Action status not found")
                 toolTextResult(id, buildJsonObject {
                     put("proposalId", status.proposalId)
@@ -227,6 +266,44 @@ class BrowserMcpGateway(
                         NavigationActionState.EXECUTING.name
                     })
                     put("message", message)
+                }.toString(), isError = decision is PolicyDecision.Denied)
+            }
+            "browser_propose_action" -> {
+                require(arguments.keys.all { it in ACTION_ARGUMENT_KEYS }) {
+                    "browser_propose_action contains unsupported arguments"
+                }
+                val kind = when (arguments["kind"]?.asString()) {
+                    "click" -> BrowserActionKind.CLICK
+                    "fill_text" -> BrowserActionKind.FILL_TEXT
+                    "select_option" -> BrowserActionKind.SELECT_OPTION
+                    else -> return error(id, INVALID_PARAMS, "kind must be click, fill_text, or select_option")
+                }
+                val targetFingerprint = arguments["targetFingerprint"]?.asString()
+                    ?: return error(id, INVALID_PARAMS, "targetFingerprint is required")
+                val proposal = runtime.proposeInteraction(
+                    kind = kind,
+                    targetFingerprint = targetFingerprint,
+                    value = arguments["value"]?.asString(),
+                    expectedUrl = arguments["expectedUrl"]?.asString(),
+                )
+                val decision = proposal.decision
+                toolTextResult(id, buildJsonObject {
+                    put("proposalId", proposal.proposalId)
+                    put("state", if (decision is PolicyDecision.RequiresConfirmation) {
+                        NavigationActionState.WAITING_FOR_CONFIRMATION.name
+                    } else if (decision is PolicyDecision.Denied) {
+                        NavigationActionState.REJECTED.name
+                    } else {
+                        NavigationActionState.EXECUTING.name
+                    })
+                    put(
+                        "message",
+                        when (decision) {
+                            PolicyDecision.Allowed -> "Typed action accepted by policy"
+                            is PolicyDecision.RequiresConfirmation -> "Typed action awaits local user confirmation"
+                            is PolicyDecision.Denied -> "Typed action denied by policy"
+                        },
+                    )
                 }.toString(), isError = decision is PolicyDecision.Denied)
             }
             else -> error(id, METHOD_NOT_FOUND, "Unknown tool: $name")
@@ -282,6 +359,7 @@ class BrowserMcpGateway(
             NavigationActionState.UNKNOWN,
             NavigationActionState.REJECTED,
         )
+        private val ACTION_ARGUMENT_KEYS = setOf("kind", "targetFingerprint", "value", "expectedUrl")
         const val MODERN_PROTOCOL_VERSION = "2026-07-28"
         const val LEGACY_PROTOCOL_VERSION = "2025-11-25"
         const val CURRENT_PAGE_URI = "browser://current-page"

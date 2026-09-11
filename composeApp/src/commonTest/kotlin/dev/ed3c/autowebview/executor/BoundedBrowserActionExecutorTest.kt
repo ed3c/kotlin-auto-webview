@@ -271,6 +271,23 @@ class BoundedBrowserActionExecutorTest {
     }
 
     @Test
+    fun dispatchedClickRemainsNonTerminalUntilExternalObservation() = runTest {
+        val proposal = proposal(expectedUrl = "https://example.com/complete")
+        val platform = FakePlatform(
+            performResult = PlatformBrowserActionResult.DispatchedAwaitingObservation,
+        )
+
+        val result = BoundedBrowserActionExecutor(platform).execute(
+            proposal,
+            context(proposal = proposal),
+        )
+
+        assertIs<BrowserActionExecutionResult.AwaitingObservation>(result)
+        assertEquals("https://example.com/complete", platform.lastCommand?.expectedUrl)
+        assertEquals(BrowserExecutionState.AWAITING_OBSERVATION, result.trace.last().state)
+    }
+
+    @Test
     fun timeoutPreservesUnknownSideEffectStateAfterExecutionBegins() = runTest {
         val platform = FakePlatform(
             onPerform = {
@@ -341,6 +358,7 @@ class BoundedBrowserActionExecutorTest {
     private fun proposal(
         kind: BrowserActionKind = BrowserActionKind.CLICK,
         payload: BrowserActionPayload = ClickPayload,
+        expectedUrl: String? = null,
         maximumPageAgeMs: Long = 500,
         maximumConfirmationAgeMs: Long = 500,
         timeoutMs: Long = 5_000,
@@ -354,6 +372,7 @@ class BoundedBrowserActionExecutorTest {
         expectedAccessibleName = "Continue",
         kind = kind,
         payload = payload,
+        expectedUrl = expectedUrl,
         risk = ActionRisk.HIGH,
         createdAtEpochMs = 1_020,
         maximumPageAgeMs = maximumPageAgeMs,

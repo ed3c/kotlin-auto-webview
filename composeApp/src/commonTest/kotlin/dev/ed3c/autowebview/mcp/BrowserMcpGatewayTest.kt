@@ -2,6 +2,9 @@ package dev.ed3c.autowebview.mcp
 
 import dev.ed3c.autowebview.dispatcher.DispatcherMode
 import dev.ed3c.autowebview.domain.PageContext
+import dev.ed3c.autowebview.domain.InteractiveElement
+import dev.ed3c.autowebview.executor.BrowserScriptEvaluator
+import dev.ed3c.autowebview.executor.CurrentWebViewBrowserActionPlatform
 import dev.ed3c.autowebview.runtime.AgentBrowserRuntime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -40,6 +43,7 @@ class BrowserMcpGatewayTest {
             .jsonArray.map { it.jsonObject["name"]!!.jsonPrimitive.content }
 
         assertTrue("browser_action_status" in toolNames)
+        assertTrue("browser_propose_action" in toolNames)
         assertTrue("browser_action_status" !in resourceNames)
     }
 
@@ -102,5 +106,73 @@ class BrowserMcpGatewayTest {
 
         assertTrue("credentials are forbidden" in credential)
         assertTrue("control characters" in control)
+    }
+
+    @Test
+    fun typedFillProposalIsDiscoverableBoundedAndDoesNotEchoValue() = runTest {
+        val runtime = AgentBrowserRuntime()
+        runtime.bindInteractionPlatform(
+            CurrentWebViewBrowserActionPlatform(
+                currentContext = { runtime.currentContext.value },
+                evaluator = BrowserScriptEvaluator { error("proposal must not evaluate JavaScript") },
+            ),
+        )
+        runtime.onPageContext(
+            PageContext(
+                url = "https://app.example.test/form",
+                title = "Fixture",
+                markdown = "fixture",
+                capturedAtEpochMs = 1,
+                interactiveElements = listOf(
+                    InteractiveElement(
+                        fingerprint = "deadbeef",
+                        tag = "input",
+                        role = "textbox",
+                        accessibleName = "Name",
+                        inputType = "text",
+                    ),
+                ),
+            ),
+        )
+        val gateway = BrowserMcpGateway(runtime)
+        val response = gateway.handle(
+            """{"jsonrpc":"2.0","id":9,"method":"tools/call","params":{"name":"browser_propose_action","arguments":{"kind":"fill_text","targetFingerprint":"deadbeef","value":"private-value"}}}""",
+        )
+
+        assertTrue("WAITING_FOR_CONFIRMATION" in response)
+        assertTrue("private-value" !in response)
+        assertTrue(runtime.dispatcherState.value.pendingAction?.arguments?.values?.none { "private-value" in it } == true)
+    }
+
+    @Test
+    fun typedActionRejectsSelectorInjectionAndCrossOriginClick() = runTest {
+        val runtime = AgentBrowserRuntime()
+        runtime.onPageContext(
+            PageContext(
+                url = "https://app.example.test/form",
+                title = "Fixture",
+                markdown = "fixture",
+                capturedAtEpochMs = 1,
+                interactiveElements = listOf(
+                    InteractiveElement(
+                        fingerprint = "deadbeef",
+                        tag = "a",
+                        role = "link",
+                        accessibleName = "Next",
+                    ),
+                ),
+            ),
+        )
+        val gateway = BrowserMcpGateway(runtime)
+        val selector = gateway.handle(
+            """{"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"browser_propose_action","arguments":{"kind":"click","targetFingerprint":"deadbeef","expectedUrl":"https://app.example.test/next","selector":"#pay"}}}""",
+        )
+        val crossOrigin = gateway.handle(
+            """{"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"browser_propose_action","arguments":{"kind":"click","targetFingerprint":"deadbeef","expectedUrl":"https://other.example.test/next"}}}""",
+        )
+
+        assertTrue("unsupported arguments" in selector)
+        assertTrue("current HTTPS origin" in crossOrigin)
+        assertEquals(DispatcherMode.READY, runtime.dispatcherState.value.mode)
     }
 }
