@@ -1,8 +1,6 @@
 package dev.ed3c.autowebview.runtime
 
 import android.graphics.Bitmap
-import android.webkit.WebResourceRequest
-import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.test.core.app.ActivityScenario
@@ -10,7 +8,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ed3c.autowebview.MainActivity
 import dev.ed3c.autowebview.domain.PageContext
-import java.io.ByteArrayInputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.runBlocking
@@ -39,6 +36,7 @@ class McpWebViewNavigationInstrumentedTest {
     @Test
     fun confirmedMcpProposalReachesRealWebViewAndObservedUrlBecomesApplied() = runBlocking {
         val destination = "https://fixture.test/next"
+        val fixtureHtml = "<html><head><title>Fixture</title></head><body>applied</body></html>"
         val finished = CountDownLatch(1)
         var observedUrl: String? = null
 
@@ -46,16 +44,6 @@ class McpWebViewNavigationInstrumentedTest {
         scenario.onActivity { activity ->
             webView = WebView(activity)
             webView.webViewClient = object : WebViewClient() {
-                override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
-                    if (request.url.host != "fixture.test") return null
-                    val html = "<html><head><title>Fixture</title></head><body>applied</body></html>"
-                    return WebResourceResponse(
-                        "text/html",
-                        "utf-8",
-                        ByteArrayInputStream(html.encodeToByteArray()),
-                    )
-                }
-
                 override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
                     observedUrl = url
                 }
@@ -71,7 +59,7 @@ class McpWebViewNavigationInstrumentedTest {
         val runtime = AgentBrowserRuntime()
         runtime.bindNavigationPort(BrowserNavigationPort { url ->
             assertEquals(destination, url)
-            webView.loadUrl(url)
+            webView.loadDataWithBaseURL(url, fixtureHtml, "text/html", "utf-8", url)
         })
         val gateway = dev.ed3c.autowebview.mcp.BrowserMcpGateway(runtime)
         val proposalResponse = gateway.handle(
