@@ -93,6 +93,7 @@ jobs:
           xcrun swiftc \
             iosApp/iosApp/iosApp.swift \
             -parse-as-library \
+            -module-name KAWIOSApp \
             -sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
             -target arm64-apple-ios15.0-simulator \
             -F "$framework_dir" \
