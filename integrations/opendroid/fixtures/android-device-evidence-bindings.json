@@ -1,0 +1,72 @@
+{
+  "schema": "kotlin-auto-webview/android-device-evidence-bindings/v1",
+  "repository": "ed3c/kotlin-auto-webview",
+  "issue": 74,
+  "git_parent": {
+    "issue": 71,
+    "head": "aad95c059add01ff183bf4a24b1b7cf32802412e",
+    "tree": "a0e771bf3fa8150fc90e9cf5dfa2ee256b3081d8"
+  },
+  "source_convergence": {
+    "commit": "73026bcff70c20d4066eeee6574bd7f59602ad6d",
+    "tree": "089573924d060891d07ea76f5f9b8ba0307bb88e",
+    "relation": "process-convergence-snapshot",
+    "process_parents": [
+      {
+        "issue": 72,
+        "head": "bcb79473eaa6bb2e09f287462aa932a7fdab4957",
+        "tree": "9fe624d903c429940cd8de0bd05bdf66fd63e4a1",
+        "lane": "play-safe-android-adapter",
+        "selected_paths": [
+          "composeApp/src/androidMain/kotlin/dev/ed3c/autowebview/executor/webview/PlaySafeWebViewBrowserActionPlatform.kt",
+          "composeApp/src/androidMain/kotlin/dev/ed3c/autowebview/executor/webview/PlaySafeWebViewContracts.kt",
+          "composeApp/src/androidUnitTest/kotlin/dev/ed3c/autowebview/executor/webview/PlaySafeWebViewContractsTest.kt",
+          "docs/architecture/ADR-0031-play-safe-webview-actions.md"
+        ]
+      },
+      {
+        "issue": 73,
+        "head": "228a9f1e0a841f5baec6bf1e50fe67f42a757134",
+        "tree": "8264401f71abc3b947c6ed2ea94e322235d4a705",
+        "lane": "enterprise-android-adapter",
+        "selected_paths": [
+          "composeApp/src/androidEnterprise/kotlin/dev/ed3c/autowebview/device/accessibility/executor/EnterpriseAccessibilityRuntime.kt",
+          "composeApp/src/androidMain/kotlin/dev/ed3c/autowebview/device/executor/EnterpriseAccessibilityDispatchPolicy.kt",
+          "composeApp/src/androidUnitTest/kotlin/dev/ed3c/autowebview/device/executor/EnterpriseAccessibilityDispatchPolicyTest.kt",
+          "composeApp/src/enterprise/AndroidManifest.xml",
+          "composeApp/src/enterprise/assets/capability-profile.json",
+          "composeApp/src/enterprise/res/xml/accessibility_service_config.xml",
+          "docs/architecture/ADR-0030-enterprise-device-adapters.md"
+        ]
+      }
+    ]
+  },
+  "integrated_runtime": {
+    "issue": 70,
+    "head": "b70ea4544b56e4ec34b11a467808814913c27dc7",
+    "tree": "f110894117a38ab0ad7c4d5c65299d2ef8c0949b"
+  },
+  "runtime_env": {
+    "repository": "ed3c/runtime-env",
+    "issue": 62,
+    "head": "f844bbef3f4ff74151fa3caa87c4fe0a737090e8",
+    "tree": "5ee50e933bd754f421e65984043b9a195ab2f9a6",
+    "state": "RUNTIME_CONTRACT_COMPLETE"
+  },
+  "distribution": {
+    "play_safe_application_id": "dev.ed3c.autowebview",
+    "enterprise_application_id": "dev.ed3c.autowebview.enterprise",
+    "enterprise_accessibility_service": "dev.ed3c.autowebview.device.accessibility.executor.EnterpriseAccessibilityService",
+    "shizuku_operation": "NOT_IMPLEMENTED"
+  },
+  "emulator_api_allowlist": [24, 28, 33, 36],
+  "evidence_lanes": [
+    "L0_STATIC_CONTRACT",
+    "L1_LOCAL_DETERMINISTIC",
+    "L2_EMULATOR",
+    "L3_PHYSICAL_DEVICE",
+    "L4_PRIVILEGED_DEVICE",
+    "L5_STORE_POLICY",
+    "L6_HUMAN_ADMIT"
+  ]
+}

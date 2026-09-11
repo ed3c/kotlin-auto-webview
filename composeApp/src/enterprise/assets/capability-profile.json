@@ -14,9 +14,13 @@
     {
       "type": "activity",
       "name": "dev.ed3c.autowebview.MainActivity"
+    },
+    {
+      "type": "service",
+      "name": "dev.ed3c.autowebview.device.accessibility.executor.EnterpriseAccessibilityService"
     }
   ],
-  "allow_accessibility_service": false,
+  "allow_accessibility_service": true,
   "allow_shizuku": false,
   "allow_root_or_shell": false,
   "inbound_mobile_mcp": false,

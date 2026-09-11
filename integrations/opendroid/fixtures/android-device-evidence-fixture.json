@@ -1,0 +1,51 @@
+{
+  "schema": "kotlin-auto-webview/android-device-evidence-fixture/v1",
+  "id": "android-opendroid-bounded-fixture-v1",
+  "play_safe": {
+    "page_url": "https://app.example.test/page",
+    "owned_origin": "https://app.example.test",
+    "click_destination": "https://app.example.test/page#complete",
+    "scenarios": [
+      "exact-anchor-navigation",
+      "fill-with-input-and-change-events",
+      "select-with-change-event",
+      "duplicate-label-distinct-fingerprints",
+      "sensitive-field-denial",
+      "disabled-target-denial",
+      "shadow-root-not-traversed",
+      "iframe-not-traversed",
+      "target-token-expiry",
+      "pre-dispatch-cancellation"
+    ]
+  },
+  "enterprise": {
+    "application_id": "dev.ed3c.autowebview.enterprise",
+    "accessibility_service": "dev.ed3c.autowebview.device.accessibility.executor.EnterpriseAccessibilityService",
+    "emulator_claims": [
+      "service-declaration-present",
+      "bind-accessibility-service-permission-present",
+      "service-not-user-enabled-by-test",
+      "shizuku-operation-not-implemented"
+    ],
+    "human_only": [
+      "enable-accessibility-service",
+      "restricted-settings-approval",
+      "managed-package-selection",
+      "physical-device-trust",
+      "shizuku-grant"
+    ]
+  },
+  "privacy": {
+    "public_receipts_forbid": [
+      "raw-dom",
+      "raw-ui-text",
+      "screenshots",
+      "device-serial",
+      "target-token",
+      "fill-value",
+      "private-path",
+      "credential",
+      "private-endpoint"
+    ]
+  }
+}
