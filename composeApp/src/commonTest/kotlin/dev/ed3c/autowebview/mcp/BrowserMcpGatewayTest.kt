@@ -79,7 +79,7 @@ class BrowserMcpGatewayTest {
             """{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"browser_propose_navigation","arguments":{"url":"https://user:secret@example.com"}}}""",
         )
         val control = gateway.handle(
-            """{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"browser_propose_navigation","arguments":{"url":"https://example.com/\\u0000"}}}""",
+            """{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"browser_propose_navigation","arguments":{"url":"https://example.com/\u0000"}}}""",
         )
 
         assertTrue("credentials are forbidden" in credential)
