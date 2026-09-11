@@ -85,14 +85,26 @@ jobs:
           gradle-version: '8.11.1'
       - name: Build iOS app for simulator
         run: |
-          xcodebuild \
-            -project iosApp/iosApp.xcodeproj \
-            -scheme iosApp \
-            -configuration Debug \
-            -sdk iphonesimulator \
-            -derivedDataPath build/ios-simulator \
-            CODE_SIGNING_ALLOWED=NO \
-            build
+          set -euo pipefail
+          ./gradlew :composeApp:linkDebugFrameworkIosSimulatorArm64
+          app_path="build/ios-simulator/Build/Products/Debug-iphonesimulator/KotlinAutoWebView.app"
+          framework_dir="composeApp/build/bin/iosSimulatorArm64/debugFramework"
+          mkdir -p "$app_path"
+          xcrun swiftc \
+            iosApp/iosApp/iosApp.swift \
+            -parse-as-library \
+            -sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
+            -target arm64-apple-ios15.0-simulator \
+            -F "$framework_dir" \
+            -framework KotlinAutoWebView \
+            -o "$app_path/KotlinAutoWebView"
+          cp iosApp/iosApp/Info.plist "$app_path/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Add :CFBundleExecutable string KotlinAutoWebView' "$app_path/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Add :CFBundleIdentifier string dev.ed3c.autowebview.ios' "$app_path/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Add :CFBundleName string KotlinAutoWebView' "$app_path/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Add :CFBundlePackageType string APPL' "$app_path/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Add :CFBundleShortVersionString string 0.1.0' "$app_path/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Add :CFBundleVersion string 1' "$app_path/Info.plist"
       - name: Boot, install and launch iOS app
         run: |
           set -euo pipefail
