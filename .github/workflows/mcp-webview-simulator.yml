@@ -72,7 +72,7 @@ jobs:
 
   ios-simulator:
     name: iOS Simulator app build and launch
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
@@ -90,7 +90,7 @@ jobs:
           app_path="build/ios-simulator/Build/Products/Debug-iphonesimulator/KotlinAutoWebView.app"
           framework_dir="composeApp/build/bin/iosSimulatorArm64/debugFramework"
           mkdir -p "$app_path"
-          xcrun swiftc \
+          xcrun --sdk iphonesimulator swiftc \
             iosApp/iosApp/iosApp.swift \
             -parse-as-library \
             -module-name KAWIOSApp \
