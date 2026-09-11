@@ -5,9 +5,10 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.test.core.app.ApplicationProvider
+import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.ed3c.autowebview.MainActivity
 import dev.ed3c.autowebview.domain.PageContext
 import java.io.ByteArrayInputStream
 import java.util.concurrent.CountDownLatch
@@ -26,11 +27,13 @@ import kotlin.test.assertTrue
 @RunWith(AndroidJUnit4::class)
 class McpWebViewNavigationInstrumentedTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
+    private lateinit var scenario: ActivityScenario<MainActivity>
     private lateinit var webView: WebView
 
     @After
     fun destroyWebView() {
         if (::webView.isInitialized) instrumentation.runOnMainSync { webView.destroy() }
+        if (::scenario.isInitialized) scenario.close()
     }
 
     @Test
@@ -39,8 +42,9 @@ class McpWebViewNavigationInstrumentedTest {
         val finished = CountDownLatch(1)
         var observedUrl: String? = null
 
-        instrumentation.runOnMainSync {
-            webView = WebView(ApplicationProvider.getApplicationContext())
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        scenario.onActivity { activity ->
+            webView = WebView(activity)
             webView.webViewClient = object : WebViewClient() {
                 override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
                     if (request.url.host != "fixture.test") return null
@@ -61,6 +65,7 @@ class McpWebViewNavigationInstrumentedTest {
                     if (url == destination) finished.countDown()
                 }
             }
+            activity.setContentView(webView)
         }
 
         val runtime = AgentBrowserRuntime()
