@@ -113,7 +113,7 @@ class BrowserMcpGatewayTest {
         val runtime = AgentBrowserRuntime()
         runtime.bindInteractionPlatform(
             CurrentWebViewBrowserActionPlatform(
-                currentContext = { runtime.latestPageContext() },
+                currentContext = { runtime.currentContext.value },
                 evaluator = BrowserScriptEvaluator { error("proposal must not evaluate JavaScript") },
             ),
         )
